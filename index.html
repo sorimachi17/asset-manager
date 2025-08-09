@@ -206,6 +206,7 @@ function parseCSV(text){
     Account: (r.Account||'').trim()
   })).filter(r=>r.Date);
   buildIndexes();
+  localStorage.setItem('assetManagerData', JSON.stringify(RAW));
   onDataReady();
   $("exportCsv").disabled = RAW.length===0;
 }
@@ -472,6 +473,21 @@ function onDataReady(){
   buildHeat();
   runCompare();
 }
+
+function loadSaved(){
+  const saved = localStorage.getItem('assetManagerData');
+  if(!saved) return;
+  try{
+    RAW = JSON.parse(saved);
+    buildIndexes();
+    onDataReady();
+    $("exportCsv").disabled = RAW.length===0;
+  }catch(e){
+    console.error('failed to load saved data', e);
+  }
+}
+
+loadSaved();
 
 $("file").addEventListener('change', e=>{
   const file = e.target.files[0];
