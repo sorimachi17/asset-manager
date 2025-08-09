@@ -475,11 +475,9 @@ function renderCalendarDetail(){
     .filter(r => r.Amount !== 0)
     .sort((a,b)=>a.Name.localeCompare(b.Name));
   const detailLines = rows.map(r=>{
-    let prevAmt = null;
-    for(let i=idx-1; i>=0 && prevAmt===null; i--){
-      const pr = (byDate.get(DATES[i])||[]).find(x=>x.Name===r.Name);
-      if(pr) prevAmt = pr.Amount;
-    }
+    const prevAmt = prev
+      ? ((byDate.get(prev) || []).find(x=>x.Name === r.Name)?.Amount || 0)
+      : null;
     const diff = prevAmt===null ? null : r.Amount - prevAmt;
     const diffStr = diff===null ? '—' : ((diff>=0?'+':'')+yen(diff));
     const diffColor = diff===null ? 'var(--muted)' : (diff>=0 ? '#22c55e' : '#ef4444');
