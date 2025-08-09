@@ -398,7 +398,7 @@ function drawStack(){
     type:'line',
     data:{ labels, datasets },
     options:{
-      responsive:true, maintainAspectRatio:false, parsing:false,
+      responsive:true, maintainAspectRatio:false,
       animation:{duration:500}, interaction:{ mode:'index', intersect:false },
       scales:{
         y:{ ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } },
