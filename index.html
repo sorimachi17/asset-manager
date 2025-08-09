@@ -63,15 +63,17 @@
     <div class="card">
       <div class="muted">前日比 <span id="dodBase"></span></div>
       <div class="big" id="dod">—</div>
+      <div class="muted" id="dodTotal"></div>
     </div>
     <div class="card">
       <div class="muted">月間増減 <span id="momBase"></span></div>
       <div class="big" id="mom">—</div>
+      <div class="muted" id="momTotal"></div>
     </div>
   </section>
 
   <section class="panel">
-    <h2>① 比率ビュー（分類/通貨/銘柄/口座） — 金額と構成比</h2>
+    <h2>資産分類 <span class="muted" id="pieDateLabel"></span></h2>
     <div class="toolbar" style="margin-bottom:8px;">
       <label>区分:
         <select id="pieDimension">
@@ -88,7 +90,7 @@
   </section>
 
   <section class="panel">
-    <h2>② 推移ビュー（同一分類の積み上げ）</h2>
+    <h2>日別推移</h2>
     <div class="toolbar" style="margin-bottom:8px;">
       <label>区分:
         <select id="stackDimension">
@@ -98,6 +100,10 @@
           <option value="StockType">StockType（区分）</option>
           <option value="Account">Account（口座）</option>
         </select>
+      </label>
+      <label>期間:
+        <input type="date" id="stackStart"/>～
+        <input type="date" id="stackEnd"/>
       </label>
     </div>
     <canvas id="stackChart" height="280"></canvas>
@@ -199,12 +205,16 @@ function refreshKPIs(){
   // 前日比（最も近い直前の記録日）
   const prevDate = computeClosestPrev(curDate);
   $("dodBase").textContent = prevDate ? `基準: ${prevDate}` : '';
-  $("dod").textContent     = prevDate ? ((curVal - sumAt(prevDate) >= 0 ? '+' : '') + yen(curVal - sumAt(prevDate))) : '—';
+  const prevVal = prevDate ? sumAt(prevDate) : 0;
+  $("dod").textContent     = prevDate ? ((curVal - prevVal >= 0 ? '+' : '') + yen(curVal - prevVal)) : '—';
+  $("dodTotal").textContent = prevDate ? `総額: ${yen(prevVal)}` : '';
 
   // 月間増減（1ヶ月前に最も近い前の記録）
   const monthBase = computeMonthBase(curDate);
   $("momBase").textContent = monthBase ? `基準: ${monthBase}` : '基準: —';
-  $("mom").textContent     = monthBase ? ((curVal - sumAt(monthBase) >= 0 ? '+' : '') + yen(curVal - sumAt(monthBase))) : '—';
+  const monthVal = monthBase ? sumAt(monthBase) : 0;
+  $("mom").textContent     = monthBase ? ((curVal - monthVal >= 0 ? '+' : '') + yen(curVal - monthVal)) : '—';
+  $("momTotal").textContent = monthBase ? `総額: ${yen(monthVal)}` : '';
 }
 
 // --- Pie (比率) ---
@@ -214,6 +224,8 @@ function drawPie(){
   const picker = $("totalDate").value || DATES.at(-1);
   const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
   const dim = $("pieDimension").value;
+
+  $("pieDateLabel").textContent = `（${selDate} 時点）`;
 
   const rows = byDate.get(selDate) || [];
   const bucket = new Map();
@@ -237,17 +249,20 @@ function drawPie(){
     }
   });
 
-  $("pieLegend").innerHTML = labels.map((k,i)=>`<span>${k}: ${yen(data[i])}（${pct(data[i], total)}）</span>`).join('');
+  const colors = pieChart.data.datasets[0].backgroundColor;
+  $("pieLegend").innerHTML = labels.map((k,i)=>`<span><span style="display:inline-block;width:10px;height:10px;background:${colors[i]};border-radius:2px;margin-right:4px;"></span>${k}</span>`).join('');
 }
 
-// --- Stacked (推移) ---
+// --- Trend (日別推移) ---
 let stackChart;
 function drawStack(){
   if(!DATES.length) return;
   const dim = $("stackDimension").value;
+  const start = $("stackStart").value;
+  const end   = $("stackEnd").value;
 
-  // データがある日だけ（= DATES）
-  const labels = [...DATES]; // 既に記録日のみ
+  // 範囲内の記録日のみ
+  const labels = DATES.filter(d => (!start || d >= start) && (!end || d <= end));
   // 各日ごとに dim で集計して全カテゴリ集合を作る
   const catSet = new Set();
   for(const d of labels){
@@ -263,11 +278,11 @@ function drawStack(){
 
   if(stackChart) stackChart.destroy();
   stackChart = new Chart($("stackChart"), {
-    type:'bar',
-    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i], stack:'s'})) },
+    type:'line',
+    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i]})) },
     options:{
       responsive:true,
-      scales:{ x:{ stacked:true }, y:{ stacked:true, ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
+      scales:{ x:{ }, y:{ ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
       plugins:{ legend:{ position:'bottom' } }
     }
   });
@@ -330,6 +345,8 @@ function exportCsv(){
 // --- lifecycle ---
 function onDataReady(){
   $("totalDate").value = DATES.at(-1) || '';
+  $("stackStart").value = DATES[0] || '';
+  $("stackEnd").value   = DATES.at(-1) || '';
   refreshKPIs();
   drawPie();
   drawStack();
@@ -354,6 +371,8 @@ $("totalDate").addEventListener('change', ()=>{
 
 $("pieDimension").addEventListener('change', drawPie);
 $("stackDimension").addEventListener('change', drawStack);
+$("stackStart").addEventListener('change', drawStack);
+$("stackEnd").addEventListener('change', drawStack);
 </script>
 </body>
 </html>
