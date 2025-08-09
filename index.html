@@ -3,12 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>資産管理アプリ</title>
-  <!-- libs -->
+  <title>資産管理アプリ（リライト版）</title>
+
+  <!-- 必要ライブラリ（※ date adapter は入れない） -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+  <script>dayjs.extend(dayjs_plugin_customParseFormat);</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
     :root{--bg:#0b0d12;--fg:#e8ecf1;--muted:#9aa4b2;--card:#131722;--line:#1e2430;}
     *{box-sizing:border-box}
@@ -17,7 +20,7 @@
     .wrap{max-width:1100px;margin:0 auto;padding:16px}
     h1{margin:0 0 8px 0;font-size:20px}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    input[type="file"]{padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+    input[type="file"]{padding:8px;background:#0e121a;border:1px solid var(--line);border-radius:10px}
     button{background:#1a5fff;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
     button:disabled{opacity:.5;cursor:not-allowed}
     .muted{color:var(--muted);font-size:12px}
@@ -33,13 +36,10 @@
     .grid{display:grid;grid-template-columns:repeat(14,12px);gap:3px}
     .cell{width:12px;height:12px;border-radius:2px;background:#0f1420;border:1px solid #0f1420}
     .lv1{background:#123}.lv2{background:#17314e}.lv3{background:#1f4b7a}.lv4{background:#2b6aa8}.lv5{background:#3d8ed6}
-    .heat-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .heat-legend{display:flex;gap:4px;align-items:center}
-    .heat-legend div{width:12px;height:12px;border-radius:2px}
+    #msg{padding:8px 12px;border:1px solid #654;border-radius:10px;background:#241a1a;color:#ffd7d7;display:none;margin-top:8px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
     th:first-child,td:first-child{text-align:left}
-    #msg{padding:8px 12px;border:1px solid #654;border-radius:10px;background:#241a1a;color:#ffd7d7;display:none}
     @media (max-width:920px){.kpi{grid-template-columns:1fr}}
   </style>
 </head>
@@ -49,7 +49,7 @@
     <h1>資産管理アプリ</h1>
     <div class="toolbar">
       <input id="file" type="file" accept=".csv" />
-      <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
+      <span class="muted">CSVを選択してください</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
     </div>
     <div id="msg"></div>
@@ -114,13 +114,13 @@
       </label>
     </div>
     <canvas id="stackChart" height="280"></canvas>
-    <div class="muted">※ データが無い日は表示しません</div>
+    <div class="muted">※ timeアダプタは使っていません（category軸）</div>
   </section>
 
   <section class="panel">
-    <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
+    <h2>カレンダー（草グラフ）— 日次の純増減</h2>
     <div class="muted" id="heatLatest">—</div>
-    <div class="heat-wrap" style="margin-top:8px;">
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
       <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
       <div class="heat-legend">
         <span class="muted">少</span>
@@ -133,8 +133,8 @@
   <section class="panel">
     <h2>2日比較</h2>
     <div class="toolbar" style="margin-bottom:8px;">
-      <label>A日: <input type="date" id="cmpA"/></label>
-      <label>B日: <input type="date" id="cmpB"/></label>
+      <label>A日:<input type="date" id="cmpA"/></label>
+      <label>B日:<input type="date" id="cmpB"/></label>
       <label>区分:
         <select id="cmpDim">
           <option value="AssetClass">AssetClass（資産分類）</option>
@@ -147,389 +147,344 @@
       <button id="cmpRun">比較する</button>
     </div>
     <table>
-      <thead>
-        <tr><th>キー</th><th>A日</th><th>B日</th><th>差額</th><th>差分%</th></tr>
-      </thead>
+      <thead><tr><th>キー</th><th>A日</th><th>B日</th><th>差額</th><th>差分%</th></tr></thead>
       <tbody id="cmpBody"></tbody>
     </table>
   </section>
 </main>
 
 <script>
-dayjs.extend(dayjs_plugin_customParseFormat);
-
-// --- state ---
-let RAW = [];            // 元データ（行）
-let DATES = [];          // 記録がある日
-const byDate = new Map();// date -> rows
-
-// --- helpers ---
+/* =========================
+   共有ユーティリティ
+========================= */
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
-const pct = (v, t) => (t ? (v/t*100) : 0).toFixed(1) + '%';
-const showMsg = (t) => { const m=$("msg"); m.style.display='block'; m.textContent=t; };
+const pct = (v,t) => (t ? (v/t*100) : 0).toFixed(1) + '%';
+const showMsg = t => { const m=$("msg"); m.style.display='block'; m.textContent=t; };
 const hideMsg = () => { const m=$("msg"); m.style.display='none'; m.textContent=''; };
 
 function normalizeDate(v){
   if(!v) return '';
   v = String(v).trim();
-  // 2025年8月9日 / 2025/8/9 / 2025-08-09
   if(/年|月|日/.test(v)){
-    return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD');
+    // 2025年8月9日 → 2025-08-09
+    const s=v.replace(/[年月]/g,'-').replace('日','');
+    return dayjs(s, ['YYYY-M-D','YYYY-MM-DD']).isValid() ? dayjs(s).format('YYYY-MM-DD') : '';
   }
-  return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).isValid()
-    ? dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD')
-    : '';
+  const fmts=['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD','MM/DD/YYYY','M/D/YYYY'];
+  const d = dayjs(v, fmts, true);
+  return d.isValid() ? d.format('YYYY-MM-DD') : '';
+}
+function isNumLike(x){
+  const s=String(x??'').trim().replace(/,/g,'');
+  return /^-?\d+(\.\d+)?$/.test(s);
 }
 
-// ---- header mapping (ゆるめ) ----
+/* =========================
+   状態
+========================= */
+let RAW=[];           // 正規化後の行
+let DATES=[];         // 記録日一覧
+const byDate=new Map();// date -> rows
+
+/* =========================
+   CSV読み込み（文字コード自動判定＋ヘッダ自動推定）
+========================= */
 const HEADER_MAP = {
-  Date:      ['date','日付','評価日','日時'],
-  Name:      ['name','銘柄','資産名','名称'],
-  Amount:    ['amount','金額','評価額','評価額(円)','時価','残高'],
-  AssetClass:['assetclass','資産分類','アセットクラス','分類'],
+  Date:      ['date','日付','評価日','日時','date_'],
+  Name:      ['name','銘柄','資産名','名称','product','security'],
+  Amount:    ['amount','金額','評価額','評価額(円)','時価','残高','value','valuation'],
+  AssetClass:['assetclass','資産分類','アセットクラス','分類','class'],
   Currency:  ['currency','通貨','ccy'],
-  StockType: ['stocktype','区分','タイプ','種別'],
+  StockType: ['stocktype','区分','タイプ','種別','type'],
   Account:   ['account','口座','アカウント']
 };
-function normalizeKey(s){
-  return String(s||'').replace(/^\uFEFF/, '').toLowerCase().replace(/\s+/g,'').trim();
-}
-function buildKeyResolver(sampleRow){
-  const keys = Object.keys(sampleRow||{});
-  const normKeys = keys.map(k=>normalizeKey(k));
+function normKey(s){ return String(s||'').replace(/^\uFEFF/,'').toLowerCase().replace(/\s+/g,'').trim(); }
 
-  const resolve = {};
-  for(const std of Object.keys(HEADER_MAP)){
-    const cands = HEADER_MAP[std];
-    let idx = -1;
-    for(const c of cands){
-      const i = normKeys.indexOf(c);
-      if(i>=0){ idx=i; break; }
+function resolveHeaders(rows){
+  if(!rows.length) throw new Error('CSVにデータがありません。');
+  const keys = Object.keys(rows[0]);
+  const nk = keys.map(normKey);
+  const pick = want=>{
+    for(const cand of HEADER_MAP[want]){ const i=nk.indexOf(cand); if(i>=0) return keys[i]; }
+    return null;
+  };
+  const res = {
+    Date: pick('Date'),
+    Name: pick('Name'),
+    Amount: pick('Amount'),
+    AssetClass: pick('AssetClass'),
+    Currency: pick('Currency'),
+    StockType: pick('StockType'),
+    Account: pick('Account')
+  };
+
+  // 不足があれば中身から推定（上位50行で判定）
+  const sample = rows.slice(0, Math.min(50, rows.length));
+  if(!res.Date){
+    // 最も「日付っぽい値が多い」列
+    let best=null,bestScore=-1;
+    for(const k of keys){
+      let sc=0; for(const r of sample){ if(normalizeDate(r[k])) sc++; }
+      if(sc>bestScore){ best=k; bestScore=sc; }
     }
-    if(idx>=0) resolve[std] = keys[idx];
+    if(bestScore>0) res.Date=best;
   }
-  return resolve;
+  if(!res.Amount){
+    // 数値っぽい比率が最大の列
+    let best=null,bestScore=-1;
+    for(const k of keys){
+      let sc=0; for(const r of sample){
+        const s=String(r[k]??'').replace(/[^\d\.\-\,]/g,''); if(isNumLike(s)) sc++;
+      }
+      if(sc>bestScore){ best=k; bestScore=sc; }
+    }
+    res.Amount=best;
+  }
+  if(!res.Name){
+    // 文字列優勢で、Date/Amount でない列
+    const ignore=new Set([res.Date,res.Amount]);
+    let best=null,bestScore=-1;
+    for(const k of keys){
+      if(ignore.has(k)) continue;
+      let sc=0; for(const r of sample){ const v=r[k]; if(v && !isNumLike(v) && normalizeDate(v)==='') sc++; }
+      if(sc>bestScore){ best=k; bestScore=sc; }
+    }
+    res.Name=best || keys[0];
+  }
+  if(!res.Date || !res.Amount){ throw new Error('日付または金額の列を特定できませんでした。ヘッダ名を見直すか、先頭行を教えてください。'); }
+  return res;
 }
 
-// --- parse ---
-function parseCSVText(text){
+async function readCSVFile(file){
+  // UTF-8 → Shift_JIS フォールバック
+  const buf = await file.arrayBuffer();
+  const tryDec = enc => { try{ return new TextDecoder(enc).decode(buf); }catch{return null;} };
+  let text = tryDec('utf-8');
+  if(!text || (text.split('\uFFFD').length-1)>5){ text = tryDec('shift_jis') || tryDec('ms932'); }
+  if(!text) throw new Error('文字コードの判定に失敗しました（UTF-8/Shift_JIS を推奨）');
+
   const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-  if(parsed.errors && parsed.errors.length){
-    console.warn(parsed.errors);
-  }
-  if(!parsed.data || parsed.data.length===0){
-    throw new Error('CSVにデータがありません。');
-  }
-  // ヘッダ名の解決
-  const resolver = buildKeyResolver(parsed.data[0]);
-  const need = ['Date','Name','Amount'];
-  const missing = need.filter(k=>!resolver[k]);
-  if(missing.length){
-    // それでも無ければ列名を推測してみる（先頭3列を Date/Name/Amount と仮置き）
-    const first = parsed.data[0];
-    const cols = Object.keys(first);
-    if(cols.length>=3){
-      resolver.Date   = resolver.Date   || cols[0];
-      resolver.Name   = resolver.Name   || cols[1];
-      resolver.Amount = resolver.Amount || cols[2];
-    }
-  }
+  if(parsed.errors && parsed.errors.length){ console.warn(parsed.errors); }
+  if(!parsed.data || parsed.data.length===0) throw new Error('CSVが空です。');
 
-  const rows = parsed.data.map(r => {
-    const get = k => r[resolver[k]] ?? r[k] ?? '';
-    const amt = Number(String(get('Amount')).replace(/,/g,'').replace(/[^\d.-]/g,'')) || 0;
+  const res = resolveHeaders(parsed.data);
+  const rows = parsed.data.map(r=>{
+    const amt = Number(String(r[res.Amount]??'').replace(/,/g,'').replace(/[^\d.-]/g,''))||0;
     return {
-      Date: normalizeDate(get('Date')),
-      Name: String(get('Name')||'').trim(),
+      Date: normalizeDate(r[res.Date]),
+      Name: String(r[res.Name]??'').trim(),
       Amount: amt,
-      AssetClass: String(get('AssetClass')||'').trim(),
-      Currency: String(get('Currency')||'').trim(),
-      StockType: String(get('StockType')||'').trim(),
-      Account: String(get('Account')||'').trim()
+      AssetClass: String(r[res.AssetClass]??'').trim(),
+      Currency: String(r[res.Currency]??'').trim(),
+      StockType: String(r[res.StockType]??'').trim(),
+      Account: String(r[res.Account]??'').trim()
     };
   }).filter(r=>r.Date);
 
-  if(rows.length===0){
-    throw new Error('日付列が解釈できず、1行も読み込めませんでした（ヘッダ名や日付形式を確認してください）。');
-  }
+  if(rows.length===0) throw new Error('1行も日付が解釈できませんでした。日付形式を確認してください。');
+
   RAW = rows;
   buildIndexes();
-  onDataReady();
-  $("exportCsv").disabled = RAW.length===0;
 }
 
-async function parseCSVFile(file){
-  // UTF-8 → Shift_JIS フォールバック
-  const buf = await file.arrayBuffer();
-  const tryDecode = enc => {
-    try { return new TextDecoder(enc).decode(buf); } catch { return null; }
-  };
-  let text = tryDecode('utf-8');
-  const bad = (text||'').split('\uFFFD').length - 1; // replacement char count
-  if(text===null || bad > 5){ // ざっくり判定
-    const sjis = tryDecode('shift_jis') || tryDecode('ms932');
-    if(sjis) text = sjis;
-  }
-  if(!text) throw new Error('文字コードの判定に失敗しました。UTF-8 か Shift_JIS で保存してください。');
-  parseCSVText(text);
-}
-
-// --- indexes ---
+/* =========================
+   インデックスと集計
+========================= */
 function buildIndexes(){
-  byDate.clear(); DATES = [];
+  byDate.clear(); DATES=[];
   for(const r of RAW){
     if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
     byDate.get(r.Date).push(r);
   }
   DATES.sort();
 }
-
-function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
-function computeClosestPrev(date){
-  const idx = DATES.indexOf(date);
-  return (idx>0) ? DATES[idx-1] : null;
-}
-function nearestOnOrBefore(target){
-  if(!target || !DATES.length) return null;
-  for(let i = DATES.length-1; i >= 0; i--){
-    if(DATES[i] <= target) return DATES[i];
-  }
+function sumAt(d){ return (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0); }
+function closestPrev(d){ const i=DATES.indexOf(d); return i>0 ? DATES[i-1] : null; }
+function nearestOnOrBefore(t){
+  if(!t || !DATES.length) return null;
+  for(let i=DATES.length-1;i>=0;i--){ if(DATES[i]<=t) return DATES[i]; }
   return null;
 }
-function computeMonthBase(curDate){
-  const target = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD');
+function monthBase(d){
+  const target = dayjs(d).subtract(1,'month').format('YYYY-MM-DD');
   return nearestOnOrBefore(target);
 }
 
-// --- KPIs ---
+/* =========================
+   画面描画
+========================= */
 function refreshKPIs(){
   if(!DATES.length){
-    $("kpiDateLabel").textContent=''; $("totalValue").textContent='—';
-    $("dod").textContent='—'; $("mom").textContent='—';
-    $("dodBase").textContent=''; $("dodTotal").textContent='';
-    $("momBase").textContent=''; $("momTotal").textContent='';
+    ["kpiDateLabel","totalValue","dod","mom","dodBase","dodTotal","momBase","momTotal"].forEach(id=>$(id).textContent='—');
     return;
   }
-  const picker = $("totalDate").value || DATES.at(-1);
-  const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
-  const curVal  = sumAt(curDate);
+  const pick=$("totalDate").value || DATES.at(-1);
+  const cur = nearestOnOrBefore(pick) || DATES.at(-1);
+  const curVal = sumAt(cur);
+  $("kpiDateLabel").textContent=`（${cur} 時点）`;
+  $("totalValue").textContent=yen(curVal);
 
-  $("kpiDateLabel").textContent = `（${curDate} 時点）`;
-  $("totalValue").textContent   = yen(curVal);
+  const prev=closestPrev(cur);
+  $("dodBase").textContent = prev ? `基準: ${prev}` : '';
+  const pv = prev? sumAt(prev):0;
+  $("dod").textContent = prev ? ((curVal-pv>=0?'+':'')+yen(curVal-pv)) : '—';
+  $("dodTotal").textContent = prev ? `総額: ${yen(pv)}` : '';
 
-  const prevDate = computeClosestPrev(curDate);
-  $("dodBase").textContent = prevDate ? `基準: ${prevDate}` : '';
-  const prevVal = prevDate ? sumAt(prevDate) : 0;
-  $("dod").textContent     = prevDate ? ((curVal - prevVal >= 0 ? '+' : '') + yen(curVal - prevVal)) : '—';
-  $("dodTotal").textContent = prevDate ? `総額: ${yen(prevVal)}` : '';
-
-  const monthBase = computeMonthBase(curDate);
-  $("momBase").textContent = monthBase ? `基準: ${monthBase}` : '基準: —';
-  const monthVal = monthBase ? sumAt(monthBase) : 0;
-  $("mom").textContent     = monthBase ? ((curVal - monthVal >= 0 ? '+' : '') + yen(curVal - monthVal)) : '—';
-  $("momTotal").textContent = monthBase ? `総額: ${yen(monthVal)}` : '';
+  const mb = monthBase(cur);
+  $("momBase").textContent = mb ? `基準: ${mb}` : '基準: —';
+  const mv = mb? sumAt(mb):0;
+  $("mom").textContent = mb ? ((curVal-mv>=0?'+':'')+yen(curVal-mv)) : '—';
+  $("momTotal").textContent = mb ? `総額: ${yen(mv)}` : '';
 }
 
-// --- Pie ---
+// Pie
 let pieChart;
 function drawPie(){
   if(!DATES.length) return;
-  const picker = $("totalDate").value || DATES.at(-1);
-  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  const pick=$("totalDate").value || DATES.at(-1);
+  const d = nearestOnOrBefore(pick) || DATES.at(-1);
   const dim = $("pieDimension").value;
+  $("pieDateLabel").textContent=`（${d} 時点）`;
 
-  $("pieDateLabel").textContent = `（${selDate} 時点）`;
-  const rows = byDate.get(selDate) || [];
-  const bucket = new Map();
-  let total = 0;
-  for(const r of rows){
-    const k = r[dim] || '(blank)';
-    bucket.set(k, (bucket.get(k)||0) + r.Amount);
-    total += r.Amount;
-  }
-  const labels = [...bucket.keys()];
-  const data   = [...bucket.values()];
+  const rows = byDate.get(d)||[];
+  const map = new Map(); let total=0;
+  rows.forEach(r=>{ const k=r[dim]||'(blank)'; map.set(k,(map.get(k)||0)+r.Amount); total+=r.Amount; });
+  const labels=[...map.keys()], data=[...map.values()];
 
   if(pieChart) pieChart.destroy();
-  pieChart = new Chart($("pieChart"), {
+  pieChart = new Chart($("pieChart"),{
     type:'doughnut',
     data:{labels, datasets:[{data}]},
-    options:{
-      plugins:{legend:{display:false}, tooltip:{callbacks:{
-        label: ctx => `${ctx.label}: ${yen(ctx.parsed)}（${pct(ctx.parsed, total)}）`
-      }}}
-    }
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{
+      label:ctx=>`${ctx.label}: ${yen(ctx.parsed)}（${pct(ctx.parsed,total)}）`
+    }}}}
   });
 
   const colors = pieChart.data.datasets[0].backgroundColor;
   $("pieLegend").innerHTML = labels.map((k,i)=>`<span><span style="display:inline-block;width:10px;height:10px;background:${colors[i]};border-radius:2px;margin-right:4px;"></span>${k}</span>`).join('');
 }
 
-// --- Trend ---
+// Trend (category axis)
 let stackChart;
 function drawStack(){
   if(!DATES.length) return;
-  const dim = $("stackDimension").value;
-  const start = $("stackStart").value;
-  const end   = $("stackEnd").value;
+  const dim=$("stackDimension").value;
+  const s=$("stackStart").value, e=$("stackEnd").value;
+  const labels = DATES.filter(d=>(!s||d>=s)&&(!e||d<=e));
 
-  const labels = DATES.filter(d => (!start || d >= start) && (!end || d <= end));
-  const catSet = new Set();
-  for(const d of labels){
-    for(const r of (byDate.get(d)||[])){
-      catSet.add(r[dim] || '(blank)');
-    }
-  }
-  const cats = [...catSet];
-  const series = cats.map(c => labels.map(d=>{
-    const sum = (byDate.get(d)||[]).filter(r => (r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0);
-    return sum;
+  const catSet=new Set();
+  labels.forEach(d=> (byDate.get(d)||[]).forEach(r=> catSet.add(r[dim]||'(blank)')));
+  const cats=[...catSet];
+  const series=cats.map(c=> labels.map(d=>{
+    return (byDate.get(d)||[]).filter(r=>(r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0);
   }));
+  const totals = labels.map(d=> (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0));
 
-  const totalSeries = labels.map(d => (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0));
-  const datasets = [
-    { label:'合計', data:totalSeries, borderColor:'#fff', borderWidth:4, order:cats.length+1 },
-    ...cats.map((c,i)=>({ label:c, data:series[i], borderWidth:1.5 }))
+  const datasets=[
+    {label:'合計',data:totals,borderColor:'#fff',borderWidth:4,order:cats.length+1},
+    ...cats.map((c,i)=>({label:c,data:series[i],borderWidth:1.5}))
   ];
 
   if(stackChart) stackChart.destroy();
-  stackChart = new Chart($("stackChart"), {
+  stackChart = new Chart($("stackChart"),{
     type:'line',
-    data:{ labels, datasets },
+    data:{labels,datasets},
     options:{
-      responsive:true, maintainAspectRatio:false,
-      animation:{duration:500}, interaction:{ mode:'index', intersect:false },
+      responsive:true, maintainAspectRatio:false, parsing:false,
+      interaction:{mode:'index',intersect:false},
+      elements:{point:{radius:0,hoverRadius:0}, line:{tension:0.35}},
       scales:{
-        y:{ ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } },
-        x:{ type:'category', ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } }
+        y:{ticks:{callback:v=>yen(v)+'円',color:'#e8ecf1'},grid:{color:'rgba(255,255,255,0.12)'}},
+        x:{type:'category',ticks:{maxRotation:45,minRotation:35,color:'#e8ecf1'},grid:{color:'rgba(255,255,255,0.12)'}}
       },
-      plugins:{
-        legend:{ position:'bottom', labels:{ usePointStyle:true, pointStyle:'line', color:'#e8ecf1' } },
-        tooltip:{ mode:'index', intersect:false, displayColors:true,
-          callbacks:{ label: ctx => `${ctx.dataset.label}: ${yen(ctx.parsed.y)}円` }, bodyColor:'#e8ecf1', titleColor:'#e8ecf1' }
-      },
-      elements:{ point:{ radius:0, hoverRadius:0 }, line:{ tension:0.35 } }
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'line',color:'#e8ecf1'}},
+               tooltip:{mode:'index',intersect:false,displayColors:true,
+                 callbacks:{label:ctx=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}円`},
+                 bodyColor:'#e8ecf1',titleColor:'#e8ecf1'}}
     }
   });
 }
 
-// --- Heatmap ---
+// Heat (delta)
 function buildHeat(){
-  const box = $("heatmap");
-  box.innerHTML = '';
-  if(DATES.length===0){ $("heatLatest").textContent='—'; return; }
-
-  const deltas = [];
+  const box=$("heatmap"); box.innerHTML='';
+  if(!DATES.length){ $("heatLatest").textContent='—'; return; }
+  const deltas=[];
   for(let i=0;i<DATES.length;i++){
-    const d = DATES[i];
-    const prev = (i>0)? DATES[i-1] : null;
-    const dv = prev ? (sumAt(d) - sumAt(prev)) : 0;
-    deltas.push({date:d, delta:dv, prev});
+    const d=DATES[i], prev=i>0? DATES[i-1]:null;
+    deltas.push({date:d, delta: prev? (sumAt(d)-sumAt(prev)) : 0, prev});
   }
-
-  const last = deltas.at(-1);
+  const last=deltas.at(-1);
   $("heatLatest").textContent = last.prev
     ? `最新: ${last.date} の純増減 ${last.delta>=0?'+':''}${yen(last.delta)}（前回: ${last.prev}）`
     : `最新: ${last.date} の純増減 —`;
 
-  const absVals = deltas.map(x=>Math.abs(x.delta)).filter(v=>v>0).sort((a,b)=>a-b);
-  const q = p => (absVals.length? absVals[Math.floor((absVals.length-1)*p)] : 0);
-  const t1=q(0.2), t2=q(0.4), t3=q(0.6), t4=q(0.8);
+  const abs = deltas.map(x=>Math.abs(x.delta)).filter(v=>v>0).sort((a,b)=>a-b);
+  const q=p=> (abs.length? abs[Math.floor((abs.length-1)*p)] : 0);
+  const t1=q(0.2),t2=q(0.4),t3=q(0.6),t4=q(0.8);
 
   for(const x of deltas){
-    const v = Math.abs(x.delta);
-    let cls='cell';
+    const v=Math.abs(x.delta); let cls='cell';
     if(v>0 && v<=t1) cls+=' lv1';
     else if(v>t1 && v<=t2) cls+=' lv2';
     else if(v>t2 && v<=t3) cls+=' lv3';
     else if(v>t3 && v<=t4) cls+=' lv4';
     else if(v>t4) cls+=' lv5';
-    const div = document.createElement('div');
-    div.className = cls;
-    div.title = `${x.date}\n${x.delta>=0?'+':''}${yen(x.delta)}${x.prev?`\n（前回: ${x.prev}）`:''}`;
+    const div=document.createElement('div');
+    div.className=cls; div.title=`${x.date}\n${x.delta>=0?'+':''}${yen(x.delta)}${x.prev?`\n（前回: ${x.prev}）`:''}`;
     box.appendChild(div);
   }
 }
 
-// --- Compare ---
+// Compare
 function runCompare(){
   if(!DATES.length) return;
-  const a = $("cmpA").value;
-  const b = $("cmpB").value;
-  const dim = $("cmpDim").value;
-
-  const agg = rows => {
-    const map = new Map();
-    for(const r of rows){
-      const k = r[dim] || '(blank)';
-      map.set(k, (map.get(k)||0) + r.Amount);
-    }
-    return map;
-  };
-
-  const mapA = agg(byDate.get(a)||[]);
-  const mapB = agg(byDate.get(b)||[]);
-  const keys = [...new Set([...mapA.keys(), ...mapB.keys()])].sort();
-  const tbody = $("cmpBody");
-  tbody.innerHTML = keys.map(k=>{
-    const va = mapA.get(k)||0;
-    const vb = mapB.get(k)||0;
-    const diff = vb - va;
-    const p = va ? (diff/va*100).toFixed(2) : '0.00';
+  const a=$("cmpA").value, b=$("cmpB").value, dim=$("cmpDim").value;
+  const agg=rows=>{ const m=new Map(); rows.forEach(r=>{ const k=r[dim]||'(blank)'; m.set(k,(m.get(k)||0)+r.Amount); }); return m; };
+  const A=agg(byDate.get(a)||[]), B=agg(byDate.get(b)||[]);
+  const keys=[...new Set([...A.keys(),...B.keys()])].sort();
+  $("cmpBody").innerHTML = keys.map(k=>{
+    const va=A.get(k)||0, vb=B.get(k)||0, diff=vb-va, p= va? (diff/va*100).toFixed(2):'0.00';
     return `<tr><td>${k}</td><td>${yen(va)}</td><td>${yen(vb)}</td><td>${yen(diff)}</td><td>${p}%</td></tr>`;
   }).join('');
 }
 
-// --- Export ---
+/* =========================
+   Export & 初期化
+========================= */
 function exportCsv(){
   if(RAW.length===0) return;
-  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
-  const rows = RAW.map(r=>header.map(h=>r[h]??''));
-  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'assets_export.csv'; a.click();
+  const header=['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+  const rows=RAW.map(r=>header.map(h=>r[h]??''));
+  const csv=[header.join(','),...rows.map(r=>r.join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='assets_export.csv'; a.click();
   URL.revokeObjectURL(url);
 }
 
-// --- lifecycle ---
 function onDataReady(){
   hideMsg();
   $("totalDate").value = DATES.at(-1) || '';
   $("stackStart").value = DATES[0] || '';
   $("stackEnd").value   = DATES.at(-1) || '';
   $("cmpB").value       = DATES.at(-1) || '';
-  $("cmpA").value       = computeClosestPrev(DATES.at(-1)) || '';
-  refreshKPIs();
-  drawPie();
-  drawStack();
-  buildHeat();
-  runCompare();
+  $("cmpA").value       = DATES.length>1 ? DATES.at(-2) : DATES.at(-1) || '';
+
+  refreshKPIs(); drawPie(); drawStack(); buildHeat(); runCompare();
+  $("exportCsv").disabled = RAW.length===0;
 }
 
-function loadSaved(){
-  const saved = localStorage.getItem('assetManagerData');
-  if(!saved) return;
-  try{
-    RAW = JSON.parse(saved);
-    buildIndexes();
-    onDataReady();
-    $("exportCsv").disabled = RAW.length===0;
-  }catch(e){
-    console.error('failed to load saved data', e);
-  }
-}
-loadSaved();
-
-// --- events ---
+/* =========================
+   イベント
+========================= */
 $("file").addEventListener('change', async e=>{
-  const file = e.target.files[0];
-  if(!file) return;
+  const f=e.target.files[0]; if(!f) return;
   try{
-    await parseCSVFile(file);
+    await readCSVFile(f);
     localStorage.setItem('assetManagerData', JSON.stringify(RAW));
+    onDataReady();
   }catch(err){
     console.error(err);
     showMsg(`読み込みエラー: ${err.message || err}`);
@@ -537,12 +492,17 @@ $("file").addEventListener('change', async e=>{
 });
 $("exportCsv").addEventListener('click', exportCsv);
 
-$("totalDate").addEventListener('change', ()=>{ refreshKPIs(); drawPie(); });
-$("pieDimension").addEventListener('change', drawPie);
-$("stackDimension").addEventListener('change', drawStack);
-$("stackStart").addEventListener('change', drawStack);
-$("stackEnd").addEventListener('change', drawStack);
+["totalDate"].forEach(id=> $(id).addEventListener('change', ()=>{ refreshKPIs(); drawPie(); }));
+["pieDimension"].forEach(id=> $(id).addEventListener('change', drawPie));
+["stackDimension","stackStart","stackEnd"].forEach(id=> $(id).addEventListener('change', drawStack));
 $("cmpRun").addEventListener('click', runCompare);
+
+// 前回保存データの復元
+(function loadSaved(){
+  const saved=localStorage.getItem('assetManagerData');
+  if(!saved) return;
+  try{ RAW=JSON.parse(saved); buildIndexes(); onDataReady(); }catch{}
+})();
 </script>
 </body>
 </html>
