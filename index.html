@@ -403,7 +403,7 @@ function drawStack(){
       animation:{duration:500}, interaction:{ mode:'index', intersect:false },
       scales:{
         y:{ ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } },
-        x:{ type:'time', ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } }
+        x:{ type:'category', ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } }
       },
       plugins:{
         legend:{ position:'bottom', labels:{ usePointStyle:true, pointStyle:'line', color:'#e8ecf1' } },
