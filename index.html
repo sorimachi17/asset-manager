@@ -65,6 +65,7 @@
     /* grass colors: 最新日との差（正:緑系 / 負:赤系）5段階 */
     .up1{background:#0f1c17}.up2{background:#123124}.up3{background:#154735}.up4{background:#1a5d46}.up5{background:#1e7457}
     .dn1{background:#201313}.dn2{background:#311818}.dn3{background:#492020}.dn4{background:#612626}.dn5{background:#7a2c2c}
+    .eq{background:#1e2638}
 
     /* mobile tuning */
     @media (max-width:600px){
@@ -409,13 +410,19 @@ function renderCalendar(){
     cell.className = 'day-cell' + (inMonth?'':' disabled');
     if(ymd===calState.selected) cell.classList.add('selected');
 
-    // 草カラー：最新との差
-    const total = byDate.has(ymd)? sumAt(ymd) : latestTotal;
-    const diff  = total - latestTotal; // 正:最新より多い
-    const a = Math.abs(diff);
-    let level = ''; // up1..5 / dn1..5
-    if(a>0 && a<=t1) level='1'; else if(a>t1 && a<=t2) level='2'; else if(a>t2 && a<=t3) level='3'; else if(a>t3 && a<=t4) level='4'; else if(a>t4) level='5';
-    if(level) cell.classList.add(diff>=0?('up'+level):('dn'+level));
+      // 草カラー：最新との差
+      const total = byDate.has(ymd)? sumAt(ymd) : latestTotal;
+      const diff  = total - latestTotal; // 正:最新より多い
+      let cls = '';
+      if(byDate.has(ymd) && diff === 0){
+        cls = 'eq';
+      }else{
+        const a = Math.abs(diff);
+        let level = ''; // up1..5 / dn1..5
+        if(a>0 && a<=t1) level='1'; else if(a>t1 && a<=t2) level='2'; else if(a>t2 && a<=t3) level='3'; else if(a>t3 && a<=t4) level='4'; else if(a>t4) level='5';
+        if(level) cls = diff>0?('up'+level):('dn'+level);
+      }
+      if(cls) cell.classList.add(cls);
 
     // 表示
     const head = document.createElement('div'); head.className='day-head';
