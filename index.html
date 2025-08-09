@@ -10,11 +10,14 @@
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    :root{--bg:#0b0d12;--fg:#e8ecf1;--muted:#9aa4b2;--card:#131722;--line:#1e2430;}
+    :root{
+      --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;
+      --panel:#151618;--grid:rgba(255,255,255,.14);
+    }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-    header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,18,.9);backdrop-filter:saturate(120%) blur(6px)}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+    header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(17,17,17,.9);backdrop-filter:saturate(120%) blur(6px)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
     h1{margin:0 0 8px 0;font-size:20px}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     input[type="file"]{padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
@@ -25,18 +28,32 @@
     .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
     .big{font-size:22px;font-weight:700;margin-top:6px}
-    .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-    h2{margin:0 0 10px 0;font-size:16px}
-    select, input[type="date"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
-    .legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
-    .legend span{font-size:12px;color:var(--muted)}
-    .grid{display:grid;grid-template-columns:repeat(14,12px);gap:3px}
-    .cell{width:12px;height:12px;border-radius:2px;background:#0f1420;border:1px solid #0f1420}
-    .lv1{background:#123;}.lv2{background:#17314e}.lv3{background:#1f4b7a}.lv4{background:#2b6aa8}.lv5{background:#3d8ed6}
-    .heat-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .heat-legend{display:flex;gap:4px;align-items:center}
-    .heat-legend div{width:12px;height:12px;border-radius:2px}
-    @media (max-width:920px){.kpi{grid-template-columns:1fr}}
+    .sub{font-size:12px;color:var(--muted)}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    h2{margin:0 0 6px 0;font-size:16px}
+    .h2-sub{margin-top:-2px;font-size:12px;color:var(--muted)}
+    select, input[type="date"], input[type="month"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
+    .legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+    .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
+    /* calendar */
+    table.calendar{width:100%;border-collapse:separate;border-spacing:6px}
+    .cal-head{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .cal-legend{display:flex;gap:6px;align-items:center}
+    .cal-legend .cell{width:12px;height:12px;border-radius:2px}
+    .cal{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
+    th,td{vertical-align:top}
+    th{color:var(--muted);font-weight:500}
+    td.day{
+      width:14.28%;min-height:90px;background:#141414;border:1px solid #202020;border-radius:10px;padding:8px;position:relative
+    }
+    .day .date{font-size:12px;color:#c9ced6}
+    .day .total{font-size:11px;color:#9fb0ff;margin-top:2px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .day .delta{font-size:11px;color:#a6ffb1;margin-top:2px}
+    .bg1{background:#101822}.bg2{background:#122238}.bg3{background:#132c49}.bg4{background:#173760}.bg5{background:#1a4577}
+    @media (max-width:980px){.kpi{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -52,6 +69,7 @@
 </header>
 
 <main class="wrap">
+  <!-- KPI -->
   <section class="kpi" id="kpis">
     <div class="card">
       <div class="muted">評価総額 <span id="kpiDateLabel"></span></div>
@@ -60,19 +78,27 @@
       </div>
       <div class="big" id="totalValue">—</div>
     </div>
+
     <div class="card">
       <div class="muted">前日比 <span id="dodBase"></span></div>
+      <div class="sub" id="dodCurSum">—</div>
       <div class="big" id="dod">—</div>
+      <div class="sub" id="dodBaseSum" style="margin-top:4px"></div>
     </div>
+
     <div class="card">
       <div class="muted">月間増減 <span id="momBase"></span></div>
+      <div class="sub" id="momCurSum">—</div>
       <div class="big" id="mom">—</div>
+      <div class="sub" id="momBaseSum" style="margin-top:4px"></div>
     </div>
   </section>
 
+  <!-- 資産分類（元: 比率ビュー） -->
   <section class="panel">
-    <h2>① 比率ビュー（分類/通貨/銘柄/口座） — 金額と構成比</h2>
-    <div class="toolbar" style="margin-bottom:8px;">
+    <h2>資産分類</h2>
+    <div class="h2-sub" id="pieDateNote">—</div>
+    <div class="controls">
       <label>区分:
         <select id="pieDimension">
           <option value="AssetClass">AssetClass（資産分類）</option>
@@ -83,15 +109,17 @@
         </select>
       </label>
     </div>
-    <canvas id="pieChart" height="200"></canvas>
-    <div class="legend" id="pieLegend"></div>
+    <div class="chart-wrap"><canvas id="pieChart" height="200"></canvas></div>
+    <div class="legend-row" id="pieLegend"></div>
   </section>
 
+  <!-- 日別推移（期間指定・折れ線） -->
   <section class="panel">
-    <h2>② 推移ビュー（同一分類の積み上げ）</h2>
-    <div class="toolbar" style="margin-bottom:8px;">
+    <h2>日別推移</h2>
+    <div class="h2-sub" id="lineRangeNote">—</div>
+    <div class="controls">
       <label>区分:
-        <select id="stackDimension">
+        <select id="lineDimension">
           <option value="AssetClass">AssetClass（資産分類）</option>
           <option value="Currency">Currency（通貨）</option>
           <option value="Name">Name（銘柄）</option>
@@ -99,22 +127,57 @@
           <option value="Account">Account（口座）</option>
         </select>
       </label>
+      <label>期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
+      <button id="applyRange">反映</button>
     </div>
-    <canvas id="stackChart" height="280"></canvas>
-    <div class="muted">※ データが無い日は表示しません</div>
+    <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
+    <div class="muted">※ 期間内の記録日のみ表示（点マーカーは常時非表示）</div>
   </section>
 
+  <!-- 2日間比較ビュー -->
   <section class="panel">
-    <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
-    <div class="muted" id="heatLatest">—</div>
-    <div class="heat-wrap" style="margin-top:8px;">
-      <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
-      <div class="heat-legend">
-        <span class="muted">少</span>
-        <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
-        <span class="muted">多</span>
+    <h2>2日間比較</h2>
+    <div class="h2-sub">指定した2日間のカテゴリ別の総額を比較します</div>
+    <div class="controls">
+      <label>区分:
+        <select id="cmpDimension">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+      <label>日付A: <input type="date" id="cmpDateA"></label>
+      <label>日付B: <input type="date" id="cmpDateB"></label>
+      <button id="applyCmp">比較</button>
+    </div>
+    <div class="chart-wrap"><canvas id="cmpChart" height="280"></canvas></div>
+    <div class="muted" id="cmpNote">—</div>
+  </section>
+
+  <!-- 月カレンダー（日別総額 + 前回比カラー） -->
+  <section class="panel">
+    <h2>月カレンダー</h2>
+    <div class="controls cal-head">
+      <div>
+        <label>対象月: <input type="month" id="calMonth"></label>
+      </div>
+      <div class="cal-legend">
+        <span class="muted">前回比 小</span>
+        <div class="cell bg1"></div><div class="cell bg2"></div><div class="cell bg3"></div><div class="cell bg4"></div><div class="cell bg5"></div>
+        <span class="muted">大</span>
       </div>
     </div>
+    <div class="cal">
+      <table class="calendar">
+        <thead>
+          <tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr>
+        </thead>
+        <tbody id="calBody"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="heatLatest">—</div>
   </section>
 </main>
 
@@ -123,24 +186,24 @@ dayjs.extend(dayjs_plugin_customParseFormat);
 
 // --- state ---
 let RAW = [];            // 元データ（行）
-let DATES = [];          // 記録がある日
+let DATES = [];          // 記録がある日（YYYY-MM-DD）
 const byDate = new Map();// date -> rows
 
 // --- helpers ---
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const pct = (v, t) => (t ? (v/t*100) : 0).toFixed(1) + '%';
+const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 
 function normalizeDate(v){
   if(!v) return '';
   if(/年|月|日/.test(v)){
     return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD');
   }
-  // "2025/8/9" 等も許容
   return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD');
 }
 
-function nearestOnOrBefore(target){ // DATES から target 以下で最も近い日
+function nearestOnOrBefore(target){
   if(!target || !DATES.length) return null;
   for(let i = DATES.length-1; i >= 0; i--){
     if(DATES[i] <= target) return DATES[i];
@@ -170,7 +233,7 @@ function buildIndexes(){
     if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
     byDate.get(r.Date).push(r);
   }
-  DATES.sort(); // 文字列 YYYY-MM-DD ソートでOK
+  DATES.sort();
 }
 
 function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
@@ -185,9 +248,15 @@ function computeMonthBase(curDate){
   return nearestOnOrBefore(target);
 }
 
-// --- KPIs ---
+// ---------- KPIs ----------
 function refreshKPIs(){
-  if(!DATES.length){ $("kpiDateLabel").textContent=''; $("totalValue").textContent='—'; $("dod").textContent='—'; $("mom").textContent='—'; return; }
+  if(!DATES.length){
+    $("kpiDateLabel").textContent='';
+    $("totalValue").textContent='—';
+    $("dod").textContent='—'; $("dodBase").textContent=''; $("dodCurSum").textContent='—'; $("dodBaseSum").textContent='';
+    $("mom").textContent='—'; $("momBase").textContent=''; $("momCurSum").textContent='—'; $("momBaseSum").textContent='';
+    return;
+  }
 
   const picker = $("totalDate").value || DATES.at(-1);
   const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
@@ -196,32 +265,35 @@ function refreshKPIs(){
   $("kpiDateLabel").textContent = `（${curDate} 時点）`;
   $("totalValue").textContent   = yen(curVal);
 
-  // 前日比（最も近い直前の記録日）
+  // 前日比
   const prevDate = computeClosestPrev(curDate);
   $("dodBase").textContent = prevDate ? `基準: ${prevDate}` : '';
   $("dod").textContent     = prevDate ? ((curVal - sumAt(prevDate) >= 0 ? '+' : '') + yen(curVal - sumAt(prevDate))) : '—';
+  $("dodCurSum").textContent = `当日総額: ${yen(curVal)}`;
+  $("dodBaseSum").textContent = prevDate ? `基準総額: ${yen(sumAt(prevDate))}` : '';
 
-  // 月間増減（1ヶ月前に最も近い前の記録）
+  // 月間増減
   const monthBase = computeMonthBase(curDate);
   $("momBase").textContent = monthBase ? `基準: ${monthBase}` : '基準: —';
   $("mom").textContent     = monthBase ? ((curVal - sumAt(monthBase) >= 0 ? '+' : '') + yen(curVal - sumAt(monthBase))) : '—';
+  $("momCurSum").textContent = `当日総額: ${yen(curVal)}`;
+  $("momBaseSum").textContent = monthBase ? `基準総額: ${yen(sumAt(monthBase))}` : '';
 }
 
-// --- Pie (比率) ---
+// ---------- Pie（資産分類） ----------
 let pieChart;
 function drawPie(){
   if(!DATES.length) return;
   const picker = $("totalDate").value || DATES.at(-1);
   const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
   const dim = $("pieDimension").value;
+  $("pieDateNote").textContent = `${selDate} 時点`;
 
   const rows = byDate.get(selDate) || [];
   const bucket = new Map();
-  let total = 0;
   for(const r of rows){
     const k = r[dim] || '(blank)';
     bucket.set(k, (bucket.get(k)||0) + r.Amount);
-    total += r.Amount;
   }
   const labels = [...bucket.keys()];
   const data   = [...bucket.values()];
@@ -231,90 +303,243 @@ function drawPie(){
     type:'doughnut',
     data:{labels, datasets:[{data}]},
     options:{
-      plugins:{legend:{display:false}, tooltip:{callbacks:{
-        label: ctx => `${ctx.label}: ${yen(ctx.parsed)}（${pct(ctx.parsed, total)}）`
-      }}}
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{ label: ctx => `${ctx.label}: ${yen(ctx.parsed)}` }}
+      }
     }
   });
 
-  $("pieLegend").innerHTML = labels.map((k,i)=>`<span>${k}: ${yen(data[i])}（${pct(data[i], total)}）</span>`).join('');
+  // 凡例（色と名前のみ）
+  const colors = pieChart.data.datasets[0].backgroundColor || Chart.defaults.color;
+  $("pieLegend").innerHTML = labels.map((k,i)=>{
+    const c = pieChart.getDatasetMeta(0).controller.getStyle(i, false).backgroundColor;
+    return `<span class="legend-item"><span class="dot" style="background:${c}"></span>${k}</span>`;
+  }).join('');
 }
 
-// --- Stacked (推移) ---
-let stackChart;
-function drawStack(){
+// ---------- 日別推移（折れ線） ----------
+let lineChart;
+function drawLine(){
   if(!DATES.length) return;
-  const dim = $("stackDimension").value;
 
-  // データがある日だけ（= DATES）
-  const labels = [...DATES]; // 既に記録日のみ
-  // 各日ごとに dim で集計して全カテゴリ集合を作る
+  const dim = $("lineDimension").value;
+  const from = $("fromDate").value ? nearestOnOrBefore($("fromDate").value) : DATES[0];
+  const toRaw = $("toDate").value || DATES.at(-1);
+  const to = nearestOnOrBefore(toRaw) || DATES.at(-1);
+  const labels = DATES.filter(d => d>=from && d<=to);
+  $("lineRangeNote").textContent = `${from} 〜 ${to}`;
+
+  // カテゴリ集合
   const catSet = new Set();
-  for(const d of labels){
-    for(const r of (byDate.get(d)||[])){
-      catSet.add(r[dim] || '(blank)');
-    }
-  }
-  const cats = [...catSet];
+  for(const d of labels){ for(const r of (byDate.get(d)||[])){ catSet.add(r[dim] || '(blank)'); } }
+  const cats = [...catSet].sort();
+
+  // 各カテゴリ系列
   const series = cats.map(c => labels.map(d=>{
-    const sum = (byDate.get(d)||[]).filter(r => (r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0);
-    return sum;
+    return (byDate.get(d)||[]).filter(r => (r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0);
   }));
 
-  if(stackChart) stackChart.destroy();
-  stackChart = new Chart($("stackChart"), {
-    type:'bar',
-    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i], stack:'s'})) },
+  // 合計ライン
+  const totals = labels.map(d=> sumAt(d));
+
+  if(lineChart) lineChart.destroy();
+  const ctx = $("lineChart");
+  lineChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets: [
+        // カテゴリ（細線）
+        ...cats.map((c,i)=>({
+          label:c,
+          data:series[i],
+          tension:0.35,           // 滑らか
+          borderWidth:1.5,
+          fill:false,
+          pointRadius:0,          // 点マーカー非表示（最重要）
+          pointHitRadius:8
+        })),
+        // 合計（白・太線・最前面）
+        {
+          label:'合計',
+          data:totals,
+          borderColor:'#ffffff',
+          borderWidth:3,
+          tension:0.35,
+          pointRadius:0,
+          pointHitRadius:10,
+          order: -1                // 最前面
+        }
+      ]
+    },
     options:{
       responsive:true,
-      scales:{ x:{ stacked:true }, y:{ stacked:true, ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
-      plugins:{ legend:{ position:'bottom' } }
+      scales:{
+        x:{
+          grid:{color:'rgba(255,255,255,0.14)'},
+          ticks:{color:'#cfd6e4', autoSkip:true, maxTicksLimit:12}
+        },
+        y:{
+          grid:{color:'rgba(255,255,255,0.14)'},
+          ticks:{color:'#cfd6e4', callback:(v)=>'¥'+fmt(v)}
+        }
+      },
+      plugins:{
+        legend:{position:'bottom', labels:{color:'#e8ecf1'}},
+        tooltip:{callbacks:{label: (ctx)=> `${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}
+      },
+      elements:{
+        line:{capBezierPoints:true}
+      }
     }
   });
 }
 
-// --- Heatmap（草） ---
-function buildHeat(){
-  const box = $("heatmap");
-  box.innerHTML = '';
-  if(DATES.length===0){ $("heatLatest").textContent='—'; return; }
+// ---------- 2日間比較 ----------
+let cmpChart;
+function drawCmp(){
+  if(!DATES.length) return;
+  let a = $("cmpDateA").value || DATES.at(-1);
+  let b = $("cmpDateB").value || DATES.at(-1);
+  a = nearestOnOrBefore(a) || DATES.at(-1);
+  b = nearestOnOrBefore(b) || DATES.at(-1);
 
-  // 各記録日の純増減（前回比）
-  const deltas = [];
+  const dim = $("cmpDimension").value;
+
+  // カテゴリ全集合
+  const set = new Set();
+  for(const r of (byDate.get(a)||[])) set.add(r[dim]||'(blank)');
+  for(const r of (byDate.get(b)||[])) set.add(r[dim]||'(blank)');
+  const cats = [...set];
+
+  const mapSum = (date, cat) => (byDate.get(date)||[]).filter(r=>(r[dim]||'(blank)')===cat).reduce((s,r)=>s+r.Amount,0);
+  const valsA = cats.map(c=> mapSum(a,c));
+  const valsB = cats.map(c=> mapSum(b,c));
+
+  const labels = cats;
+  if(cmpChart) cmpChart.destroy();
+  cmpChart = new Chart($("cmpChart"), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:`${a}`, data:valsA, borderWidth:0, backgroundColor:'rgba(255,255,255,0.8)'},
+        {label:`${b}`, data:valsB, borderWidth:0}
+      ]
+    },
+    options:{
+      plugins:{
+        legend:{position:'bottom'},
+        tooltip:{callbacks:{label:ctx => `${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}
+      },
+      responsive:true,
+      scales:{
+        x:{grid:{color: 'rgba(255,255,255,0.14)'}},
+        y:{grid:{color: 'rgba(255,255,255,0.14)'}, ticks:{callback:(v)=>'¥'+fmt(v)}}
+      }
+    }
+  });
+  const totalA = valsA.reduce((s,v)=>s+v,0);
+  const totalB = valsB.reduce((s,v)=>s+v,0);
+  $("cmpNote").textContent = `合計: ${a} = ${yen(totalA)} / ${b} = ${yen(totalB)}（差分: ${(totalB-totalA>=0?'+':'')+yen(totalB-totalA)}）`;
+}
+
+// ---------- 月カレンダー ----------
+function buildCalendar(){
+  const body = $("calBody");
+  body.innerHTML = '';
+  if(!DATES.length) { $("heatLatest").textContent='—'; return; }
+
+  // 対象月
+  const sel = $("calMonth").value;
+  const baseMonth = sel ? dayjs(sel+'-01') : dayjs(DATES.at(-1));
+  const year = baseMonth.year();
+  const month = baseMonth.month(); // 0-based
+
+  // その月の全日
+  const firstDay = dayjs(new Date(year, month, 1));
+  const lastDay  = dayjs(new Date(year, month+1, 0));
+  const startCell = firstDay.day(); // 0:日
+  const days = lastDay.date();
+
+  // 月内の記録日・総額・前回比
+  const monthDates = DATES.filter(d => dayjs(d).year()===year && dayjs(d).month()===month);
+  // 当月に隣接する前回日を辿れるよう全体から prev を計算
+  const deltas = new Map(); // date -> {delta, prev}
   for(let i=0;i<DATES.length;i++){
     const d = DATES[i];
     const prev = (i>0)? DATES[i-1] : null;
     const dv = prev ? (sumAt(d) - sumAt(prev)) : 0;
-    deltas.push({date:d, delta:dv, prev});
+    deltas.set(d, {delta:dv, prev});
   }
 
-  // 直近の増減テキスト
-  const last = deltas.at(-1);
-  $("heatLatest").textContent = last.prev
-    ? `最新: ${last.date} の純増減 ${last.delta>=0?'+':''}${yen(last.delta)}（前回: ${last.prev}）`
-    : `最新: ${last.date} の純増減 —`;
-
-  // スケール（絶対値の分位で段階化）
-  const absVals = deltas.map(x=>Math.abs(x.delta)).filter(v=>v>0).sort((a,b)=>a-b);
+  // スケール（当月分で分位）
+  const absVals = monthDates.map(d => Math.abs(deltas.get(d)?.delta||0)).filter(v=>v>0).sort((a,b)=>a-b);
   const q = p => (absVals.length? absVals[Math.floor((absVals.length-1)*p)] : 0);
   const t1=q(0.2), t2=q(0.4), t3=q(0.6), t4=q(0.8);
 
-  for(const x of deltas){
-    const v = Math.abs(x.delta);
-    let cls='cell';
-    if(v>0 && v<=t1) cls+=' lv1';
-    else if(v>t1 && v<=t2) cls+=' lv2';
-    else if(v>t2 && v<=t3) cls+=' lv3';
-    else if(v>t3 && v<=t4) cls+=' lv4';
-    else if(v>t4) cls+=' lv5';
-    const div = document.createElement('div');
-    div.className = cls;
-    div.title = `${x.date}\n${x.delta>=0?'+':''}${yen(x.delta)}${x.prev?`\n（前回: ${x.prev}）`:''}`;
-    box.appendChild(div);
+  let cells = [];
+  for(let i=0;i<startCell;i++) cells.push(null); // 空白
+  for(let d=1; d<=days; d++) cells.push(dayjs(new Date(year, month, d)).format('YYYY-MM-DD'));
+
+  // 行分割して描画
+  for(let i=0;i<cells.length; i+=7){
+    const tr = document.createElement('tr');
+    for(let j=0;j<7; j++){
+      const c = cells[i+j];
+      const td = document.createElement('td');
+      td.className='day';
+
+      if(!c){
+        td.style.visibility='hidden';
+      }else{
+        const dd = dayjs(c).date();
+        const total = byDate.has(c)? sumAt(c) : null;
+        const info = deltas.get(c);
+        const v = Math.abs(info?.delta||0);
+        let bg='';
+        if(v>0 && v<=t1) bg=' bg1';
+        else if(v>t1 && v<=t2) bg=' bg2';
+        else if(v>t2 && v<=t3) bg=' bg3';
+        else if(v>t3 && v<=t4) bg=' bg4';
+        else if(v>t4) bg=' bg5';
+
+        td.className += bg;
+        td.title = byDate.has(c)
+          ? `${c}\n総額 ${yen(total)}\n前回比 ${(info.delta>=0?'+':'')+yen(info.delta)}${info.prev?`\n（前回: ${info.prev}）`:''}`
+          : `${c}\n記録なし`;
+
+        const dateEl = document.createElement('div');
+        dateEl.className='date';
+        dateEl.textContent = String(dd);
+
+        td.appendChild(dateEl);
+
+        const totalEl = document.createElement('div');
+        totalEl.className='total';
+        totalEl.textContent = byDate.has(c) ? `総額 ${yen(total)}` : '—';
+        td.appendChild(totalEl);
+
+        const deltaEl = document.createElement('div');
+        deltaEl.className='delta';
+        deltaEl.textContent = byDate.has(c) && info?.prev ? `Δ ${(info.delta>=0?'+':'')+yen(info.delta)}` : '';
+        td.appendChild(deltaEl);
+      }
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
   }
+
+  // 直近
+  const last = DATES.at(-1);
+  const info = deltas.get(last);
+  $("heatLatest").textContent = info?.prev
+    ? `最新: ${last} 総額 ${yen(sumAt(last))} / 前回比 ${(info.delta>=0?'+':'')+yen(info.delta)}（前回: ${info.prev}）`
+    : `最新: ${last} 総額 ${yen(sumAt(last))}`;
 }
 
-// --- Export ---
+// ---------- Export ----------
 function exportCsv(){
   if(RAW.length===0) return;
   const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
@@ -327,15 +552,23 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
-// --- lifecycle ---
+// ---------- lifecycle ----------
 function onDataReady(){
   $("totalDate").value = DATES.at(-1) || '';
+  $("fromDate").value  = DATES[0] || '';
+  $("toDate").value    = DATES.at(-1) || '';
+  $("cmpDateA").value  = DATES.at(-1) || '';
+  $("cmpDateB").value  = DATES.at(-1) || '';
+  $("calMonth").value  = (DATES.at(-1) || dayjs().format('YYYY-MM-DD')).slice(0,7);
+
   refreshKPIs();
   drawPie();
-  drawStack();
-  buildHeat();
+  drawLine();
+  drawCmp();
+  buildCalendar();
 }
 
+// events
 $("file").addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -348,12 +581,18 @@ $("exportCsv").addEventListener('click', exportCsv);
 
 $("totalDate").addEventListener('change', ()=>{
   refreshKPIs();
-  drawPie();
-  // 推移と草は時点依存でないので更新不要
+  drawPie(); // pieの日付も連動
 });
 
 $("pieDimension").addEventListener('change', drawPie);
-$("stackDimension").addEventListener('change', drawStack);
+
+$("lineDimension").addEventListener('change', drawLine);
+$("applyRange").addEventListener('click', drawLine);
+
+$("cmpDimension").addEventListener('change', drawCmp);
+$("applyCmp").addEventListener('click', drawCmp);
+
+$("calMonth").addEventListener('change', buildCalendar);
 </script>
 </body>
 </html>
