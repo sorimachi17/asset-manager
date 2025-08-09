@@ -38,6 +38,7 @@
     .dot{width:10px;height:10px;border-radius:50%}
     .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
     .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
+    .chart-wrap canvas{width:100%;}
 
     /* ===== Calendar (responsive + grass) ===== */
     .cal-header{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
@@ -94,7 +95,7 @@
       .kpi{grid-template-columns:1fr}
       .day-total{font-size:9px}  /* ← さらに小さく */
       .day-delta{font-size:9px}
-      #cmpTable{min-width:520px}
+      #cmpTable{min-width:100%}
       .year-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     }
     @media (max-width:420px){
