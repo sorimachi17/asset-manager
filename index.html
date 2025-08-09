@@ -481,7 +481,9 @@ function renderCalendarDetail(){
     const diff = prevAmt===null ? null : r.Amount - prevAmt;
     const diffStr = diff===null ? '—' : ((diff>=0?'+':'')+yen(diff));
     const diffColor = diff===null ? 'var(--muted)' : (diff>=0 ? '#22c55e' : '#ef4444');
-    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">${diffStr}</span></div>`;
+    const ratio = (prevAmt===null || prevAmt===0) ? null : (diff / prevAmt * 100);
+    const ratioStr = ratio===null ? ' (—%)' : ` (${ratio>=0?'+':''}${ratio.toFixed(2)}%)`;
+    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">${diffStr}${ratioStr}</span></div>`;
   }).join('');
 
   const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
