@@ -470,7 +470,10 @@ function renderCalendarDetail(){
   const deltaStr = delta===null ? '—' : ((delta>=0?'+':'')+yen(delta));
   const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
 
-  const rows = byDate.get(d).slice().sort((a,b)=>a.Name.localeCompare(b.Name));
+  // 金額が0円の銘柄は表示しない
+  const rows = byDate.get(d)
+    .filter(r => r.Amount !== 0)
+    .sort((a,b)=>a.Name.localeCompare(b.Name));
   const detailLines = rows.map(r=>{
     let prevAmt = null;
     for(let i=idx-1; i>=0 && prevAmt===null; i--){
