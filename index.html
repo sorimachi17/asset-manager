@@ -264,26 +264,11 @@ function drawStack(){
   if(stackChart) stackChart.destroy();
   stackChart = new Chart($("stackChart"), {
     type:'bar',
-    data:{
-      labels,
-      datasets: cats.map((c,i) => ({
-        label:c,
-        data:series[i],
-        stack:'s',
-        backgroundColor:'#3d8ed6'
-      }))
-    },
+    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i], stack:'s'})) },
     options:{
       responsive:true,
       scales:{ x:{ stacked:true }, y:{ stacked:true, ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
-      plugins:{
-        legend:{
-          position:'bottom',
-          labels:{
-            filter:item=>item.text.toLowerCase()==='stock'
-          }
-        }
-      }
+      plugins:{ legend:{ position:'bottom' } }
     }
   });
 }
