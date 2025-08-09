@@ -381,6 +381,12 @@ function drawStack(){
   }));
   const totals = labels.map(d=> (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0));
 
+  // y軸の範囲計算（0を含む値は除外し、必要最小限の範囲にする）
+  const allValues = [...totals, ...series.flat().filter(v=>v!==0)];
+  const minY = Math.min(...allValues);
+  const maxY = Math.max(...allValues);
+  const pad = (maxY - minY) * 0.05;
+
   const datasets=[
     {label:'合計',data:totals,borderColor:'#fff',borderWidth:4,order:cats.length+1},
     ...cats.map((c,i)=>({label:c,data:series[i],borderWidth:1.5}))
@@ -395,7 +401,12 @@ function drawStack(){
       interaction:{mode:'index',intersect:false},
       elements:{point:{radius:0,hoverRadius:0}, line:{tension:0.35}},
       scales:{
-        y:{ticks:{callback:v=>yen(v)+'円',color:'#e8ecf1'},grid:{color:'rgba(255,255,255,0.12)'}},
+        y:{
+          min: minY - pad,
+          max: maxY + pad,
+          ticks:{callback:v=>yen(v)+'円',color:'#e8ecf1'},
+          grid:{color:'rgba(255,255,255,0.12)'}
+        },
         x:{type:'category',ticks:{maxRotation:45,minRotation:35,color:'#e8ecf1'},grid:{color:'rgba(255,255,255,0.12)'}}
       },
       plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'line',color:'#e8ecf1'}},
