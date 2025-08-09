@@ -201,7 +201,7 @@
 
     <div class="cal-detail">
       <p class="detail-title" id="calDetailDate">—</p>
-      <div class="muted" id="calDetailBody">記録なし</div>
+      <div id="calDetailBody">記録なし</div>
     </div>
   </section>
 </main>
@@ -464,11 +464,27 @@ function renderCalendarDetail(){
   $("calDetailDate").textContent = d;
   if(!byDate.has(d)){ $("calDetailBody").textContent = '記録なし'; return; }
   const total = sumAt(d);
-  const idx = DATES.indexOf(d); const prev = idx>0? DATES[idx-1] : null;
-  const delta = prev ? (sumAt(d)-sumAt(prev)) : null;
+  const idx = DATES.indexOf(d);
+  const prev = computeClosestPrev(d);
+  const delta = prev ? (total - sumAt(prev)) : null;
   const deltaStr = delta===null ? '—' : ((delta>=0?'+':'')+yen(delta));
   const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
-  $("calDetailBody").innerHTML = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
+
+  const rows = byDate.get(d).slice().sort((a,b)=>a.Name.localeCompare(b.Name));
+  const detailLines = rows.map(r=>{
+    let prevAmt = null;
+    for(let i=idx-1; i>=0 && prevAmt===null; i--){
+      const pr = (byDate.get(DATES[i])||[]).find(x=>x.Name===r.Name);
+      if(pr) prevAmt = pr.Amount;
+    }
+    const diff = prevAmt===null ? null : r.Amount - prevAmt;
+    const diffStr = diff===null ? '—' : ((diff>=0?'+':'')+yen(diff));
+    const diffColor = diff===null ? 'var(--muted)' : (diff>=0 ? '#22c55e' : '#ef4444');
+    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">${diffStr}</span></div>`;
+  }).join('');
+
+  const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
+  $("calDetailBody").innerHTML = summary + (detailLines ? `<hr style="margin:8px 0;border:1px solid var(--line)">${detailLines}` : '');
 }
 
 // ---------- Export ----------
