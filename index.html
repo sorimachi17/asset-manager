@@ -36,6 +36,9 @@
     .heat-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .heat-legend{display:flex;gap:4px;align-items:center}
     .heat-legend div{width:12px;height:12px;border-radius:2px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+    th:first-child,td:first-child{text-align:left}
     @media (max-width:920px){.kpi{grid-template-columns:1fr}}
   </style>
 </head>
@@ -110,19 +113,53 @@
     <div class="muted">※ データが無い日は表示しません</div>
   </section>
 
-  <section class="panel">
-    <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
-    <div class="muted" id="heatLatest">—</div>
-    <div class="heat-wrap" style="margin-top:8px;">
-      <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
-      <div class="heat-legend">
-        <span class="muted">少</span>
-        <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
-        <span class="muted">多</span>
+    <section class="panel">
+      <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
+      <div class="muted" id="heatLatest">—</div>
+      <div class="heat-wrap" style="margin-top:8px;">
+        <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
+        <div class="heat-legend">
+          <span class="muted">少</span>
+          <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
+          <span class="muted">多</span>
+        </div>
       </div>
-    </div>
-  </section>
-</main>
+    </section>
+
+    <section class="panel">
+      <h2>2日比較</h2>
+      <div class="toolbar" style="margin-bottom:8px;">
+        <label>A日:
+          <input type="date" id="cmpA"/>
+        </label>
+        <label>B日:
+          <input type="date" id="cmpB"/>
+        </label>
+        <label>区分:
+          <select id="cmpDim">
+            <option value="AssetClass">AssetClass（資産分類）</option>
+            <option value="Currency">Currency（通貨）</option>
+            <option value="Name">Name（銘柄）</option>
+            <option value="StockType">StockType（区分）</option>
+            <option value="Account">Account（口座）</option>
+          </select>
+        </label>
+        <button id="cmpRun">比較する</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>キー</th>
+            <th>A日</th>
+            <th>B日</th>
+            <th>差額</th>
+            <th>差分%</th>
+          </tr>
+        </thead>
+        <tbody id="cmpBody"></tbody>
+      </table>
+    </section>
+  </main>
 
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
@@ -329,6 +366,35 @@ function buildHeat(){
   }
 }
 
+// --- Compare (2日比較) ---
+function runCompare(){
+  if(!DATES.length) return;
+  const a = $("cmpA").value;
+  const b = $("cmpB").value;
+  const dim = $("cmpDim").value;
+
+  const agg = rows => {
+    const map = new Map();
+    for(const r of rows){
+      const k = r[dim] || '(blank)';
+      map.set(k, (map.get(k)||0) + r.Amount);
+    }
+    return map;
+  };
+
+  const mapA = agg(byDate.get(a)||[]);
+  const mapB = agg(byDate.get(b)||[]);
+  const keys = [...new Set([...mapA.keys(), ...mapB.keys()])].sort();
+  const tbody = $("cmpBody");
+  tbody.innerHTML = keys.map(k=>{
+    const va = mapA.get(k)||0;
+    const vb = mapB.get(k)||0;
+    const diff = vb - va;
+    const pct = va ? (diff/va*100).toFixed(2) : '0.00';
+    return `<tr><td>${k}</td><td>${yen(va)}</td><td>${yen(vb)}</td><td>${yen(diff)}</td><td>${pct}%</td></tr>`;
+  }).join('');
+}
+
 // --- Export ---
 function exportCsv(){
   if(RAW.length===0) return;
@@ -347,10 +413,13 @@ function onDataReady(){
   $("totalDate").value = DATES.at(-1) || '';
   $("stackStart").value = DATES[0] || '';
   $("stackEnd").value   = DATES.at(-1) || '';
+  $("cmpB").value       = DATES.at(-1) || '';
+  $("cmpA").value       = computeClosestPrev(DATES.at(-1)) || '';
   refreshKPIs();
   drawPie();
   drawStack();
   buildHeat();
+  runCompare();
 }
 
 $("file").addEventListener('change', e=>{
@@ -373,6 +442,7 @@ $("pieDimension").addEventListener('change', drawPie);
 $("stackDimension").addEventListener('change', drawStack);
 $("stackStart").addEventListener('change', drawStack);
 $("stackEnd").addEventListener('change', drawStack);
+$("cmpRun").addEventListener('click', runCompare);
 </script>
 </body>
 </html>
