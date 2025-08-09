@@ -62,8 +62,8 @@
     .cal-detail{margin-top:12px;background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:14px}
     .detail-title{font-size:16px;font-weight:600;margin:0 0 8px 0}
 
-    /* grass colors: 最新日との差（正:緑系 / 負:赤系）5段階 */
-    .up1{background:#dcfce7}.up2{background:#86efac}.up3{background:#4ade80}.up4{background:#22c55e}.up5{background:#16a34a}
+    /* grass colors: 最新日との差（増:緑系 / 減:赤系）5段階 */
+    .up1{background:#0e4429}.up2{background:#006d32}.up3{background:#26a641}.up4{background:#39d353}.up5{background:#63d353}
     .dn1{background:#fee2e2}.dn2{background:#fecaca}.dn3{background:#fca5a5}.dn4{background:#f87171}.dn5{background:#ef4444}
     .eq{background:#1e2638}
 
@@ -410,9 +410,9 @@ function renderCalendar(){
     cell.className = 'day-cell' + (inMonth?'':' disabled');
     if(ymd===calState.selected) cell.classList.add('selected');
 
-      // 草カラー：最新との差
+      // 草カラー：最新との差（増:緑系 / 減:赤系）
       const total = byDate.has(ymd)? sumAt(ymd) : latestTotal;
-      const diff  = total - latestTotal; // 正:最新より多い
+      const diff  = latestTotal - total; // 正:最新より増加
       let cls = '';
       if(byDate.has(ymd) && diff === 0){
         cls = 'eq';
