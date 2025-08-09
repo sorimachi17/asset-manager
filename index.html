@@ -63,8 +63,8 @@
     .detail-title{font-size:16px;font-weight:600;margin:0 0 8px 0}
 
     /* grass colors: 最新日との差（正:緑系 / 負:赤系）5段階 */
-    .up1{background:#0f1c17}.up2{background:#123124}.up3{background:#154735}.up4{background:#1a5d46}.up5{background:#1e7457}
-    .dn1{background:#201313}.dn2{background:#311818}.dn3{background:#492020}.dn4{background:#612626}.dn5{background:#7a2c2c}
+    .up1{background:#dcfce7}.up2{background:#86efac}.up3{background:#4ade80}.up4{background:#22c55e}.up5{background:#16a34a}
+    .dn1{background:#fee2e2}.dn2{background:#fecaca}.dn3{background:#fca5a5}.dn4{background:#f87171}.dn5{background:#ef4444}
     .eq{background:#1e2638}
 
     /* mobile tuning */
@@ -434,7 +434,11 @@ function renderCalendar(){
     const deltaEl = document.createElement('div'); deltaEl.className='day-delta';
     if(byDate.has(ymd)){
       const idx = DATES.indexOf(ymd); const prev = idx>0? DATES[idx-1] : null;
-      if(prev){ const dv = sumAt(ymd)-sumAt(prev); deltaEl.textContent = (dv>=0?'+':'') + compactJPY(dv); deltaEl.style.color = dv>=0 ? '#8ff2a1' : '#ff9a9a'; }
+      if(prev){
+        const dv = sumAt(ymd)-sumAt(prev);
+        deltaEl.textContent = (dv>=0?'+':'') + compactJPY(dv);
+        deltaEl.style.color = dv>=0 ? '#22c55e' : '#ef4444';
+      }
     }
     if(deltaEl.textContent) cell.appendChild(deltaEl);
 
@@ -456,7 +460,9 @@ function renderCalendarDetail(){
   const total = sumAt(d);
   const idx = DATES.indexOf(d); const prev = idx>0? DATES[idx-1] : null;
   const delta = prev ? (sumAt(d)-sumAt(prev)) : null;
-  $("calDetailBody").innerHTML = `総額：${yen(total)}<br/>前回比：${delta===null?'—':((delta>=0?'+':'')+yen(delta))}${prev?`（前回: ${prev}）`:''}`;
+  const deltaStr = delta===null ? '—' : ((delta>=0?'+':'')+yen(delta));
+  const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
+  $("calDetailBody").innerHTML = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
 }
 
 // ---------- Export ----------
