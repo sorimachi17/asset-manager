@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>資産管理アプリ</title>
+  <!-- libs -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{--bg:#0b0d12;--fg:#e8ecf1;--muted:#9aa4b2;--card:#131722;--line:#1e2430;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,18,.9);backdrop-filter:saturate(120%) blur(6px)}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{margin:0 0 8px 0;font-size:20px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input[type="file"]{padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+    button{background:#1a5fff;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .muted{color:var(--muted);font-size:12px}
+    main{display:grid;gap:16px}
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .big{font-size:22px;font-weight:700;margin-top:6px}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    h2{margin:0 0 10px 0;font-size:16px}
+    select, input[type="date"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
+    .legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+    .legend span{font-size:12px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(14,12px);gap:3px}
+    .cell{width:12px;height:12px;border-radius:2px;background:#0f1420;border:1px solid #0f1420}
+    .lv1{background:#123;}.lv2{background:#17314e}.lv3{background:#1f4b7a}.lv4{background:#2b6aa8}.lv5{background:#3d8ed6}
+    .heat-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .heat-legend{display:flex;gap:4px;align-items:center}
+    .heat-legend div{width:12px;height:12px;border-radius:2px}
+    @media (max-width:920px){.kpi{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>資産管理アプリ</h1>
+    <div class="toolbar">
+      <input id="file" type="file" accept=".csv" />
+      <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
+      <button id="exportCsv" disabled>CSV書き出し</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="kpi" id="kpis">
+    <div class="card">
+      <div class="muted">評価総額 <span id="kpiDateLabel"></span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+        <input type="date" id="totalDate"/>
+      </div>
+      <div class="big" id="totalValue">—</div>
+    </div>
+    <div class="card">
+      <div class="muted">前日比 <span id="dodBase"></span></div>
+      <div class="big" id="dod">—</div>
+    </div>
+    <div class="card">
+      <div class="muted">月間増減 <span id="momBase"></span></div>
+      <div class="big" id="mom">—</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>① 比率ビュー（分類/通貨/銘柄/口座） — 金額と構成比</h2>
+    <div class="toolbar" style="margin-bottom:8px;">
+      <label>区分:
+        <select id="pieDimension">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+    </div>
+    <canvas id="pieChart" height="200"></canvas>
+    <div class="legend" id="pieLegend"></div>
+  </section>
+
+  <section class="panel">
+    <h2>② 推移ビュー（同一分類の積み上げ）</h2>
+    <div class="toolbar" style="margin-bottom:8px;">
+      <label>区分:
+        <select id="stackDimension">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+    </div>
+    <canvas id="stackChart" height="280"></canvas>
+    <div class="muted">※ データが無い日は表示しません</div>
+  </section>
+
+  <section class="panel">
+    <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
+    <div class="muted" id="heatLatest">—</div>
+    <div class="heat-wrap" style="margin-top:8px;">
+      <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
+      <div class="heat-legend">
+        <span class="muted">少</span>
+        <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
+        <span class="muted">多</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+dayjs.extend(dayjs_plugin_customParseFormat);
+
+// --- state ---
+let RAW = [];            // 元データ（行）
+let DATES = [];          // 記録がある日
+const byDate = new Map();// date -> rows
+
+// --- helpers ---
+const $ = id => document.getElementById(id);
+const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
+const pct = (v, t) => (t ? (v/t*100) : 0).toFixed(1) + '%';
+
+function normalizeDate(v){
+  if(!v) return '';
+  if(/年|月|日/.test(v)){
+    return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD');
+  }
+  // "2025/8/9" 等も許容
+  return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD');
+}
+
+function nearestOnOrBefore(target){ // DATES から target 以下で最も近い日
+  if(!target || !DATES.length) return null;
+  for(let i = DATES.length-1; i >= 0; i--){
+    if(DATES[i] <= target) return DATES[i];
+  }
+  return null;
+}
+
+function parseCSV(text){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  RAW = parsed.data.map(r => ({
+    Date: normalizeDate(r.Date),
+    Name: (r.Name||'').trim(),
+    Amount: Number(String(r.Amount||'0').replace(/,/g,''))||0,
+    AssetClass: (r.AssetClass||'').trim(),
+    Currency: (r.Currency||'').trim(),
+    StockType: (r.StockType||'').trim(),
+    Account: (r.Account||'').trim()
+  })).filter(r=>r.Date);
+  buildIndexes();
+  onDataReady();
+  $("exportCsv").disabled = RAW.length===0;
+}
+
+function buildIndexes(){
+  byDate.clear(); DATES = [];
+  for(const r of RAW){
+    if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
+    byDate.get(r.Date).push(r);
+  }
+  DATES.sort(); // 文字列 YYYY-MM-DD ソートでOK
+}
+
+function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
+
+function computeClosestPrev(date){
+  const idx = DATES.indexOf(date);
+  return (idx>0) ? DATES[idx-1] : null;
+}
+
+function computeMonthBase(curDate){
+  const target = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD');
+  return nearestOnOrBefore(target);
+}
+
+// --- KPIs ---
+function refreshKPIs(){
+  if(!DATES.length){ $("kpiDateLabel").textContent=''; $("totalValue").textContent='—'; $("dod").textContent='—'; $("mom").textContent='—'; return; }
+
+  const picker = $("totalDate").value || DATES.at(-1);
+  const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  const curVal  = sumAt(curDate);
+
+  $("kpiDateLabel").textContent = `（${curDate} 時点）`;
+  $("totalValue").textContent   = yen(curVal);
+
+  // 前日比（最も近い直前の記録日）
+  const prevDate = computeClosestPrev(curDate);
+  $("dodBase").textContent = prevDate ? `基準: ${prevDate}` : '';
+  $("dod").textContent     = prevDate ? ((curVal - sumAt(prevDate) >= 0 ? '+' : '') + yen(curVal - sumAt(prevDate))) : '—';
+
+  // 月間増減（1ヶ月前に最も近い前の記録）
+  const monthBase = computeMonthBase(curDate);
+  $("momBase").textContent = monthBase ? `基準: ${monthBase}` : '基準: —';
+  $("mom").textContent     = monthBase ? ((curVal - sumAt(monthBase) >= 0 ? '+' : '') + yen(curVal - sumAt(monthBase))) : '—';
+}
+
+// --- Pie (比率) ---
+let pieChart;
+function drawPie(){
+  if(!DATES.length) return;
+  const picker = $("totalDate").value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  const dim = $("pieDimension").value;
+
+  const rows = byDate.get(selDate) || [];
+  const bucket = new Map();
+  let total = 0;
+  for(const r of rows){
+    const k = r[dim] || '(blank)';
+    bucket.set(k, (bucket.get(k)||0) + r.Amount);
+    total += r.Amount;
+  }
+  const labels = [...bucket.keys()];
+  const data   = [...bucket.values()];
+
+  if(pieChart) pieChart.destroy();
+  pieChart = new Chart($("pieChart"), {
+    type:'doughnut',
+    data:{labels, datasets:[{data}]},
+    options:{
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        label: ctx => `${ctx.label}: ${yen(ctx.parsed)}（${pct(ctx.parsed, total)}）`
+      }}}
+    }
+  });
+
+  $("pieLegend").innerHTML = labels.map((k,i)=>`<span>${k}: ${yen(data[i])}（${pct(data[i], total)}）</span>`).join('');
+}
+
+// --- Stacked (推移) ---
+let stackChart;
+function drawStack(){
+  if(!DATES.length) return;
+  const dim = $("stackDimension").value;
+
+  // データがある日だけ（= DATES）
+  const labels = [...DATES]; // 既に記録日のみ
+  // 各日ごとに dim で集計して全カテゴリ集合を作る
+  const catSet = new Set();
+  for(const d of labels){
+    for(const r of (byDate.get(d)||[])){
+      catSet.add(r[dim] || '(blank)');
+    }
+  }
+  const cats = [...catSet];
+  const series = cats.map(c => labels.map(d=>{
+    const sum = (byDate.get(d)||[]).filter(r => (r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0);
+    return sum;
+  }));
+
+  if(stackChart) stackChart.destroy();
+  stackChart = new Chart($("stackChart"), {
+    type:'bar',
+    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i], stack:'s'})) },
+    options:{
+      responsive:true,
+      scales:{ x:{ stacked:true }, y:{ stacked:true, ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
+      plugins:{ legend:{ position:'bottom' } }
+    }
+  });
+}
+
+// --- Heatmap（草） ---
+function buildHeat(){
+  const box = $("heatmap");
+  box.innerHTML = '';
+  if(DATES.length===0){ $("heatLatest").textContent='—'; return; }
+
+  // 各記録日の純増減（前回比）
+  const deltas = [];
+  for(let i=0;i<DATES.length;i++){
+    const d = DATES[i];
+    const prev = (i>0)? DATES[i-1] : null;
+    const dv = prev ? (sumAt(d) - sumAt(prev)) : 0;
+    deltas.push({date:d, delta:dv, prev});
+  }
+
+  // 直近の増減テキスト
+  const last = deltas.at(-1);
+  $("heatLatest").textContent = last.prev
+    ? `最新: ${last.date} の純増減 ${last.delta>=0?'+':''}${yen(last.delta)}（前回: ${last.prev}）`
+    : `最新: ${last.date} の純増減 —`;
+
+  // スケール（絶対値の分位で段階化）
+  const absVals = deltas.map(x=>Math.abs(x.delta)).filter(v=>v>0).sort((a,b)=>a-b);
+  const q = p => (absVals.length? absVals[Math.floor((absVals.length-1)*p)] : 0);
+  const t1=q(0.2), t2=q(0.4), t3=q(0.6), t4=q(0.8);
+
+  for(const x of deltas){
+    const v = Math.abs(x.delta);
+    let cls='cell';
+    if(v>0 && v<=t1) cls+=' lv1';
+    else if(v>t1 && v<=t2) cls+=' lv2';
+    else if(v>t2 && v<=t3) cls+=' lv3';
+    else if(v>t3 && v<=t4) cls+=' lv4';
+    else if(v>t4) cls+=' lv5';
+    const div = document.createElement('div');
+    div.className = cls;
+    div.title = `${x.date}\n${x.delta>=0?'+':''}${yen(x.delta)}${x.prev?`\n（前回: ${x.prev}）`:''}`;
+    box.appendChild(div);
+  }
+}
+
+// --- Export ---
+function exportCsv(){
+  if(RAW.length===0) return;
+  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+  const rows = RAW.map(r=>header.map(h=>r[h]??''));
+  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'assets_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- lifecycle ---
+function onDataReady(){
+  $("totalDate").value = DATES.at(-1) || '';
+  refreshKPIs();
+  drawPie();
+  drawStack();
+  buildHeat();
+}
+
+$("file").addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> parseCSV(reader.result);
+  reader.readAsText(file);
+});
+
+$("exportCsv").addEventListener('click', exportCsv);
+
+$("totalDate").addEventListener('change', ()=>{
+  refreshKPIs();
+  drawPie();
+  // 推移と草は時点依存でないので更新不要
+});
+
+$("pieDimension").addEventListener('change', drawPie);
+$("stackDimension").addEventListener('change', drawStack);
+</script>
+</body>
+</html>
