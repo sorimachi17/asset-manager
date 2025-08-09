@@ -66,6 +66,8 @@
     .up1{background:#0e4429}.up2{background:#006d32}.up3{background:#26a641}.up4{background:#39d353}.up5{background:#63d353}
     .dn1{background:#fee2e2}.dn2{background:#fecaca}.dn3{background:#fca5a5}.dn4{background:#f87171}.dn5{background:#ef4444}
     .eq{background:#1e2638}
+    .day-cell.plus{background:rgba(34,197,94,.15);border-color:#22c55e;}
+    .day-cell.minus{background:rgba(239,68,68,.15);border-color:#ef4444;}
 
     /* mobile tuning */
     @media (max-width:600px){
@@ -437,7 +439,9 @@ function renderCalendar(){
       if(prev){
         const dv = sumAt(ymd)-sumAt(prev);
         deltaEl.textContent = (dv>=0?'+':'') + compactJPY(dv);
-        deltaEl.style.color = dv>=0 ? '#22c55e' : '#ef4444';
+        const isPlus = dv >= 0;
+        deltaEl.style.color = isPlus ? '#22c55e' : '#ef4444';
+        cell.classList.add(isPlus ? 'plus' : 'minus');
       }
     }
     if(deltaEl.textContent) cell.appendChild(deltaEl);
