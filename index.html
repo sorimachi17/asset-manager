@@ -9,6 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-dayjs-4/dist/chartjs-adapter-dayjs-4.umd.min.js"></script>
   <style>
     :root{--bg:#0b0d12;--fg:#e8ecf1;--muted:#9aa4b2;--card:#131722;--line:#1e2430;}
     *{box-sizing:border-box}
@@ -315,14 +316,62 @@ function drawStack(){
     return sum;
   }));
 
+  // データセット（合計を先頭に表示しつつ最前面に描画）
+  const totalSeries = labels.map(d => (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0));
+  const datasets = [
+    {
+      label:'合計',
+      data:totalSeries,
+      borderColor:'#fff',
+      borderWidth:4,
+      order:cats.length+1
+    },
+    ...cats.map((c,i)=>({
+      label:c,
+      data:series[i],
+      borderWidth:1.5
+    }))
+  ];
+
   if(stackChart) stackChart.destroy();
   stackChart = new Chart($("stackChart"), {
     type:'line',
-    data:{ labels, datasets: cats.map((c,i)=>({label:c, data:series[i]})) },
+    data:{ labels, datasets },
     options:{
       responsive:true,
-      scales:{ x:{ }, y:{ ticks:{ callback:(v)=> '¥'+new Intl.NumberFormat('ja-JP').format(v) } } },
-      plugins:{ legend:{ position:'bottom' } }
+      maintainAspectRatio:false,
+      parsing:false,
+      animation:{duration:500},
+      interaction:{ mode:'index', intersect:false },
+      scales:{
+        y:{
+          ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' },
+          grid:{ color:'rgba(255,255,255,0.12)' }
+        },
+        x:{
+          type:'time',
+          ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' },
+          grid:{ color:'rgba(255,255,255,0.12)' }
+        }
+      },
+      plugins:{
+        legend:{
+          position:'bottom',
+          labels:{ usePointStyle:true, pointStyle:'line', color:'#e8ecf1' }
+        },
+        tooltip:{
+          mode:'index',
+          intersect:false,
+          displayColors:true,
+          callbacks:{ label: ctx => `${ctx.dataset.label}: ${yen(ctx.parsed.y)}円` },
+          bodyColor:'#e8ecf1',
+          titleColor:'#e8ecf1'
+        }
+      },
+      elements:{
+        point:{ radius:0, hoverRadius:0 },
+        line:{ tension:0.35 }
+      }
     }
   });
 }
