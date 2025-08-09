@@ -257,6 +257,15 @@ function buildIndexes(){
 }
 function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
 function computeClosestPrev(date){ const i = DATES.indexOf(date); return (i>0)? DATES[i-1] : null; }
+function computePrevDateForName(date, name){
+  const idx = DATES.indexOf(date);
+  for(let i=idx-1;i>=0;i--){
+    const d = DATES[i];
+    const rows = byDate.get(d) || [];
+    if(rows.some(r=>r.Name===name && r.Amount!==0)) return d;
+  }
+  return null;
+}
 function computeMonthBase(curDate){ const t = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD'); return nearestOnOrBefore(t); }
 
 // ---------- KPIs ----------
@@ -475,15 +484,12 @@ function renderCalendarDetail(){
     .filter(r => r.Amount !== 0)
     .sort((a,b)=>a.Name.localeCompare(b.Name));
   const detailLines = rows.map(r=>{
-    const prevAmt = prev
-      ? ((byDate.get(prev) || []).find(x=>x.Name === r.Name)?.Amount || 0)
-      : null;
+    const prevDate = computePrevDateForName(d, r.Name);
+    const prevAmt = prevDate ? ((byDate.get(prevDate) || []).find(x=>x.Name === r.Name)?.Amount || 0) : null;
     const diff = prevAmt===null ? null : r.Amount - prevAmt;
     const diffStr = diff===null ? '—' : ((diff>=0?'+':'')+yen(diff));
     const diffColor = diff===null ? 'var(--muted)' : (diff>=0 ? '#22c55e' : '#ef4444');
-    const ratio = (prevAmt===null || prevAmt===0) ? null : (diff / prevAmt * 100);
-    const ratioStr = ratio===null ? ' (—%)' : ` (${ratio>=0?'+':''}${ratio.toFixed(2)}%)`;
-    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">${diffStr}${ratioStr}</span></div>`;
+    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">前回比：${diffStr}</span>${prevDate?`（前回: ${prevDate}）`:''}</div>`;
   }).join('');
 
   const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
