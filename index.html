@@ -211,6 +211,7 @@ let RAW = []; let DATES = []; const byDate = new Map();
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
+const COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#14b8a6','#eab308','#ec4899','#6366f1','#06b6d4'];
 function normalizeDate(v){
   if(!v) return '';
   if(/年|月|日/.test(v)){ return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD'); }
@@ -319,7 +320,17 @@ function drawLine(){
     type:'line',
     data:{labels,
       datasets:[
-        ...cats.map((c,i)=>({label:c,data:series[i],tension:0.35,borderWidth:1.5,fill:false,pointRadius:0,pointHitRadius:8})),
+        ...cats.map((c,i)=>({
+          label:c,
+          data:series[i],
+          tension:0.35,
+          borderWidth:1.5,
+          fill:false,
+          pointRadius:0,
+          pointHitRadius:8,
+          borderColor:COLORS[i%COLORS.length],
+          backgroundColor:COLORS[i%COLORS.length]
+        })),
         {label:'合計',data:totals,borderColor:'#fff',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
       ]},
     options:{
@@ -346,7 +357,10 @@ function drawCmp(){
   const valsA = cats.map(c=>sumBy(a,c)), valsB = cats.map(c=>sumBy(b,c));
   if(cmpChart) cmpChart.destroy();
   cmpChart = new Chart($("cmpChart"), {
-    type:'bar', data:{labels:cats, datasets:[{label:a, data:valsA, backgroundColor:'rgba(255,255,255,.8)'},{label:b, data:valsB}]},
+    type:'bar', data:{labels:cats, datasets:[
+      {label:a, data:valsA, backgroundColor:COLORS[0], borderColor:COLORS[0]},
+      {label:b, data:valsB, backgroundColor:COLORS[1], borderColor:COLORS[1]}
+    ]},
     options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}},
              scales:{x:{grid:{color:'rgba(255,255,255,.14)'}},y:{grid:{color:'rgba(255,255,255,.14)'},ticks:{callback:v=>'¥'+fmt(v)}}}}
   });
