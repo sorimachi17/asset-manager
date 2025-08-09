@@ -488,8 +488,10 @@ function renderCalendarDetail(){
     const prevAmt = prevDate ? ((byDate.get(prevDate) || []).find(x=>x.Name === r.Name)?.Amount || 0) : null;
     const diff = prevAmt===null ? null : r.Amount - prevAmt;
     const diffStr = diff===null ? '—' : ((diff>=0?'+':'')+yen(diff));
+    const diffPct = (prevAmt && prevAmt!==0) ? diff/prevAmt*100 : null;
+    const diffPctStr = diffPct===null ? '' : ` (${diffPct>=0?'+':''}${diffPct.toFixed(1)}%)`;
     const diffColor = diff===null ? 'var(--muted)' : (diff>=0 ? '#22c55e' : '#ef4444');
-    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">前回比：${diffStr}</span>${prevDate?`（前回: ${prevDate}）`:''}</div>`;
+    return `<div>${r.Name}: ${yen(r.Amount)} <span style="color:${diffColor}">${diffStr}${diffPctStr}</span></div>`;
   }).join('');
 
   const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
