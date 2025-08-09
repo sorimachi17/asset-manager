@@ -13,7 +13,7 @@
   <style>
     :root{--bg:#0b0d12;--fg:#e8ecf1;--muted:#9aa4b2;--card:#131722;--line:#1e2430;}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
     header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,18,.9);backdrop-filter:saturate(120%) blur(6px)}
     .wrap{max-width:1100px;margin:0 auto;padding:16px}
     h1{margin:0 0 8px 0;font-size:20px}
@@ -33,13 +33,14 @@
     .legend span{font-size:12px;color:var(--muted)}
     .grid{display:grid;grid-template-columns:repeat(14,12px);gap:3px}
     .cell{width:12px;height:12px;border-radius:2px;background:#0f1420;border:1px solid #0f1420}
-    .lv1{background:#123;}.lv2{background:#17314e}.lv3{background:#1f4b7a}.lv4{background:#2b6aa8}.lv5{background:#3d8ed6}
+    .lv1{background:#123}.lv2{background:#17314e}.lv3{background:#1f4b7a}.lv4{background:#2b6aa8}.lv5{background:#3d8ed6}
     .heat-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .heat-legend{display:flex;gap:4px;align-items:center}
     .heat-legend div{width:12px;height:12px;border-radius:2px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
     th:first-child,td:first-child{text-align:left}
+    #msg{padding:8px 12px;border:1px solid #654;border-radius:10px;background:#241a1a;color:#ffd7d7;display:none}
     @media (max-width:920px){.kpi{grid-template-columns:1fr}}
   </style>
 </head>
@@ -52,6 +53,7 @@
       <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
     </div>
+    <div id="msg"></div>
   </div>
 </header>
 
@@ -116,53 +118,43 @@
     <div class="muted">※ データが無い日は表示しません</div>
   </section>
 
-    <section class="panel">
-      <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
-      <div class="muted" id="heatLatest">—</div>
-      <div class="heat-wrap" style="margin-top:8px;">
-        <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
-        <div class="heat-legend">
-          <span class="muted">少</span>
-          <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
-          <span class="muted">多</span>
-        </div>
+  <section class="panel">
+    <h2>④ カレンダー（草グラフ）— 日次の純増減</h2>
+    <div class="muted" id="heatLatest">—</div>
+    <div class="heat-wrap" style="margin-top:8px;">
+      <div id="heatmap" class="grid" title="各マスにカーソルで日付と増減を表示"></div>
+      <div class="heat-legend">
+        <span class="muted">少</span>
+        <div class="cell lv1"></div><div class="cell lv2"></div><div class="cell lv3"></div><div class="cell lv4"></div><div class="cell lv5"></div>
+        <span class="muted">多</span>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="panel">
-      <h2>2日比較</h2>
-      <div class="toolbar" style="margin-bottom:8px;">
-        <label>A日:
-          <input type="date" id="cmpA"/>
-        </label>
-        <label>B日:
-          <input type="date" id="cmpB"/>
-        </label>
-        <label>区分:
-          <select id="cmpDim">
-            <option value="AssetClass">AssetClass（資産分類）</option>
-            <option value="Currency">Currency（通貨）</option>
-            <option value="Name">Name（銘柄）</option>
-            <option value="StockType">StockType（区分）</option>
-            <option value="Account">Account（口座）</option>
-          </select>
-        </label>
-        <button id="cmpRun">比較する</button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>キー</th>
-            <th>A日</th>
-            <th>B日</th>
-            <th>差額</th>
-            <th>差分%</th>
-          </tr>
-        </thead>
-        <tbody id="cmpBody"></tbody>
-      </table>
-    </section>
-  </main>
+  <section class="panel">
+    <h2>2日比較</h2>
+    <div class="toolbar" style="margin-bottom:8px;">
+      <label>A日: <input type="date" id="cmpA"/></label>
+      <label>B日: <input type="date" id="cmpB"/></label>
+      <label>区分:
+        <select id="cmpDim">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+      <button id="cmpRun">比較する</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>キー</th><th>A日</th><th>B日</th><th>差額</th><th>差分%</th></tr>
+      </thead>
+      <tbody id="cmpBody"></tbody>
+    </table>
+  </section>
+</main>
 
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
@@ -176,57 +168,136 @@ const byDate = new Map();// date -> rows
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const pct = (v, t) => (t ? (v/t*100) : 0).toFixed(1) + '%';
+const showMsg = (t) => { const m=$("msg"); m.style.display='block'; m.textContent=t; };
+const hideMsg = () => { const m=$("msg"); m.style.display='none'; m.textContent=''; };
 
 function normalizeDate(v){
   if(!v) return '';
+  v = String(v).trim();
+  // 2025年8月9日 / 2025/8/9 / 2025-08-09
   if(/年|月|日/.test(v)){
     return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD');
   }
-  // "2025/8/9" 等も許容
-  return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD');
+  return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).isValid()
+    ? dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD')
+    : '';
 }
 
-function nearestOnOrBefore(target){ // DATES から target 以下で最も近い日
-  if(!target || !DATES.length) return null;
-  for(let i = DATES.length-1; i >= 0; i--){
-    if(DATES[i] <= target) return DATES[i];
+// ---- header mapping (ゆるめ) ----
+const HEADER_MAP = {
+  Date:      ['date','日付','評価日','日時'],
+  Name:      ['name','銘柄','資産名','名称'],
+  Amount:    ['amount','金額','評価額','評価額(円)','時価','残高'],
+  AssetClass:['assetclass','資産分類','アセットクラス','分類'],
+  Currency:  ['currency','通貨','ccy'],
+  StockType: ['stocktype','区分','タイプ','種別'],
+  Account:   ['account','口座','アカウント']
+};
+function normalizeKey(s){
+  return String(s||'').replace(/^\uFEFF/, '').toLowerCase().replace(/\s+/g,'').trim();
+}
+function buildKeyResolver(sampleRow){
+  const keys = Object.keys(sampleRow||{});
+  const normKeys = keys.map(k=>normalizeKey(k));
+
+  const resolve = {};
+  for(const std of Object.keys(HEADER_MAP)){
+    const cands = HEADER_MAP[std];
+    let idx = -1;
+    for(const c of cands){
+      const i = normKeys.indexOf(c);
+      if(i>=0){ idx=i; break; }
+    }
+    if(idx>=0) resolve[std] = keys[idx];
   }
-  return null;
+  return resolve;
 }
 
-function parseCSV(text){
+// --- parse ---
+function parseCSVText(text){
   const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-  RAW = parsed.data.map(r => ({
-    Date: normalizeDate(r.Date),
-    Name: (r.Name||'').trim(),
-    Amount: Number(String(r.Amount||'0').replace(/,/g,''))||0,
-    AssetClass: (r.AssetClass||'').trim(),
-    Currency: (r.Currency||'').trim(),
-    StockType: (r.StockType||'').trim(),
-    Account: (r.Account||'').trim()
-  })).filter(r=>r.Date);
+  if(parsed.errors && parsed.errors.length){
+    console.warn(parsed.errors);
+  }
+  if(!parsed.data || parsed.data.length===0){
+    throw new Error('CSVにデータがありません。');
+  }
+  // ヘッダ名の解決
+  const resolver = buildKeyResolver(parsed.data[0]);
+  const need = ['Date','Name','Amount'];
+  const missing = need.filter(k=>!resolver[k]);
+  if(missing.length){
+    // それでも無ければ列名を推測してみる（先頭3列を Date/Name/Amount と仮置き）
+    const first = parsed.data[0];
+    const cols = Object.keys(first);
+    if(cols.length>=3){
+      resolver.Date   = resolver.Date   || cols[0];
+      resolver.Name   = resolver.Name   || cols[1];
+      resolver.Amount = resolver.Amount || cols[2];
+    }
+  }
+
+  const rows = parsed.data.map(r => {
+    const get = k => r[resolver[k]] ?? r[k] ?? '';
+    const amt = Number(String(get('Amount')).replace(/,/g,'').replace(/[^\d.-]/g,'')) || 0;
+    return {
+      Date: normalizeDate(get('Date')),
+      Name: String(get('Name')||'').trim(),
+      Amount: amt,
+      AssetClass: String(get('AssetClass')||'').trim(),
+      Currency: String(get('Currency')||'').trim(),
+      StockType: String(get('StockType')||'').trim(),
+      Account: String(get('Account')||'').trim()
+    };
+  }).filter(r=>r.Date);
+
+  if(rows.length===0){
+    throw new Error('日付列が解釈できず、1行も読み込めませんでした（ヘッダ名や日付形式を確認してください）。');
+  }
+  RAW = rows;
   buildIndexes();
-  localStorage.setItem('assetManagerData', JSON.stringify(RAW));
   onDataReady();
   $("exportCsv").disabled = RAW.length===0;
 }
 
+async function parseCSVFile(file){
+  // UTF-8 → Shift_JIS フォールバック
+  const buf = await file.arrayBuffer();
+  const tryDecode = enc => {
+    try { return new TextDecoder(enc).decode(buf); } catch { return null; }
+  };
+  let text = tryDecode('utf-8');
+  const bad = (text||'').split('\uFFFD').length - 1; // replacement char count
+  if(text===null || bad > 5){ // ざっくり判定
+    const sjis = tryDecode('shift_jis') || tryDecode('ms932');
+    if(sjis) text = sjis;
+  }
+  if(!text) throw new Error('文字コードの判定に失敗しました。UTF-8 か Shift_JIS で保存してください。');
+  parseCSVText(text);
+}
+
+// --- indexes ---
 function buildIndexes(){
   byDate.clear(); DATES = [];
   for(const r of RAW){
     if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
     byDate.get(r.Date).push(r);
   }
-  DATES.sort(); // 文字列 YYYY-MM-DD ソートでOK
+  DATES.sort();
 }
 
 function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
-
 function computeClosestPrev(date){
   const idx = DATES.indexOf(date);
   return (idx>0) ? DATES[idx-1] : null;
 }
-
+function nearestOnOrBefore(target){
+  if(!target || !DATES.length) return null;
+  for(let i = DATES.length-1; i >= 0; i--){
+    if(DATES[i] <= target) return DATES[i];
+  }
+  return null;
+}
 function computeMonthBase(curDate){
   const target = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD');
   return nearestOnOrBefore(target);
@@ -234,8 +305,13 @@ function computeMonthBase(curDate){
 
 // --- KPIs ---
 function refreshKPIs(){
-  if(!DATES.length){ $("kpiDateLabel").textContent=''; $("totalValue").textContent='—'; $("dod").textContent='—'; $("mom").textContent='—'; return; }
-
+  if(!DATES.length){
+    $("kpiDateLabel").textContent=''; $("totalValue").textContent='—';
+    $("dod").textContent='—'; $("mom").textContent='—';
+    $("dodBase").textContent=''; $("dodTotal").textContent='';
+    $("momBase").textContent=''; $("momTotal").textContent='';
+    return;
+  }
   const picker = $("totalDate").value || DATES.at(-1);
   const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
   const curVal  = sumAt(curDate);
@@ -243,14 +319,12 @@ function refreshKPIs(){
   $("kpiDateLabel").textContent = `（${curDate} 時点）`;
   $("totalValue").textContent   = yen(curVal);
 
-  // 前日比（最も近い直前の記録日）
   const prevDate = computeClosestPrev(curDate);
   $("dodBase").textContent = prevDate ? `基準: ${prevDate}` : '';
   const prevVal = prevDate ? sumAt(prevDate) : 0;
   $("dod").textContent     = prevDate ? ((curVal - prevVal >= 0 ? '+' : '') + yen(curVal - prevVal)) : '—';
   $("dodTotal").textContent = prevDate ? `総額: ${yen(prevVal)}` : '';
 
-  // 月間増減（1ヶ月前に最も近い前の記録）
   const monthBase = computeMonthBase(curDate);
   $("momBase").textContent = monthBase ? `基準: ${monthBase}` : '基準: —';
   const monthVal = monthBase ? sumAt(monthBase) : 0;
@@ -258,7 +332,7 @@ function refreshKPIs(){
   $("momTotal").textContent = monthBase ? `総額: ${yen(monthVal)}` : '';
 }
 
-// --- Pie (比率) ---
+// --- Pie ---
 let pieChart;
 function drawPie(){
   if(!DATES.length) return;
@@ -267,7 +341,6 @@ function drawPie(){
   const dim = $("pieDimension").value;
 
   $("pieDateLabel").textContent = `（${selDate} 時点）`;
-
   const rows = byDate.get(selDate) || [];
   const bucket = new Map();
   let total = 0;
@@ -294,7 +367,7 @@ function drawPie(){
   $("pieLegend").innerHTML = labels.map((k,i)=>`<span><span style="display:inline-block;width:10px;height:10px;background:${colors[i]};border-radius:2px;margin-right:4px;"></span>${k}</span>`).join('');
 }
 
-// --- Trend (日別推移) ---
+// --- Trend ---
 let stackChart;
 function drawStack(){
   if(!DATES.length) return;
@@ -302,9 +375,7 @@ function drawStack(){
   const start = $("stackStart").value;
   const end   = $("stackEnd").value;
 
-  // 範囲内の記録日のみ
   const labels = DATES.filter(d => (!start || d >= start) && (!end || d <= end));
-  // 各日ごとに dim で集計して全カテゴリ集合を作る
   const catSet = new Set();
   for(const d of labels){
     for(const r of (byDate.get(d)||[])){
@@ -317,21 +388,10 @@ function drawStack(){
     return sum;
   }));
 
-  // データセット（合計を先頭に表示しつつ最前面に描画）
   const totalSeries = labels.map(d => (byDate.get(d)||[]).reduce((s,r)=>s+r.Amount,0));
   const datasets = [
-    {
-      label:'合計',
-      data:totalSeries,
-      borderColor:'#fff',
-      borderWidth:4,
-      order:cats.length+1
-    },
-    ...cats.map((c,i)=>({
-      label:c,
-      data:series[i],
-      borderWidth:1.5
-    }))
+    { label:'合計', data:totalSeries, borderColor:'#fff', borderWidth:4, order:cats.length+1 },
+    ...cats.map((c,i)=>({ label:c, data:series[i], borderWidth:1.5 }))
   ];
 
   if(stackChart) stackChart.destroy();
@@ -339,51 +399,28 @@ function drawStack(){
     type:'line',
     data:{ labels, datasets },
     options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      parsing:false,
-      animation:{duration:500},
-      interaction:{ mode:'index', intersect:false },
+      responsive:true, maintainAspectRatio:false, parsing:false,
+      animation:{duration:500}, interaction:{ mode:'index', intersect:false },
       scales:{
-        y:{
-          ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' },
-          grid:{ color:'rgba(255,255,255,0.12)' }
-        },
-        x:{
-          type:'time',
-          ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' },
-          grid:{ color:'rgba(255,255,255,0.12)' }
-        }
+        y:{ ticks:{ callback:(v)=> yen(v)+'円', color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } },
+        x:{ type:'time', ticks:{ maxRotation:45, minRotation:35, color:'#e8ecf1' }, grid:{ color:'rgba(255,255,255,0.12)' } }
       },
       plugins:{
-        legend:{
-          position:'bottom',
-          labels:{ usePointStyle:true, pointStyle:'line', color:'#e8ecf1' }
-        },
-        tooltip:{
-          mode:'index',
-          intersect:false,
-          displayColors:true,
-          callbacks:{ label: ctx => `${ctx.dataset.label}: ${yen(ctx.parsed.y)}円` },
-          bodyColor:'#e8ecf1',
-          titleColor:'#e8ecf1'
-        }
+        legend:{ position:'bottom', labels:{ usePointStyle:true, pointStyle:'line', color:'#e8ecf1' } },
+        tooltip:{ mode:'index', intersect:false, displayColors:true,
+          callbacks:{ label: ctx => `${ctx.dataset.label}: ${yen(ctx.parsed.y)}円` }, bodyColor:'#e8ecf1', titleColor:'#e8ecf1' }
       },
-      elements:{
-        point:{ radius:0, hoverRadius:0 },
-        line:{ tension:0.35 }
-      }
+      elements:{ point:{ radius:0, hoverRadius:0 }, line:{ tension:0.35 } }
     }
   });
 }
 
-// --- Heatmap（草） ---
+// --- Heatmap ---
 function buildHeat(){
   const box = $("heatmap");
   box.innerHTML = '';
   if(DATES.length===0){ $("heatLatest").textContent='—'; return; }
 
-  // 各記録日の純増減（前回比）
   const deltas = [];
   for(let i=0;i<DATES.length;i++){
     const d = DATES[i];
@@ -392,13 +429,11 @@ function buildHeat(){
     deltas.push({date:d, delta:dv, prev});
   }
 
-  // 直近の増減テキスト
   const last = deltas.at(-1);
   $("heatLatest").textContent = last.prev
     ? `最新: ${last.date} の純増減 ${last.delta>=0?'+':''}${yen(last.delta)}（前回: ${last.prev}）`
     : `最新: ${last.date} の純増減 —`;
 
-  // スケール（絶対値の分位で段階化）
   const absVals = deltas.map(x=>Math.abs(x.delta)).filter(v=>v>0).sort((a,b)=>a-b);
   const q = p => (absVals.length? absVals[Math.floor((absVals.length-1)*p)] : 0);
   const t1=q(0.2), t2=q(0.4), t3=q(0.6), t4=q(0.8);
@@ -418,7 +453,7 @@ function buildHeat(){
   }
 }
 
-// --- Compare (2日比較) ---
+// --- Compare ---
 function runCompare(){
   if(!DATES.length) return;
   const a = $("cmpA").value;
@@ -442,8 +477,8 @@ function runCompare(){
     const va = mapA.get(k)||0;
     const vb = mapB.get(k)||0;
     const diff = vb - va;
-    const pct = va ? (diff/va*100).toFixed(2) : '0.00';
-    return `<tr><td>${k}</td><td>${yen(va)}</td><td>${yen(vb)}</td><td>${yen(diff)}</td><td>${pct}%</td></tr>`;
+    const p = va ? (diff/va*100).toFixed(2) : '0.00';
+    return `<tr><td>${k}</td><td>${yen(va)}</td><td>${yen(vb)}</td><td>${yen(diff)}</td><td>${p}%</td></tr>`;
   }).join('');
 }
 
@@ -462,6 +497,7 @@ function exportCsv(){
 
 // --- lifecycle ---
 function onDataReady(){
+  hideMsg();
   $("totalDate").value = DATES.at(-1) || '';
   $("stackStart").value = DATES[0] || '';
   $("stackEnd").value   = DATES.at(-1) || '';
@@ -486,25 +522,23 @@ function loadSaved(){
     console.error('failed to load saved data', e);
   }
 }
-
 loadSaved();
 
-$("file").addEventListener('change', e=>{
+// --- events ---
+$("file").addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=> parseCSV(reader.result);
-  reader.readAsText(file);
+  try{
+    await parseCSVFile(file);
+    localStorage.setItem('assetManagerData', JSON.stringify(RAW));
+  }catch(err){
+    console.error(err);
+    showMsg(`読み込みエラー: ${err.message || err}`);
+  }
 });
-
 $("exportCsv").addEventListener('click', exportCsv);
 
-$("totalDate").addEventListener('change', ()=>{
-  refreshKPIs();
-  drawPie();
-  // 推移と草は時点依存でないので更新不要
-});
-
+$("totalDate").addEventListener('change', ()=>{ refreshKPIs(); drawPie(); });
 $("pieDimension").addEventListener('change', drawPie);
 $("stackDimension").addEventListener('change', drawStack);
 $("stackStart").addEventListener('change', drawStack);
