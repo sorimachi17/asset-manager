@@ -311,6 +311,30 @@ const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0)
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#14b8a6','#eab308','#ec4899','#6366f1','#06b6d4'];
 
+function hsl(h, s, l, a=1){
+  return `hsla(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%, ${a})`;
+}
+function getPalette(n, baseHue=210, s=62, l=52, alpha=0.95){
+  const phi = 137.508; // 黄金角
+  const arr = [];
+  for(let i=0;i<n;i++){
+    const hue = (baseHue + i*phi) % 360;
+    const li  = l + (i%2===0 ? -6 : 6); // 交互に明度を少し振る
+    arr.push(hsl(hue, s, li, alpha));
+  }
+  return arr;
+}
+function getHoverPalette(n, baseHue=210, s=62, l=52, alpha=1){
+  const phi = 137.508;
+  const arr = [];
+  for(let i=0;i<n;i++){
+    const hue = (baseHue + i*phi) % 360;
+    const li  = Math.min(95, l + 8 + (i%2===0 ? -4 : 4));
+    arr.push(hsl(hue, s, li, alpha));
+  }
+  return arr;
+}
+
 function normalizeDate(v){
   if(!v) return '';
   if(/年|月|日/.test(v)){ return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD'); }
@@ -432,12 +456,21 @@ function drawPie(){
   const labels = [], data=[];
   rawLabels.forEach((k,i)=>{ if(rawData[i]!==0){ labels.push(k); data.push(rawData[i]); } });
 
+  const colors = getPalette(labels.length);
+  const hoverColors = getHoverPalette(labels.length);
+
   if(pieChart) pieChart.destroy();
   pieHidden.clear();
   pieChart = new Chart($("pieChart"), {
     type:'doughnut',
-    data:{labels, datasets:[{data}]},
+    data:{labels, datasets:[{
+      data,
+      backgroundColor: colors,
+      hoverBackgroundColor: hoverColors,
+      borderWidth: 0
+    }]},
     options:{
+      cutout:'28%',
       plugins:{
         legend:{display:false},
         tooltip:{callbacks:{
