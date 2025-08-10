@@ -324,24 +324,25 @@ const META_BY_DATE_NAME = new Map(); // date -> Map(Name -> {AssetClass,...})
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
+// Robinhood inspired palette
 const PALETTE_BASE = [
-  '31,119,180', // 濃い青
-  '44,160,44',  // 緑
-  '148,103,189',// 紫
-  '255,127,14', // オレンジ
-  '214,39,40',  // 赤
-  '127,127,127',// グレー
-  '23,190,207', // 水色
-  '227,119,194',// ピンク
-  '188,189,34', // 黄緑
-  '57,59,121',  // 濃紺
-  '140,86,75'   // 茶色寄り
+  '0,200,5',     // brand green
+  '66,194,255',  // light blue
+  '255,72,66',   // coral
+  '255,144,0',   // orange
+  '141,84,217',  // purple
+  '0,172,155',   // teal
+  '255,199,0',   // yellow
+  '255,0,186',   // magenta
+  '100,100,100', // gray
+  '53,178,116',  // mint
+  '255,105,180'  // pink
 ];
-const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.7)`);
+const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.8)`);
 
 function getPalette(n){
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.7)`);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`);
   return arr;
 }
 function getHoverPalette(n){
@@ -618,7 +619,7 @@ function drawLine(){
           borderColor:COLORS[i%COLORS.length],
           backgroundColor:COLORS[i%COLORS.length]
         })),
-        {label:'合計',data:totals,borderColor:'#fff',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
+        {label:'合計',data:totals,borderColor:'rgba(0,200,5,1)',backgroundColor:'rgba(0,200,5,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
       ]},
     options:{
       responsive:true,
