@@ -325,17 +325,17 @@ const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const PALETTE_BASE = [
-  '30,30,30',   // dark1
-  '37,37,38',   // dark2
-  '212,212,212',// gray
-  '106,153,85', // green
-  '206,145,120',// salmon
-  '181,206,168',// light-green
-  '197,134,192',// purple
-  '111,19,19',  // maroon
-  '20,68,20',   // deep-green
-  '224,108,117',// pink
-  '156,220,254' // sky
+  '31,119,180', // 濃い青
+  '44,160,44',  // 緑
+  '148,103,189',// 紫
+  '255,127,14', // オレンジ
+  '214,39,40',  // 赤
+  '127,127,127',// グレー
+  '23,190,207', // 水色
+  '227,119,194',// ピンク
+  '188,189,34', // 黄緑
+  '57,59,121',  // 濃紺
+  '140,86,75'   // 茶色寄り
 ];
 const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.7)`);
 
