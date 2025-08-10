@@ -107,6 +107,13 @@
     .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
     #cmpTable{min-width:720px}
 
+    /* pc */
+    @media (min-width:900px){
+      main{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .kpi{grid-column:1 / -1}
+      .panel.wide{grid-column:1 / -1}
+    }
+
     /* mobile */
     @media (max-width:600px){
       .wrap{padding:12px}
@@ -194,7 +201,7 @@
   </section>
 
   <!-- 2日間比較（表のみ） -->
-  <section class="panel">
+  <section class="panel wide">
     <h2>2日間比較</h2>
     <div class="h2-sub">指定した2日間の銘柄別比較（A・Bともに0の行は表示しません）</div>
     <div class="controls">
@@ -235,7 +242,7 @@
   </section>
 
   <!-- 月カレンダー -->
-  <section class="panel">
+  <section class="panel wide">
     <h2>月カレンダー</h2>
     <div class="cal-header">
       <div class="cal-nav" id="calNavMonth">
