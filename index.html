@@ -75,11 +75,26 @@
     .year-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
     .month-card{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
     .month-title{font-weight:600;margin-bottom:6px}
-    .mini-month{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:6px}
-    .mini-day{width:100%;aspect-ratio:1/1;border-radius:3px;border:1px solid #2a2f3a}
-    .mini-day.eq{background:#1e2638}
-    .mini-day.u1{background:#0e4429}.mini-day.u2{background:#006d32}.mini-day.u3{background:#26a641}.mini-day.u4{background:#39d353}
-    .mini-day.d1{background:#fecaca}.mini-day.d2{background:#fca5a5}.mini-day.d3{background:#f87171}.mini-day.d4{background:#ef4444}
+    .mini-month{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-top:6px}
+    .mini-day{
+      width:100%;aspect-ratio:1/1;border:none;border-radius:2px;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;background:rgba(0,0,0,0.6);transition:background-color .2s;
+    }
+    .mini-day.neutral{background:rgba(0,0,0,0.6)}
+    .mini-day.gain-low{background:rgba(0,255,0,0.3)}
+    .mini-day.gain-mid{background:rgba(0,255,0,0.6)}
+    .mini-day.gain-high{background:rgba(0,255,0,0.8)}
+    .mini-day.loss-low{background:rgba(255,0,0,0.3);color:#eee}
+    .mini-day.loss-mid{background:rgba(255,0,0,0.6);color:#eee}
+    .mini-day.loss-high{background:rgba(255,0,0,0.8);color:#eee}
+    .mini-day.gain-low:hover{background:rgba(0,255,0,0.5)}
+    .mini-day.gain-mid:hover{background:rgba(0,255,0,0.8)}
+    .mini-day.gain-high:hover{background:rgba(0,255,0,1)}
+    .mini-day.loss-low:hover{background:rgba(255,0,0,0.5)}
+    .mini-day.loss-mid:hover{background:rgba(255,0,0,0.8)}
+    .mini-day.loss-high:hover{background:rgba(255,0,0,1)}
+    .mini-day.neutral:hover{background:rgba(0,0,0,0.8)}
     .pos{color:#22c55e}.neg{color:#ef4444}
 
     /* tables */
@@ -949,30 +964,32 @@ function renderYearView(){
         });
         const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
         const q = p => (sorted.length? sorted[Math.floor((sorted.length-1)*p)] : 0);
-        const t1=q(0.25), t2=q(0.5), t3=q(0.75), t4=q(0.9);
+        const t1=q(0.33), t2=q(0.66);
 
         for(const d of cells){
           const ymd = d.format('YYYY-MM-DD');
           const box = document.createElement('div'); box.className='mini-day';
-          if(d.month()===base.month()){
-            if(byDate.has(ymd)){
-              const prev = previousRecordedDate(ymd);
-              if(prev){
-                const diff = sumAt(ymd) - sumAt(prev);
-                if(diff===0){ box.classList.add('eq'); }
-                else{
-                  const a = Math.abs(diff);
-                  let tag = '';
-                  if(a>0 && a<=t1) tag='1'; else if(a>t1 && a<=t2) tag='2'; else if(a>t2 && a<=t3) tag='3'; else if(a>t3 && a<=t4) tag='4'; else if(a>t4) tag='4';
-                  if(tag) box.classList.add(diff>0?('u'+tag):('d'+tag));
+            if(d.month()===base.month()){
+              if(byDate.has(ymd)){
+                const prev = previousRecordedDate(ymd);
+                if(prev){
+                  const diff = sumAt(ymd) - sumAt(prev);
+                  if(diff===0){ box.classList.add('neutral'); }
+                  else{
+                    const a = Math.abs(diff);
+                    let tag = '';
+                    if(a<=t1) tag='low';
+                    else if(a<=t2) tag='mid';
+                    else tag='high';
+                    box.classList.add(diff>0 ? `gain-${tag}` : `loss-${tag}`);
+                  }
+                }else{
+                  box.classList.add('neutral');
                 }
-              }else{
-                box.classList.add('eq');
               }
+            }else{
+              box.style.opacity=.25;
             }
-          }else{
-            box.style.opacity=.25;
-          }
           mini.appendChild(box);
         }
         card.appendChild(mini);
