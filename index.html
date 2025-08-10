@@ -325,24 +325,32 @@ const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const PALETTE_BASE = [
-  '59,130,246','139,92,246','107,114,128','30,64,175','16,185,129',
-  '99,102,241','71,85,105','56,189,248','168,85,247','34,197,94'
+  '249,168,212', // pink
+  '251,146,60',  // orange
+  '96,165,250',  // blue
+  '167,139,250', // purple
+  '74,222,128',  // green
+  '248,113,113', // red
+  '250,204,21',  // yellow
+  '153,246,228', // teal
+  '196,181,253', // violet
+  '125,211,252'  // sky
 ];
-const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.6)`);
+const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.7)`);
 
 function getPalette(n){
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.4)`);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.7)`);
   return arr;
 }
 function getHoverPalette(n){
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.6)`);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.9)`);
   return arr;
 }
 function getBorderPalette(n){
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},1)`);
   return arr;
 }
 
