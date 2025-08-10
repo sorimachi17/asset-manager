@@ -414,7 +414,16 @@ function drawPie(){
   const rows = byDate.get(selDate) || [];
   const bucket = new Map();
   for(const r of rows){
-    const k = r[dim] || '(blank)';
+    let k;
+    if(dim === 'Name'){
+      const isCash = (r.AssetClass||'').toLowerCase() === 'cash';
+      k = isCash ? '現金' : (r.Name || '(blank)');
+    }else if(dim === 'StockType' || dim === 'Account'){
+      const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+      k = isStock ? (r[dim] || '(blank)') : '株式以外';
+    }else{
+      k = r[dim] || '(blank)';
+    }
     bucket.set(k, (bucket.get(k)||0) + r.Amount);
   }
   const rawLabels = [...bucket.keys()];
@@ -462,7 +471,7 @@ function drawPie(){
   });
 }
 
-// ---------- Line（Name時は非stock=「株式以外」に集約／最新日0は除外） ----------
+// ---------- Line（Name時は非stock=「株式以外」に集約／StockType・Accountも非stockを「株式以外」と表示／最新日0は除外） ----------
 let lineChart;
 function drawLine(){
   if(!DATES.length) return;
@@ -503,9 +512,27 @@ function drawLine(){
     }
   }else{
     const set = new Set();
-    for(const d of labels){ for(const r of (byDate.get(d)||[])){ set.add(r[dim]||'(blank)'); } }
+    for(const d of labels){
+      for(const r of (byDate.get(d)||[])){
+        if(dim === 'StockType' || dim === 'Account'){
+          const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+          const key = isStock ? (r[dim] || '(blank)') : '株式以外';
+          set.add(key);
+        }else{
+          set.add(r[dim]||'(blank)');
+        }
+      }
+    }
     cats = [...set].sort();
-    series = cats.map(c => labels.map(d => (byDate.get(d)||[]).filter(r => (r[dim]||'(blank)')===c).reduce((s,r)=>s+r.Amount,0)));
+    series = cats.map(c => labels.map(d => (byDate.get(d)||[]).filter(r => {
+      if(dim === 'StockType' || dim === 'Account'){
+        const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+        const key = isStock ? (r[dim] || '(blank)') : '株式以外';
+        return key === c;
+      }else{
+        return (r[dim]||'(blank)') === c;
+      }
+    }).reduce((s,r)=>s+r.Amount,0)));
   }
 
   // 最新日の値が0の系列は除外
