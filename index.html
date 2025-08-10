@@ -311,7 +311,7 @@
 
     <div id="yearView" style="display:none">
       <div class="year-top">
-        <span class="muted">※ 月を選択すると月末総額の詳細を表示（ダブルクリックで月表示へ）</span>
+        <span class="muted">※ 月を選択すると月末総額の詳細を表示（選択中の月を再度タップで月表示へ）</span>
       </div>
       <div class="year-grid" id="yearGrid"></div>
       <div class="muted" id="yearNote" style="margin-top:6px">—</div>
@@ -750,6 +750,7 @@ function initCalendarDefaults(){
 
 function syncCalUI(){
   const monthMode = calState.view==='month';
+  $("calView").value = calState.view;
   $("monthView").style.display = monthMode ? '' : 'none';
   $("yearView").style.display  = monthMode ? 'none' : '';
   $("calNavMonth").style.display = monthMode ? '' : 'none';
@@ -940,11 +941,9 @@ function renderYearView(){
   grid.innerHTML = '';
 
   // 選択状態の初期化（記録がない場合はnull）
-  if(mode==='month'){
-    if(!calState.yearSelected || !calState.yearSelected.startsWith(String(y)) || monthEndDate(y, Number(calState.yearSelected.slice(5)))==null){
-      const first = months.find(mm=>monthEndDate(y,mm)!=null);
-      calState.yearSelected = first? `${y}-${String(first).padStart(2,'0')}` : null;
-    }
+  if(!calState.yearSelected || !calState.yearSelected.startsWith(String(y)) || monthEndDate(y, Number(calState.yearSelected.slice(5)))==null){
+    const first = months.find(mm=>monthEndDate(y,mm)!=null);
+    calState.yearSelected = first? `${y}-${String(first).padStart(2,'0')}` : null;
   }
 
   for(let i=0;i<12;i++){
@@ -1029,15 +1028,16 @@ function renderYearView(){
     }
 
     card.addEventListener('click', ()=>{
-      calState.yearSelected = ym;
-      renderYearView();
-    });
-    card.addEventListener('dblclick', ()=>{
-      calState.view='month';
-      calState.month = ym;
-      const firstInMonth = DATES.find(x=>x.startsWith(calState.month)) || `${calState.month}-01`;
-      calState.selected = firstInMonth;
-      syncCalUI(); renderCalendar();
+      if(calState.yearSelected===ym){
+        calState.view='month';
+        calState.month = ym;
+        const firstInMonth = DATES.find(x=>x.startsWith(calState.month)) || `${calState.month}-01`;
+        calState.selected = firstInMonth;
+        syncCalUI(); renderCalendar();
+      }else{
+        calState.yearSelected = ym;
+        renderYearView();
+      }
     });
 
     grid.appendChild(card);
@@ -1048,7 +1048,7 @@ function renderYearView(){
   $("yearNote").textContent = (firstDispMonth==null) ? 'この年の記録がありません' :
     `${y}-${String(firstDispMonth).padStart(2,'0')} 〜 ${y}-${String(lastDispMonth).padStart(2,'0')}（各月の最終記録日基準）`;
 
-  if(mode==='month' && calState.yearSelected){ renderYearDetail(); }
+  if(calState.yearSelected){ renderYearDetail(); }
   else { $("yearDetail").style.display='none'; }
 }
 
@@ -1064,12 +1064,11 @@ function renderYearDetail(){
     return;
   }
   detail.style.display='';
-  titleEl.textContent = `${ym} 月末`;
-
   const y = Number(ym.slice(0,4));
   const m = Number(ym.slice(5));
   const end = monthEndDate(y,m);
-  if(!end){ bodyEl.textContent='記録なし'; return; }
+  if(!end){ titleEl.textContent = `${ym} 月末`; bodyEl.textContent='記録なし'; return; }
+  titleEl.textContent = `${ym} 月末（${end}）`;
 
   // 前月末（前年補完あり）
   let prevEnd = null;
@@ -1099,7 +1098,7 @@ function renderYearDetail(){
     return `<div>${escapeHtml(r.Name)}: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
   }).join('');
 
-  const summary = `月末総額：${yen(total)}<br/>前月比：<span style="color:${deltaColor}">${deltaStr}</span>${prevEnd?`（前月: ${prevEnd}）`:''}`;
+  const summary = `月末総額（${end}）：${yen(total)}<br/>前月比：<span style="color:${deltaColor}">${deltaStr}</span>${prevEnd?`（前月: ${prevEnd}）`:''}`;
   bodyEl.innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
 }
 
