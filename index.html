@@ -324,19 +324,18 @@ const META_BY_DATE_NAME = new Map(); // date -> Map(Name -> {AssetClass,...})
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
-// Robinhood inspired palette
+// Cyberpunk-inspired blue/green palette
 const PALETTE_BASE = [
-  '0,200,5',     // brand green
-  '66,194,255',  // light blue
-  '255,72,66',   // coral
-  '255,144,0',   // orange
-  '141,84,217',  // purple
-  '0,172,155',   // teal
-  '255,199,0',   // yellow
-  '255,0,186',   // magenta
-  '100,100,100', // gray
-  '53,178,116',  // mint
-  '255,105,180'  // pink
+  '0,255,255',   // cyber cyan
+  '0,180,255',   // neon blue
+  '57,255,20',   // laser green
+  '0,120,255',   // electric blue
+  '0,255,170',   // aqua green
+  '0,150,255',   // azure
+  '0,255,200',   // mint
+  '0,90,255',    // deep blue
+  '0,255,120',   // neon lime
+  '0,210,255'    // sky neon
 ];
 const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.8)`);
 
@@ -619,13 +618,13 @@ function drawLine(){
           borderColor:COLORS[i%COLORS.length],
           backgroundColor:COLORS[i%COLORS.length]
         })),
-        {label:'合計',data:totals,borderColor:'rgba(0,200,5,1)',backgroundColor:'rgba(0,200,5,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
+        {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
       ]},
     options:{
       responsive:true,
-      scales:{x:{grid:{color:'rgba(255,255,255,0.14)'},ticks:{color:'#cfd6e4',autoSkip:true,maxTicksLimit:12}},
-              y:{grid:{color:'rgba(255,255,255,0.14)'},ticks:{color:'#cfd6e4',callback:(v)=>'¥'+fmt(v)}}},
-      plugins:{legend:{position:'bottom',labels:{color:'#e8ecf1'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
+      scales:{x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
+              y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}},
+      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
     }
   });
 }
