@@ -324,27 +324,25 @@ const META_BY_DATE_NAME = new Map(); // date -> Map(Name -> {AssetClass,...})
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
-const COLORS = [
-  'rgba(255,0,255,0.5)','rgba(0,255,255,0.5)','rgba(255,255,0,0.5)','rgba(0,255,170,0.5)','rgba(255,0,170,0.5)',
-  'rgba(0,170,255,0.5)','rgba(170,0,255,0.5)','rgba(255,85,0,0.5)','rgba(0,255,85,0.5)','rgba(85,0,255,0.5)'
+const PALETTE_BASE = [
+  '59,130,246','139,92,246','107,114,128','30,64,175','16,185,129',
+  '99,102,241','71,85,105','56,189,248','168,85,247','34,197,94'
 ];
+const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.6)`);
 
 function getPalette(n){
-  const base = [
-    'rgba(255,0,255,0.5)','rgba(0,255,255,0.5)','rgba(255,255,0,0.5)','rgba(0,255,170,0.5)','rgba(255,0,170,0.5)',
-    'rgba(0,170,255,0.5)','rgba(170,0,255,0.5)','rgba(255,85,0,0.5)','rgba(0,255,85,0.5)','rgba(85,0,255,0.5)'
-  ];
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(base[i%base.length]);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.4)`);
   return arr;
 }
 function getHoverPalette(n){
-  const base = [
-    'rgba(255,0,255,0.7)','rgba(0,255,255,0.7)','rgba(255,255,0,0.7)','rgba(0,255,170,0.7)','rgba(255,0,170,0.7)',
-    'rgba(0,170,255,0.7)','rgba(170,0,255,0.7)','rgba(255,85,0,0.7)','rgba(0,255,85,0.7)','rgba(85,0,255,0.7)'
-  ];
   const arr = [];
-  for(let i=0;i<n;i++) arr.push(base[i%base.length]);
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.6)`);
+  return arr;
+}
+function getBorderPalette(n){
+  const arr = [];
+  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`);
   return arr;
 }
 
@@ -471,6 +469,7 @@ function drawPie(){
 
   const colors = getPalette(labels.length);
   const hoverColors = getHoverPalette(labels.length);
+  const borderColors = getBorderPalette(labels.length);
 
   if(pieChart) pieChart.destroy();
   pieHidden.clear();
@@ -480,7 +479,9 @@ function drawPie(){
       data,
       backgroundColor: colors,
       hoverBackgroundColor: hoverColors,
-      borderWidth: 0
+      borderColor: borderColors,
+      hoverBorderColor: borderColors,
+      borderWidth: 1
     }]},
     options:{
       cutout:'28%',
