@@ -325,14 +325,14 @@ const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const COLORS = [
-  'rgba(255,0,255,0.8)','rgba(0,255,255,0.8)','rgba(255,255,0,0.8)','rgba(0,255,170,0.8)','rgba(255,0,170,0.8)',
-  'rgba(0,170,255,0.8)','rgba(170,0,255,0.8)','rgba(255,85,0,0.8)','rgba(0,255,85,0.8)','rgba(85,0,255,0.8)'
+  'rgba(255,0,255,0.5)','rgba(0,255,255,0.5)','rgba(255,255,0,0.5)','rgba(0,255,170,0.5)','rgba(255,0,170,0.5)',
+  'rgba(0,170,255,0.5)','rgba(170,0,255,0.5)','rgba(255,85,0,0.5)','rgba(0,255,85,0.5)','rgba(85,0,255,0.5)'
 ];
 
 function getPalette(n){
   const base = [
-    'rgba(255,0,255,0.7)','rgba(0,255,255,0.7)','rgba(255,255,0,0.7)','rgba(0,255,170,0.7)','rgba(255,0,170,0.7)',
-    'rgba(0,170,255,0.7)','rgba(170,0,255,0.7)','rgba(255,85,0,0.7)','rgba(0,255,85,0.7)','rgba(85,0,255,0.7)'
+    'rgba(255,0,255,0.5)','rgba(0,255,255,0.5)','rgba(255,255,0,0.5)','rgba(0,255,170,0.5)','rgba(255,0,170,0.5)',
+    'rgba(0,170,255,0.5)','rgba(170,0,255,0.5)','rgba(255,85,0,0.5)','rgba(0,255,85,0.5)','rgba(85,0,255,0.5)'
   ];
   const arr = [];
   for(let i=0;i<n;i++) arr.push(base[i%base.length]);
@@ -340,8 +340,8 @@ function getPalette(n){
 }
 function getHoverPalette(n){
   const base = [
-    'rgba(255,0,255,0.9)','rgba(0,255,255,0.9)','rgba(255,255,0,0.9)','rgba(0,255,170,0.9)','rgba(255,0,170,0.9)',
-    'rgba(0,170,255,0.9)','rgba(170,0,255,0.9)','rgba(255,85,0,0.9)','rgba(0,255,85,0.9)','rgba(85,0,255,0.9)'
+    'rgba(255,0,255,0.7)','rgba(0,255,255,0.7)','rgba(255,255,0,0.7)','rgba(0,255,170,0.7)','rgba(255,0,170,0.7)',
+    'rgba(0,170,255,0.7)','rgba(170,0,255,0.7)','rgba(255,85,0,0.7)','rgba(0,255,85,0.7)','rgba(85,0,255,0.7)'
   ];
   const arr = [];
   for(let i=0;i<n;i++) arr.push(base[i%base.length]);
