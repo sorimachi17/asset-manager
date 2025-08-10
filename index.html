@@ -870,10 +870,6 @@ function renderYearView(){
   const grid = $("yearGrid");
   grid.innerHTML = '';
 
-  // 事前に distinct 値でミニ草色のスケール用しきい値を作る
-  const latest = DATES.at(-1);
-  const latestTotal = sumAt(latest);
-
   for(let i=0;i<12;i++){
     const m = months[i];
     const card = document.createElement('div');
@@ -911,9 +907,13 @@ function renderYearView(){
         const cells = Array.from({length:42},(_,k)=> start.add(k,'day'));
         const mini = document.createElement('div');
         mini.className = 'mini-month';
-        // しきい値
+        // しきい値 (前日比の絶対値)
         const monthDays = cells.filter(d=>d.month()===base.month()).map(d=>d.format('YYYY-MM-DD'));
-        const diffsAbs = monthDays.map(d=> Math.abs((byDate.has(d)? sumAt(d):latestTotal) - latestTotal));
+        const diffsAbs = monthDays.map(d=>{
+          if(!byDate.has(d)) return 0;
+          const prev = previousRecordedDate(d);
+          return prev ? Math.abs(sumAt(d) - sumAt(prev)) : 0;
+        });
         const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
         const q = p => (sorted.length? sorted[Math.floor((sorted.length-1)*p)] : 0);
         const t1=q(0.25), t2=q(0.5), t3=q(0.75), t4=q(0.9);
@@ -922,14 +922,20 @@ function renderYearView(){
           const ymd = d.format('YYYY-MM-DD');
           const box = document.createElement('div'); box.className='mini-day';
           if(d.month()===base.month()){
-            const tot = byDate.has(ymd)? sumAt(ymd) : latestTotal;
-            const diff = latestTotal - tot;
-            if(byDate.has(ymd) && diff===0){ box.classList.add('eq'); }
-            else{
-              const a = Math.abs(diff);
-              let tag = '';
-              if(a>0 && a<=t1) tag='1'; else if(a>t1 && a<=t2) tag='2'; else if(a>t2 && a<=t3) tag='3'; else if(a>t3 && a<=t4) tag='4'; else if(a>t4) tag='4';
-              if(tag) box.classList.add(diff>0?('u'+tag):('d'+tag));
+            if(byDate.has(ymd)){
+              const prev = previousRecordedDate(ymd);
+              if(prev){
+                const diff = sumAt(ymd) - sumAt(prev);
+                if(diff===0){ box.classList.add('eq'); }
+                else{
+                  const a = Math.abs(diff);
+                  let tag = '';
+                  if(a>0 && a<=t1) tag='1'; else if(a>t1 && a<=t2) tag='2'; else if(a>t2 && a<=t3) tag='3'; else if(a>t3 && a<=t4) tag='4'; else if(a>t4) tag='4';
+                  if(tag) box.classList.add(diff>0?('u'+tag):('d'+tag));
+                }
+              }else{
+                box.classList.add('eq');
+              }
             }
           }else{
             box.style.opacity=.25;
