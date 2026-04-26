@@ -32,7 +32,7 @@
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
     .big{font-size:22px;font-weight:700;margin-top:6px}
     .sub{font-size:12px;color:var(--muted)}
-    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0;overflow:hidden}
     h2{margin:0 0 6px 0;font-size:16px}
     .h2-sub{margin-top:-2px;font-size:12px;color:var(--muted)}
     select, input[type="date"], input[type="month"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
@@ -190,6 +190,8 @@
       #analTable{min-width:100%;font-size:11px}
       #analTable th,#analTable td{padding:4px 3px}
       #analTable th:nth-child(n+5),#analTable td:nth-child(n+5){display:none}
+      #analTable th:nth-child(4){min-width:0!important}
+      #analTable td:nth-child(4) .pct-bar-wrap{min-width:20px}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
@@ -713,27 +715,68 @@ let pieHidden = new Set();
 const pieLabelsPlugin = {
   id: 'pieLabels',
   afterDatasetsDraw(chart) {
-    const { ctx, data } = chart;
+    const { ctx, data, chartArea } = chart;
     const meta = chart.getDatasetMeta(0);
     const total = data.datasets[0].data.reduce((s,v,i)=>s+(chart.getDataVisibility(i)?v:0),0);
-    if(!total) return;
-    ctx.save();
+    if(!total || !meta.data.length) return;
+    const cx = (chartArea.left + chartArea.right) / 2;
+    const cy = (chartArea.top + chartArea.bottom) / 2;
+    const outerR = meta.data[0]?.outerRadius ?? 0;
+    if(!outerR) return;
+
+    // Build label entries with initial outside positions
+    const items = [];
     meta.data.forEach((arc, i) => {
       if(!chart.getDataVisibility(i)) return;
       const val = data.datasets[0].data[i];
-      const pct = val/total*100;
+      const pct = val / total * 100;
       if(pct < 1) return;
-      const pos = arc.tooltipPosition();
-      const raw = data.labels[i];
-      const label = raw.length > 10 ? raw.slice(0,10)+'…' : raw;
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
+      const mid = (arc.startAngle + arc.endAngle) / 2;
+      items.push({
+        pct,
+        raw: data.labels[i],
+        arcX: cx + Math.cos(mid) * outerR * 1.03,
+        arcY: cy + Math.sin(mid) * outerR * 1.03,
+        lx:   cx + Math.cos(mid) * outerR * 1.18,
+        ly:   cy + Math.sin(mid) * outerR * 1.18,
+        isRight: Math.cos(mid) >= 0
+      });
+    });
+
+    // Deconflict labels on each side by spreading them vertically
+    const LH = 18;
+    [true, false].forEach(side => {
+      const grp = items.filter(it => it.isRight === side);
+      grp.sort((a, b) => a.ly - b.ly);
+      for(let i = 1; i < grp.length; i++){
+        if(grp[i].ly - grp[i-1].ly < LH) grp[i].ly = grp[i-1].ly + LH;
+      }
+      grp.forEach(it => {
+        it.ly = Math.max(chartArea.top + 7, Math.min(chartArea.bottom - 7, it.ly));
+      });
+    });
+
+    ctx.save();
+    items.forEach(it => {
+      const label = it.raw.length > 9 ? it.raw.slice(0, 9) + '…' : it.raw;
+      const tx = it.isRight ? it.lx + 3 : it.lx - 3;
+      // Leader line
+      ctx.beginPath();
+      ctx.moveTo(it.arcX, it.arcY);
+      ctx.lineTo(it.lx, it.ly);
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      // Name
+      ctx.textAlign = it.isRight ? 'left' : 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, pos.x, pos.y - 6);
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillText(label, tx, it.ly - 5);
+      // Percentage
       ctx.font = '9px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.fillText(pct.toFixed(1)+'%', pos.x, pos.y + 6);
+      ctx.fillStyle = 'rgba(160,200,255,0.85)';
+      ctx.fillText(it.pct.toFixed(1) + '%', tx, it.ly + 5);
     });
     ctx.restore();
   }
@@ -779,6 +822,7 @@ function drawPie(){
     }]},
     options:{
       cutout:'28%',
+      layout:{ padding:40 },
       plugins:{
         legend:{display:false},
         tooltip:{callbacks:{
@@ -1494,7 +1538,8 @@ function updateSelSummary(totalVal){
   $('selCount').textContent     = count;
   $('selTotal').textContent     = yen(selTotal);
   $('selPct').textContent       = selPct.toFixed(1);
-  $('selNames').textContent     = [...analSelected].join('、');
+  const _names = [...analSelected];
+  $('selNames').textContent = _names.length > 4 ? _names.slice(0,4).join('、') + ` 他${_names.length-4}銘柄` : _names.join('、');
 
   if(selVizMode === 'bar'){
     $('selBarView').style.display = '';
