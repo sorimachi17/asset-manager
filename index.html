@@ -724,7 +724,12 @@ const pieLabelsPlugin = {
     const outerR = meta.data[0]?.outerRadius ?? 0;
     if(!outerR) return;
 
-    // Build label entries with initial outside positions
+    // Canvas CSS pixel dimensions for boundary checks
+    const cw = chart.canvas.clientWidth  || chart.canvas.offsetWidth  || chartArea.right  + 50;
+    const ch = chart.canvas.clientHeight || chart.canvas.offsetHeight || chartArea.bottom + 50;
+    const PAD = 3; // minimum gap from canvas edge
+
+    // Build label entries
     const items = [];
     meta.data.forEach((arc, i) => {
       if(!chart.getDataVisibility(i)) return;
@@ -737,14 +742,14 @@ const pieLabelsPlugin = {
         raw: data.labels[i],
         arcX: cx + Math.cos(mid) * outerR * 1.03,
         arcY: cy + Math.sin(mid) * outerR * 1.03,
-        lx:   cx + Math.cos(mid) * outerR * 1.18,
-        ly:   cy + Math.sin(mid) * outerR * 1.18,
+        lx:   cx + Math.cos(mid) * outerR * 1.17,
+        ly:   cy + Math.sin(mid) * outerR * 1.17,
         isRight: Math.cos(mid) >= 0
       });
     });
 
-    // Deconflict labels on each side by spreading them vertically
-    const LH = 18;
+    // Deconflict each side vertically, clamp to canvas
+    const LH = 19;
     [true, false].forEach(side => {
       const grp = items.filter(it => it.isRight === side);
       grp.sort((a, b) => a.ly - b.ly);
@@ -752,14 +757,32 @@ const pieLabelsPlugin = {
         if(grp[i].ly - grp[i-1].ly < LH) grp[i].ly = grp[i-1].ly + LH;
       }
       grp.forEach(it => {
-        it.ly = Math.max(chartArea.top + 7, Math.min(chartArea.bottom - 7, it.ly));
+        it.ly = Math.max(PAD + 8, Math.min(ch - PAD - 8, it.ly));
       });
     });
 
     ctx.save();
     items.forEach(it => {
-      const label = it.raw.length > 9 ? it.raw.slice(0, 9) + '…' : it.raw;
-      const tx = it.isRight ? it.lx + 3 : it.lx - 3;
+      const label  = it.raw.length > 10 ? it.raw.slice(0, 10) + '…' : it.raw;
+      const pctStr = it.pct.toFixed(1) + '%';
+
+      // Measure actual text widths to detect canvas overflow
+      ctx.font = '10px sans-serif';
+      const nameW = ctx.measureText(label).width;
+      ctx.font = '9px sans-serif';
+      const pctW  = ctx.measureText(pctStr).width;
+      const maxW  = Math.max(nameW, pctW);
+
+      // Decide anchor side: prefer away from center, but flip if it overflows canvas
+      let tx, align;
+      if(it.isRight) {
+        if(it.lx + 4 + maxW <= cw - PAD) { tx = it.lx + 4; align = 'left';  }
+        else                               { tx = it.lx - 4; align = 'right'; }
+      } else {
+        if(it.lx - 4 - maxW >= PAD)       { tx = it.lx - 4; align = 'right'; }
+        else                               { tx = it.lx + 4; align = 'left';  }
+      }
+
       // Leader line
       ctx.beginPath();
       ctx.moveTo(it.arcX, it.arcY);
@@ -767,16 +790,16 @@ const pieLabelsPlugin = {
       ctx.strokeStyle = 'rgba(255,255,255,0.22)';
       ctx.lineWidth = 0.8;
       ctx.stroke();
-      // Name
-      ctx.textAlign = it.isRight ? 'left' : 'right';
+
+      // Name + percentage
+      ctx.textAlign = align;
       ctx.textBaseline = 'middle';
       ctx.font = '10px sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.fillText(label, tx, it.ly - 5);
-      // Percentage
       ctx.font = '9px sans-serif';
       ctx.fillStyle = 'rgba(160,200,255,0.85)';
-      ctx.fillText(it.pct.toFixed(1) + '%', tx, it.ly + 5);
+      ctx.fillText(pctStr, tx, it.ly + 5);
     });
     ctx.restore();
   }
