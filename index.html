@@ -132,7 +132,12 @@
 
     /* mobile */
     @media (max-width:600px){
-      .wrap{padding:12px}
+      .wrap{padding:10px}
+      h1{font-size:16px}
+      button{padding:8px 10px;font-size:13px}
+      .toolbar{gap:6px}
+      .big{font-size:18px}
+      select,input[type="date"]{padding:6px;font-size:13px}
       .cal-grid{gap:4px}
       .day-cell{padding:5px;border-radius:10px}
       .weekday{font-size:11px}
@@ -143,10 +148,24 @@
       #cmpTable th,#cmpTable td{padding:4px 3px}
       #cmpTable th:first-child,#cmpTable td:first-child{white-space:normal;word-break:break-word}
       .year-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      /* 銘柄分析 */
+      #analTable{min-width:100%;font-size:11px}
+      #analTable th,#analTable td{padding:4px 3px}
+      .sel-summary{gap:8px;padding:8px 10px;font-size:12px}
+      /* モーダル */
+      .modal-box{padding:14px}
+      .map-row{flex-direction:column;align-items:flex-start;gap:4px}
+      .map-label{width:auto}
+      .map-row select{width:100%}
+      .controls{gap:6px}
     }
     @media (max-width:420px){
       .day-total{font-size:8px}
       .day-num{font-size:11px}
+      .big{font-size:16px}
+      h1{font-size:15px}
+      /* 420px以下では銘柄分析テーブルのAssetClass・Currency・Account列を非表示 */
+      #analTable th:nth-child(n+5),#analTable td:nth-child(n+5){display:none}
     }
 
     /* 銘柄分析 */
