@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>資産管理アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;
+      --panel:#151618;--grid:rgba(255,255,255,.14);--accent:#3b82f6;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;max-width:100%;overflow-x:hidden}
+    header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(17,17,17,.9);backdrop-filter:saturate(120%) blur(6px);z-index:10}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    h1{margin:0 0 8px 0;font-size:20px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input[type="file"]{padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+    button{background:#1a5fff;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .btn-danger{background:#7f1d1d}
+    .btn-ghost{background:#1e2638;border:1px solid var(--line)}
+    .muted{color:var(--muted);font-size:12px}
+    .saved-badge{font-size:11px;color:#22c55e;display:none}
+    main{display:grid;gap:16px}
+    .kpi{display:grid;grid-template-columns:1fr;gap:12px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .big{font-size:22px;font-weight:700;margin-top:6px}
+    .sub{font-size:12px;color:var(--muted)}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    h2{margin:0 0 6px 0;font-size:16px}
+    .h2-sub{margin-top:-2px;font-size:12px;color:var(--muted)}
+    select, input[type="date"], input[type="month"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
+    .legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+    .legend-item.inactive{opacity:.4;text-decoration:line-through}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+    .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
+    .chart-wrap canvas{width:100%;}
+
+    /* ===== Calendar (responsive + grass) ===== */
+    .cal-header{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
+    .cal-nav{display:flex;align-items:center;gap:8px}
+    .icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:#1b1b1b;color:#cfd6e4;cursor:pointer}
+    .cal-title{font-size:18px;font-weight:600}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;width:100%}
+    .weekday{font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px}
+    .day-cell{
+      background:#1c1f25;border:1px solid #2a2f3a;border-radius:12px;
+      padding:8px;display:flex;flex-direction:column;gap:4px;cursor:pointer;
+      aspect-ratio:1/1; min-width:0;
+    }
+    .day-cell.disabled{opacity:.35;cursor:default}
+    .day-cell:hover{border-color:#3b4252}
+    .day-head{display:flex;justify-content:space-between;align-items:center;gap:6px}
+    .day-num{font-size:12px;line-height:1;color:#c9ced6;flex:0 0 auto}
+    .day-total{font-size:12px;line-height:1;color:#c9d7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .day-delta{font-size:11px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .selected{outline:2px solid var(--accent); outline-offset:-2px}
+    .cal-detail{margin-top:12px;background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:14px}
+    .detail-title{font-size:16px;font-weight:600;margin:0 0 8px 0}
+
+    /* grass colors */
+    .up1{background:#0e4429}.up2{background:#006d32}.up3{background:#26a641}.up4{background:#39d353}.up5{background:#63d353}
+    .dn1{background:#fee2e2}.dn2{background:#fecaca}.dn3{background:#fca5a5}.dn4{background:#f87171}.dn5{background:#ef4444}
+    .eq{background:#1e2638}
+    .day-cell.plus{background:rgba(34,197,94,.15);border-color:#22c55e;}
+    .day-cell.minus{background:rgba(239,68,68,.15);border-color:#ef4444;}
+
+    /* year summary */
+    .year-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+    .year-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .month-card{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+    .month-title{font-weight:600;margin-bottom:6px}
+    .mini-month{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-top:6px}
+    .mini-day{
+      width:100%;aspect-ratio:1/1;border:none;border-radius:2px;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;background:rgba(0,0,0,0.3);transition:background-color .2s;
+    }
+    .mini-day.neutral{background:rgba(0,0,0,0.3)}
+    .mini-day.gain-low{background:rgba(34,197,94,0.25)}
+    .mini-day.gain-mid{background:rgba(34,197,94,0.45)}
+    .mini-day.gain-high{background:rgba(34,197,94,0.65)}
+    .mini-day.loss-low{background:rgba(239,68,68,0.25);color:#eee}
+    .mini-day.loss-mid{background:rgba(239,68,68,0.45);color:#eee}
+    .mini-day.loss-high{background:rgba(239,68,68,0.65);color:#eee}
+    .mini-day.gain-low:hover{background:rgba(34,197,94,0.35)}
+    .mini-day.gain-mid:hover{background:rgba(34,197,94,0.6)}
+    .mini-day.gain-high:hover{background:rgba(34,197,94,0.8)}
+    .mini-day.loss-low:hover{background:rgba(239,68,68,0.35)}
+    .mini-day.loss-mid:hover{background:rgba(239,68,68,0.6)}
+    .mini-day.loss-high:hover{background:rgba(239,68,68,0.8)}
+    .mini-day.neutral:hover{background:rgba(0,0,0,0.5)}
+    .pos{color:#22c55e}.neg{color:#ef4444}
+
+    /* tables */
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:right;white-space:nowrap}
+    th:first-child, td:first-child{text-align:left}
+    th.sortable{cursor:pointer}
+
+    /* 2日比較：モバイル対応 */
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+    #cmpTable{min-width:720px}
+
+    /* 銘柄リンク */
+    .stock-link{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
+    .stock-link:hover{opacity:.8}
+
+    /* モーダル */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:16px}
+    .modal-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-height:90vh;overflow-y:auto}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .modal-title{font-size:18px;font-weight:600;margin:0}
+    .modal-close{background:none;border:1px solid var(--line);color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+    .map-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .map-label{width:110px;flex:0 0 110px;font-weight:500}
+    .map-row select{flex:1}
+
+    /* pc */
+    @media (min-width:900px){
+      main{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .kpi{grid-column:1 / -1}
+      .panel.wide{grid-column:1 / -1}
+    }
+
+    /* mobile */
+    @media (max-width:600px){
+      .wrap{padding:12px}
+      .cal-grid{gap:4px}
+      .day-cell{padding:5px;border-radius:10px}
+      .weekday{font-size:11px}
+      .cal-title{font-size:16px}
+      .day-total{font-size:9px}
+      .day-delta{font-size:9px}
+      #cmpTable{min-width:100%;font-size:11px}
+      #cmpTable th,#cmpTable td{padding:4px 3px}
+      #cmpTable th:first-child,#cmpTable td:first-child{white-space:normal;word-break:break-word}
+      .year-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:420px){
+      .day-total{font-size:8px}
+      .day-num{font-size:11px}
+    }
+
+    /* 銘柄分析 */
+    .pct-bar-wrap{background:#1e2638;border-radius:4px;height:6px;flex:1;min-width:60px;max-width:140px;overflow:hidden}
+    .pct-bar{height:100%;border-radius:4px;background:rgba(0,255,200,0.65);transition:width .3s}
+    .sel-summary{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.35);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .sel-summary strong{color:#93c5fd}
+    .anal-selected td{background:rgba(59,130,246,0.09)!important}
+    #analTable{min-width:640px}
+    .anal-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>資産管理アプリ</h1>
+    <div class="toolbar">
+      <input id="file" type="file" accept=".csv" />
+      <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
+      <button id="exportCsv" disabled>CSV書き出し</button>
+      <button id="clearData" class="btn-danger" disabled>データをクリア</button>
+      <span id="savedBadge" class="saved-badge">● 保存済み</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- KPI（統合） -->
+  <section class="kpi" id="kpis">
+    <div class="card">
+      <div class="muted">評価総額 <span id="kpiDateLabel"></span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+        <input type="date" id="totalDate"/>
+      </div>
+      <div class="big" id="totalValue">—</div>
+      <div class="sub" id="kpiDoDLine" style="margin-top:4px;">—</div>
+      <div class="sub" id="kpiMoMLine" style="margin-top:2px;">—</div>
+      <div class="sub" id="kpiYtdLine" style="margin-top:2px;">—</div>
+    </div>
+  </section>
+
+  <!-- 資産分類 -->
+  <section class="panel">
+    <h2>資産分類</h2>
+    <div class="h2-sub" id="pieDateNote">—</div>
+    <div class="controls">
+      <label>区分:
+        <select id="pieDimension">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+    </div>
+    <div class="chart-wrap"><canvas id="pieChart" height="200"></canvas></div>
+    <div class="legend-row" id="pieLegend"></div>
+  </section>
+
+  <!-- 日別推移 -->
+  <section class="panel">
+    <h2>日別推移</h2>
+    <div class="h2-sub" id="lineRangeNote">—</div>
+    <div class="controls">
+      <label>区分:
+        <select id="lineDimension">
+          <option value="AssetClass">AssetClass（資産分類）</option>
+          <option value="Currency">Currency（通貨）</option>
+          <option value="Name">Name（銘柄）</option>
+          <option value="StockType">StockType（区分）</option>
+          <option value="Account">Account（口座）</option>
+        </select>
+      </label>
+      <label>期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
+      <button id="applyRange">反映</button>
+    </div>
+    <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
+    <div class="muted">※ 記録日のみ表示（点マーカーは非表示）／最新日が¥0の系列は非表示</div>
+  </section>
+
+  <!-- 2日間比較（表のみ） -->
+  <section class="panel wide">
+    <h2>2日間比較</h2>
+    <div class="h2-sub">指定した2日間の銘柄別比較（A・Bともに0の行は表示しません）</div>
+    <div class="controls">
+      <label>日付A: <input type="date" id="cmpDateA"></label>
+      <label>日付B: <input type="date" id="cmpDateB"></label>
+      <label>AssetClass:
+        <select id="cmpFAsset"><option value="">(すべて)</option></select>
+      </label>
+      <label>StockType:
+        <select id="cmpFSType"><option value="">(すべて)</option></select>
+      </label>
+      <label>Currency:
+        <select id="cmpFCcy"><option value="">(すべて)</option></select>
+      </label>
+      <label>Account:
+        <select id="cmpFAcc"><option value="">(すべて)</option></select>
+      </label>
+      <button id="applyCmp">比較</button>
+    </div>
+    <div class="muted" id="cmpNote">—</div>
+
+    <h3 style="margin:14px 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
+    <div class="h2-sub" id="cmpDetailNote">—</div>
+    <div class="table-wrap">
+      <table id="cmpTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-key="Name">銘柄</th>
+            <th class="sortable" data-key="a" style="text-align:right">A日額</th>
+            <th class="sortable" data-key="b" style="text-align:right">B日額</th>
+            <th class="sortable" data-key="diff" style="text-align:right">差額</th>
+            <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 月カレンダー -->
+  <section class="panel wide">
+    <h2>月カレンダー</h2>
+    <div class="cal-header">
+      <div class="cal-nav" id="calNavMonth">
+        <button id="calPrev" class="icon-btn" aria-label="前の月"><</button>
+        <div class="cal-title" id="calTitle">—</div>
+        <button id="calNext" class="icon-btn" aria-label="次の月">></button>
+      </div>
+      <div class="cal-nav" id="calNavYear" style="display:none">
+        <button id="yearPrev" class="icon-btn" aria-label="前年"><</button>
+        <div class="cal-title" id="yearTitle">—年</div>
+        <button id="yearNext" class="icon-btn" aria-label="翌年">></button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label class="muted">表示:
+          <select id="calView">
+            <option value="month">月表示</option>
+            <option value="year">年表示</option>
+          </select>
+        </label>
+        <span id="yearModeWrap" class="muted" style="display:none">
+          モード:
+          <select id="yearMode">
+            <option value="month">月タイル</option>
+            <option value="day">日タイル（12か月）</option>
+          </select>
+        </span>
+        <label class="muted" id="sortWrap">並び順:
+          <select id="calSort">
+            <option value="amount_desc">金額（降順）</option>
+            <option value="delta_desc">増加額（降順）</option>
+            <option value="pct_desc">増加率（降順）</option>
+            <option value="name_asc">名前（昇順）</option>
+          </select>
+        </label>
+        <span class="muted" id="monthHeaderDelta" style="display:none"></span>
+      </div>
+    </div>
+
+    <div id="monthView">
+      <div class="cal-grid" style="margin-bottom:4px">
+        <div class="weekday">月</div><div class="weekday">火</div><div class="weekday">水</div>
+        <div class="weekday">木</div><div class="weekday">金</div><div class="weekday">土</div><div class="weekday">日</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div class="controls" id="calFilters" style="margin-top:10px">
+        <label>AssetClass:
+          <select id="calFAsset"><option value="">(すべて)</option></select>
+        </label>
+        <label>StockType:
+          <select id="calFSType"><option value="">(すべて)</option></select>
+        </label>
+        <label>Currency:
+          <select id="calFCcy"><option value="">(すべて)</option></select>
+        </label>
+        <label>Account:
+          <select id="calFAcc"><option value="">(すべて)</option></select>
+        </label>
+      </div>
+
+      <div class="cal-detail">
+        <p class="detail-title" id="calDetailDate">—</p>
+        <div id="calDetailBody">記録なし</div>
+      </div>
+    </div>
+
+    <div id="yearView" style="display:none">
+      <div class="year-top">
+        <span class="muted">※ 月を選択すると月末総額の詳細を表示（選択中の月を再度タップで月表示へ）</span>
+      </div>
+      <div class="year-grid" id="yearGrid"></div>
+      <div class="muted" id="yearNote" style="margin-top:6px">—</div>
+      <div class="cal-detail" id="yearDetail" style="display:none">
+        <p class="detail-title" id="yearDetailMonth">—</p>
+        <div id="yearDetailBody">記録なし</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 銘柄別割合・合算 -->
+  <section class="panel wide">
+    <h2>銘柄別割合・合算</h2>
+    <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
+    <div class="controls" style="margin-top:8px">
+      <label>日付: <input type="date" id="analDate"/></label>
+      <span class="muted" id="analDateNote">—</span>
+    </div>
+
+    <div id="stockSelSummary" class="sel-summary" style="display:none">
+      <span>選択中: <strong id="selCount">0</strong> 銘柄</span>
+      <span>合計: <strong id="selTotal">—</strong></span>
+      <span>全体の: <strong id="selPct">—</strong>%</span>
+      <span class="muted" id="selNames" style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;margin-left:auto">選択解除</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="analTable">
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
+            <th class="sortable" data-key="name">銘柄</th>
+            <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
+            <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
+            <th>AssetClass</th>
+            <th>Currency</th>
+            <th>Account</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr style="font-weight:600">
+            <td></td><td>合計</td>
+            <td style="text-align:right" id="analTotalVal">—</td>
+            <td>100%</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- 列マッピング モーダル -->
+<div id="mapModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <h2 class="modal-title">CSV 列マッピング</h2>
+      <button id="mapCancel" class="modal-close">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 14px">CSVの列名が標準と異なります。対応する列を選択してください。</p>
+    <div id="mapBody"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="mapApply">適用して読み込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- 銘柄推移 モーダル -->
+<div id="stockModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:800px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="stockModalTitle">—</h2>
+      <button id="stockClose" class="modal-close">✕</button>
+    </div>
+    <div class="chart-wrap"><canvas id="stockCanvas" height="300"></canvas></div>
+    <p class="muted" id="stockModalNote" style="margin-top:8px"></p>
+  </div>
+</div>
+
+<script>
+dayjs.extend(dayjs_plugin_customParseFormat);
+
+// --- state ---
+let RAW = []; let DATES = []; const byDate = new Map();
+const byDateName = new Map();
+const META_BY_DATE_NAME = new Map();
+
+// --- helpers ---
+const $ = id => document.getElementById(id);
+const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
+const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
+const PALETTE_BASE = [
+  '0,255,255','0,180,255','57,255,20','0,120,255','0,255,170',
+  '0,150,255','0,255,200','0,90,255','0,255,120','0,210,255'
+];
+const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.8)`);
+
+function getPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`); }
+function getHoverPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.9)`); }
+function getBorderPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},1)`); }
+
+function normalizeDate(v){
+  if(!v) return '';
+  if(/年|月|日/.test(v)){ return dayjs(v.replace(/[年月]/g,'-').replace('日',''), ['YYYY-M-D','YYYY-MM-DD']).format('YYYY-MM-DD'); }
+  return dayjs(v, ['YYYY-M-D','YYYY/MM/DD','YYYY-MM-DD']).format('YYYY-MM-DD');
+}
+function nearestOnOrBefore(target){
+  if(!target || !DATES.length) return null;
+  for(let i = DATES.length-1; i >= 0; i--){ if(DATES[i] <= target) return DATES[i]; }
+  return null;
+}
+function previousRecordedDate(cur){ const i = DATES.indexOf(cur); return (i>0) ? DATES[i-1] : null; }
+function compactJPY(n){
+  const sign = n<0?'-':'';
+  const v = Math.abs(n);
+  if(v>=1e12)  return sign + (v/1e12).toFixed(v%1e12?1:0) + '兆';
+  if(v>=1e8)   return sign + (v/1e8 ).toFixed(v%1e8 ?1:0) + '億';
+  if(v>=1e4)   return sign + Math.round(v/1e4).toLocaleString('ja-JP') + '万';
+  return sign + Math.round(v).toLocaleString('ja-JP');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ===================== LocalStorage =====================
+const LS_KEY = 'asset_mgr_v1';
+
+function saveToStorage(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(RAW));
+    const badge = $('savedBadge');
+    badge.style.display = 'inline';
+  }catch(e){ console.warn('LocalStorage save failed:', e); }
+}
+
+function tryLoadSaved(){
+  try{
+    const saved = localStorage.getItem(LS_KEY);
+    if(!saved) return false;
+    const data = JSON.parse(saved);
+    if(!Array.isArray(data) || !data.length) return false;
+    RAW = data;
+    buildIndexes();
+    onDataReady();
+    $('exportCsv').disabled = false;
+    $('clearData').disabled = false;
+    $('savedBadge').style.display = 'inline';
+    return true;
+  }catch(e){ return false; }
+}
+
+function clearStorage(){
+  if(!confirm('保存されたデータを削除してページをリセットしますか？')) return;
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+}
+
+// ===================== CSV列マッピング =====================
+const REQUIRED_FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+
+let _pendingRawRows = null;
+
+function parseCSV(text){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const headers = parsed.meta.fields || [];
+  const missing = REQUIRED_FIELDS.filter(f => !headers.includes(f));
+  if(missing.length === 0){
+    applyMappingAndProcess(
+      Object.fromEntries(REQUIRED_FIELDS.map(f=>[f,f])),
+      parsed.data
+    );
+  } else {
+    _pendingRawRows = parsed.data;
+    showMapModal(headers);
+  }
+}
+
+function showMapModal(headers){
+  const body = $('mapBody');
+  body.innerHTML = REQUIRED_FIELDS.map(field => {
+    const opts = headers.map(h =>
+      `<option value="${escapeHtml(h)}" ${h===field?'selected':''}>${escapeHtml(h)}</option>`
+    ).join('');
+    return `<div class="map-row">
+      <span class="map-label">${field}</span>
+      <select id="map_${field}"><option value="">(なし)</option>${opts}</select>
+    </div>`;
+  }).join('');
+  $('mapModal').style.display = 'flex';
+}
+
+$('mapApply').addEventListener('click', ()=>{
+  const mapping = Object.fromEntries(REQUIRED_FIELDS.map(f => [f, $('map_'+f).value]));
+  $('mapModal').style.display = 'none';
+  if(_pendingRawRows){ applyMappingAndProcess(mapping, _pendingRawRows); _pendingRawRows = null; }
+});
+$('mapCancel').addEventListener('click', ()=>{ $('mapModal').style.display = 'none'; _pendingRawRows = null; });
+
+function applyMappingAndProcess(mapping, rawRows){
+  RAW = rawRows.map(r => ({
+    Date:      normalizeDate(r[mapping.Date] || ''),
+    Name:      (r[mapping.Name] || '').trim(),
+    Amount:    Number(String(r[mapping.Amount] || '0').replace(/,/g,'')) || 0,
+    AssetClass:(r[mapping.AssetClass] || '').trim(),
+    Currency:  (r[mapping.Currency] || '').trim(),
+    StockType: (r[mapping.StockType] || '').trim(),
+    Account:   (r[mapping.Account] || '').trim()
+  })).filter(r => r.Date);
+  buildIndexes();
+  onDataReady();
+  $('exportCsv').disabled = RAW.length === 0;
+  $('clearData').disabled = RAW.length === 0;
+}
+
+// ===================== indexes =====================
+function buildIndexes(){
+  byDate.clear(); byDateName.clear(); META_BY_DATE_NAME.clear(); DATES = [];
+  for(const r of RAW){
+    if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
+    byDate.get(r.Date).push(r);
+    if(!byDateName.has(r.Date)) byDateName.set(r.Date, new Map());
+    const m = byDateName.get(r.Date);
+    m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
+    if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
+    const mm = META_BY_DATE_NAME.get(r.Date);
+    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account});
+  }
+  DATES.sort();
+}
+
+function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0); }
+function amountOfNameAt(name, date){ if(!date) return 0; const m = byDateName.get(date); return m ? (m.get(name)||0) : 0; }
+function attrsOfNameAt(name, date){
+  if(!date) return {};
+  const m = META_BY_DATE_NAME.get(date);
+  if(m && m.has(name)) return m.get(name);
+  const prev = previousRecordedDate(date);
+  if(prev && META_BY_DATE_NAME.get(prev)?.get(name)) return META_BY_DATE_NAME.get(prev).get(name);
+  return {};
+}
+function computeMonthBase(curDate){ const t = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD'); return nearestOnOrBefore(t); }
+
+// ===================== KPIs =====================
+function refreshKPIs(){
+  if(!DATES.length){
+    ["kpiDateLabel","totalValue","kpiDoDLine","kpiMoMLine","kpiYtdLine"].forEach(id=>$(id).textContent='—');
+    return;
+  }
+  const picker = $("totalDate").value || DATES.at(-1);
+  const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  const curVal  = sumAt(curDate);
+  $("kpiDateLabel").textContent = `（${curDate} 時点）`;
+  $("totalValue").textContent   = yen(curVal);
+
+  const prevDate = previousRecordedDate(curDate);
+  const dod = prevDate ? curVal - sumAt(prevDate) : null;
+  $("kpiDoDLine").textContent = prevDate
+    ? `前日比 ${(dod>=0?'+':'')}${yen(dod)}（基準: ${prevDate}）`
+    : '前日比 —';
+
+  const monthBase = computeMonthBase(curDate);
+  const mom = monthBase ? curVal - sumAt(monthBase) : null;
+  $("kpiMoMLine").textContent = monthBase
+    ? `月間増減 ${(mom>=0?'+':'')}${yen(mom)}（基準: ${monthBase}）`
+    : '月間増減 —';
+
+  // 年初来
+  const yearStr = curDate.slice(0,4);
+  const prevYearDates = DATES.filter(d => d.slice(0,4) < yearStr);
+  const ytdBase = prevYearDates.length ? prevYearDates[prevYearDates.length-1] : null;
+  const ytd = ytdBase ? curVal - sumAt(ytdBase) : null;
+  $("kpiYtdLine").textContent = ytdBase
+    ? `年初来 ${(ytd>=0?'+':'')}${yen(ytd)}（基準: ${ytdBase}）`
+    : '年初来 —';
+}
+
+// ===================== Pie =====================
+let pieChart;
+let pieHidden = new Set();
+
+function drawPie(){
+  if(!DATES.length) return;
+  const picker = $("totalDate").value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  $("pieDateNote").textContent = `${selDate} 時点`;
+  const dim = $("pieDimension").value;
+  const rows = byDate.get(selDate) || [];
+  const bucket = new Map();
+  for(const r of rows){
+    let k;
+    if(dim === 'Name'){
+      const isCash = (r.AssetClass||'').toLowerCase() === 'cash';
+      k = isCash ? '現金' : (r.Name || '(blank)');
+    }else if(dim === 'StockType' || dim === 'Account'){
+      const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+      k = isStock ? (r[dim] || '(blank)') : '株式以外';
+    }else{
+      k = r[dim] || '(blank)';
+    }
+    bucket.set(k, (bucket.get(k)||0) + r.Amount);
+  }
+  const rawLabels = [...bucket.keys()];
+  const rawData   = rawLabels.map(k=>bucket.get(k));
+  const labels = [], data=[];
+  rawLabels.forEach((k,i)=>{ if(rawData[i]!==0){ labels.push(k); data.push(rawData[i]); } });
+
+  if(pieChart) pieChart.destroy();
+  pieHidden.clear();
+  pieChart = new Chart($("pieChart"), {
+    type:'doughnut',
+    data:{labels, datasets:[{
+      data,
+      backgroundColor: getPalette(labels.length),
+      hoverBackgroundColor: getHoverPalette(labels.length),
+      borderColor: getBorderPalette(labels.length),
+      hoverBorderColor: getBorderPalette(labels.length),
+      borderWidth: 1
+    }]},
+    options:{
+      cutout:'28%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label: (ctx)=>{
+            const total = ctx.dataset.data.reduce((s,v,idx)=> s + (pieHidden.has(idx)?0:v), 0);
+            const pct = total ? (ctx.parsed/total*100) : 0;
+            return `${ctx.label}: ${yen(ctx.parsed)} (${pct.toFixed(1)}%)`;
+          }
+        }}
+      }
+    }
+  });
+
+  $("pieLegend").innerHTML = labels.map((k,i)=>{
+    const c = pieChart.getDatasetMeta(0).controller.getStyle(i,false).backgroundColor;
+    return `<span class="legend-item" data-idx="${i}"><span class="dot" style="background:${c}"></span>${k}</span>`;
+  }).join('');
+  $("pieLegend").querySelectorAll('.legend-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i = Number(el.dataset.idx);
+      if(pieHidden.has(i)) pieHidden.delete(i); else pieHidden.add(i);
+      el.classList.toggle('inactive');
+      pieChart.toggleDataVisibility(i);
+      pieChart.update();
+    });
+  });
+}
+
+// ===================== Line =====================
+let lineChart;
+function drawLine(){
+  if(!DATES.length) return;
+  const dim = $("lineDimension").value;
+  const from = $("fromDate").value ? nearestOnOrBefore($("fromDate").value) : DATES[0];
+  const to   = nearestOnOrBefore($("toDate").value || DATES.at(-1)) || DATES.at(-1);
+  const labels = DATES.filter(d => d>=from && d<=to);
+  if(labels.length===0) return;
+  $("lineRangeNote").textContent = `${from} 〜 ${to}`;
+
+  let cats = [], series = [];
+  const totals = labels.map(d=> sumAt(d));
+
+  if(dim === 'Name'){
+    const stockNames = new Set();
+    for(const d of labels){
+      for(const r of (byDate.get(d)||[])){
+        if((r.AssetClass||'').toLowerCase() === 'stock') stockNames.add(r.Name||'(blank)');
+      }
+    }
+    cats = [...stockNames].sort();
+    series = cats.map(name => labels.map(d=>{
+      return (byDate.get(d)||[]).filter(r => ((r.AssetClass||'').toLowerCase()==='stock') && (r.Name||'(blank)')===name)
+                 .reduce((s,r)=>s+r.Amount,0);
+    }));
+    const nonStockSeries = labels.map(d=>(byDate.get(d)||[]).filter(r=>(r.AssetClass||'').toLowerCase()!=='stock').reduce((s,r)=>s+r.Amount,0));
+    if(nonStockSeries.some(v=>v!==0)){ cats.push('株式以外'); series.push(nonStockSeries); }
+  }else{
+    const set = new Set();
+    for(const d of labels){
+      for(const r of (byDate.get(d)||[])){
+        if(dim === 'StockType' || dim === 'Account'){
+          const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+          set.add(isStock ? (r[dim] || '(blank)') : '株式以外');
+        }else{
+          set.add(r[dim]||'(blank)');
+        }
+      }
+    }
+    cats = [...set].sort();
+    series = cats.map(c => labels.map(d => (byDate.get(d)||[]).filter(r => {
+      if(dim === 'StockType' || dim === 'Account'){
+        const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
+        return (isStock ? (r[dim] || '(blank)') : '株式以外') === c;
+      }
+      return (r[dim]||'(blank)') === c;
+    }).reduce((s,r)=>s+r.Amount,0)));
+  }
+
+  const filtered = [], filteredCats = [];
+  series.forEach((arr,i)=>{ if(arr[arr.length-1] !== 0){ filtered.push(arr); filteredCats.push(cats[i]); } });
+
+  if(lineChart) lineChart.destroy();
+  lineChart = new Chart($("lineChart"), {
+    type:'line',
+    data:{labels, datasets:[
+      ...filteredCats.map((c,i)=>({
+        label:c, data:filtered[i], tension:0.35, borderWidth:1.5, fill:false,
+        pointRadius:0, pointHitRadius:8,
+        borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]
+      })),
+      {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
+    ]},
+    options:{
+      responsive:true,
+      scales:{
+        x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
+        y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}
+      },
+      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
+    }
+  });
+}
+
+// ===================== 2日比較 =====================
+let cmpSort = {key:'diff', dir:'desc'};
+
+function collectDistinct(keys, dates){
+  const set = new Set();
+  for(const d of dates){ for(const r of (byDate.get(d)||[])){ keys.forEach(k=> set.add((r[k]||'').trim())); } }
+  set.delete('');
+  return [...set].sort();
+}
+function fillCmpFilters(){
+  const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
+  fill('cmpFAsset', collectDistinct(['AssetClass'], DATES));
+  fill('cmpFSType', collectDistinct(['StockType'], DATES));
+  fill('cmpFCcy',   collectDistinct(['Currency'], DATES));
+  fill('cmpFAcc',   collectDistinct(['Account'], DATES));
+}
+
+function drawCmp(){
+  if(!DATES.length) return;
+  let a = nearestOnOrBefore($("cmpDateA").value || DATES.at(-1)) || DATES.at(-1);
+  let b = nearestOnOrBefore($("cmpDateB").value || DATES.at(-1)) || DATES.at(-1);
+  if(a===b){ const idx = DATES.indexOf(b); if(idx>0) a = DATES[idx-1]; }
+  const ta = sumAt(a), tb = sumAt(b);
+  $("cmpNote").textContent = `合計: A=${a} ${yen(ta)} / B=${b} ${yen(tb)}（差分: ${(tb-ta>=0?'+':'')+yen(tb-ta)}）`;
+  $("cmpDetailNote").textContent = `銘柄別（Name）: A=${a} / B=${b}`;
+
+  const names = new Set();
+  const pushNames = d => { for(const [nm] of (byDateName.get(d)||new Map())) names.add(nm); };
+  pushNames(a); pushNames(b);
+
+  const fA=$("cmpFAsset").value, fS=$("cmpFSType").value, fC=$("cmpFCcy").value, fAcc=$("cmpFAcc").value;
+  const rows = [...names].map(nm=>{
+    const av = amountOfNameAt(nm,a), bv = amountOfNameAt(nm,b);
+    const diff = bv - av;
+    const pct = av!==0 ? diff/av : null;
+    const meta = {...attrsOfNameAt(nm,a), ...attrsOfNameAt(nm,b)};
+    return {Name:nm, a:av, b:bv, diff, pct, ...meta};
+  })
+  .filter(r => !(r.a===0 && r.b===0))
+  .filter(r => (fA? r.AssetClass===fA : true))
+  .filter(r => (fS? r.StockType===fS : true))
+  .filter(r => (fC? r.Currency===fC : true))
+  .filter(r => (fAcc? r.Account===fAcc : true));
+
+  sortRows(rows, cmpSort.key, cmpSort.dir);
+  renderCmpTable(rows);
+}
+
+function sortRows(arr, key, dir){
+  arr.sort((x,y)=>{
+    const ax = key==='Name' ? x.Name : x[key];
+    const ay = key==='Name' ? y.Name : y[key];
+    if(ax===null) return 1; if(ay===null) return -1;
+    if(typeof ax==='string') return dir==='asc' ? ax.localeCompare(ay) : ay.localeCompare(ax);
+    return dir==='asc' ? (ax-ay) : (ay-ax);
+  });
+}
+
+function renderCmpTable(rows){
+  const tbody = $("cmpTable").querySelector('tbody');
+  tbody.innerHTML = rows.map(r=>{
+    const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
+    const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
+    return `<tr>
+      <td><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
+      <td style="text-align:right">${yen(r.a)}</td>
+      <td style="text-align:right">${yen(r.b)}</td>
+      <td style="text-align:right" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
+      <td style="text-align:right" class="${cls}">${pctStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===================== 銘柄推移グラフ =====================
+let stockChart = null;
+
+function showStockChart(name){
+  $('stockModalTitle').textContent = name;
+  $('stockModal').style.display = 'flex';
+  const dates = DATES.filter(d => (byDateName.get(d)||new Map()).has(name));
+  const values = dates.map(d => amountOfNameAt(name, d));
+  if(stockChart){ stockChart.destroy(); stockChart = null; }
+  if(!dates.length){ $('stockModalNote').textContent = 'データなし'; return; }
+  $('stockModalNote').textContent = `${dates[0]} 〜 ${dates.at(-1)}（${dates.length}件）`;
+  stockChart = new Chart($('stockCanvas'), {
+    type:'line',
+    data:{labels:dates, datasets:[{
+      label:name, data:values,
+      borderColor:'rgba(0,255,200,1)', backgroundColor:'rgba(0,255,200,0.07)',
+      fill:true, tension:0.35,
+      pointRadius: dates.length <= 60 ? 3 : 0,
+      pointHitRadius:8, borderWidth:2
+    }]},
+    options:{
+      responsive:true,
+      scales:{
+        x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
+        y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:v=>'¥'+fmt(v)}}
+      },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${name}: ${yen(ctx.parsed.y)}`}}}
+    }
+  });
+}
+
+$('stockClose').addEventListener('click', ()=>{ $('stockModal').style.display='none'; });
+$('stockModal').addEventListener('click', e=>{ if(e.target===$('stockModal')){ $('stockModal').style.display='none'; } });
+$('mapModal').addEventListener('click', e=>{ if(e.target===$('mapModal')){ $('mapModal').style.display='none'; _pendingRawRows=null; } });
+
+// ===================== Calendar =====================
+const calState = { view:'month', month:null, selected:null, year:null, yearMode:'month', yearSelected:null };
+
+function initCalendarDefaults(){
+  const last = DATES.at(-1) || dayjs().format('YYYY-MM-DD');
+  calState.view = 'month';
+  calState.month = last.slice(0,7);
+  calState.selected = last;
+  calState.year = Number(last.slice(0,4));
+  calState.yearMode = 'month';
+  calState.yearSelected = last.slice(0,7);
+  syncCalUI();
+}
+
+function syncCalUI(){
+  const monthMode = calState.view==='month';
+  $("calView").value = calState.view;
+  $("monthView").style.display = monthMode ? '' : 'none';
+  $("yearView").style.display  = monthMode ? 'none' : '';
+  $("calNavMonth").style.display = monthMode ? '' : 'none';
+  $("calNavYear").style.display  = monthMode ? 'none' : '';
+  $("sortWrap").style.display    = monthMode ? '' : 'none';
+  $("yearModeWrap").style.display= monthMode ? 'none' : '';
+  $("monthHeaderDelta").style.display = monthMode ? '' : 'none';
+}
+
+function renderCalendar(){
+  if(!DATES.length){
+    $("calTitle").textContent='—'; $("calGrid").innerHTML=''; $("calDetailDate").textContent='—'; $("calDetailBody").textContent='記録なし';
+    $("yearGrid").innerHTML=''; $("yearTitle").textContent='—年'; $("yearNote").textContent='—'; $("monthHeaderDelta").textContent='';
+    $("yearDetailMonth").textContent='—'; $("yearDetailBody").textContent='記録なし'; $("yearDetail").style.display='none';
+    return;
+  }
+  if(calState.view==='month') renderMonthCalendar();
+  else renderYearView();
+}
+
+function monthEndDate(yy,mm){
+  const prefix = `${yy}-${String(mm).padStart(2,'0')}`;
+  const ds = DATES.filter(d=>d.startsWith(prefix));
+  return ds.length ? ds[ds.length-1] : null;
+}
+
+function renderMonthCalendar(){
+  const ym = calState.month;
+  const base = dayjs(ym+'-01');
+  $("calTitle").textContent = base.format('YYYY年M月');
+
+  const endThis = monthEndDate(base.year(), base.month()+1);
+  const prevMonth = base.subtract(1,'month');
+  const endPrev  = monthEndDate(prevMonth.year(), prevMonth.month()+1);
+  let monthHdr = '';
+  if(endThis){
+    const thisSum = sumAt(endThis);
+    const dv = endPrev ? thisSum - sumAt(endPrev) : null;
+    monthHdr = `月末総額：${yen(thisSum)} ／ 前月比 ${dv!=null ? (dv>=0?'+':'')+yen(dv) : '—'}`;
+  }else{
+    monthHdr = 'この月の月末記録がありません';
+  }
+  $("monthHeaderDelta").textContent = monthHdr;
+
+  const latest = DATES.at(-1);
+  const latestTotal = sumAt(latest);
+  const firstDowMon0 = (base.day()+6)%7;
+  const start = base.subtract(firstDowMon0,'day');
+  const cells = Array.from({length:42},(_,i)=> start.add(i,'day'));
+
+  const monthDays = cells.filter(d=>d.month()===base.month()).map(d=>d.format('YYYY-MM-DD'));
+  const diffsAbs = monthDays.map(d=> Math.abs((byDate.has(d)? sumAt(d):latestTotal) - latestTotal));
+  const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
+  const q = p => (sorted.length? sorted[Math.floor((sorted.length-1)*p)] : 0);
+  const t1=q(0.2), t2=q(0.4), t3=q(0.6), t4=q(0.8);
+
+  const grid = $("calGrid"); grid.innerHTML = '';
+  for(const d of cells){
+    const ymd = d.format('YYYY-MM-DD');
+    const inMonth = d.month()===base.month();
+    const cell = document.createElement('div');
+    cell.className = 'day-cell' + (inMonth?'':' disabled');
+    if(ymd===calState.selected) cell.classList.add('selected');
+
+    const total = byDate.has(ymd)? sumAt(ymd) : latestTotal;
+    const diff  = latestTotal - total;
+    let cls = '';
+    if(byDate.has(ymd) && diff === 0){ cls = 'eq'; }
+    else{
+      const a = Math.abs(diff);
+      let level = '';
+      if(a>0&&a<=t1) level='1'; else if(a>t1&&a<=t2) level='2'; else if(a>t2&&a<=t3) level='3'; else if(a>t3&&a<=t4) level='4'; else if(a>t4) level='5';
+      if(level) cls = diff>0?('up'+level):('dn'+level);
+    }
+    if(cls) cell.classList.add(cls);
+
+    const head = document.createElement('div'); head.className='day-head';
+    const num = document.createElement('div');  num.className='day-num'; num.textContent = String(d.date());
+    const totalEl = document.createElement('div'); totalEl.className='day-total'; totalEl.textContent = byDate.has(ymd)? compactJPY(total) : '';
+    head.appendChild(num); head.appendChild(totalEl);
+    cell.appendChild(head);
+
+    const deltaEl = document.createElement('div'); deltaEl.className='day-delta';
+    if(byDate.has(ymd)){
+      const prev = previousRecordedDate(ymd);
+      if(prev){
+        const dv = sumAt(ymd)-sumAt(prev);
+        deltaEl.textContent = (dv>=0?'+':'') + compactJPY(dv);
+        deltaEl.style.color = dv>=0 ? '#22c55e' : '#ef4444';
+        cell.classList.add(dv>=0 ? 'plus' : 'minus');
+      }
+    }
+    if(deltaEl.textContent) cell.appendChild(deltaEl);
+
+    cell.addEventListener('click', ()=>{ if(!inMonth) return; calState.selected = ymd; renderCalendarDetail(); renderCalendar(); });
+    grid.appendChild(cell);
+  }
+
+  if(!calState.selected || calState.selected.slice(0,7)!==ym){
+    calState.selected = DATES.find(x=>x.startsWith(ym)) || ym+'-01';
+  }
+  renderCalendarDetail();
+}
+
+function getCalFilters(){
+  return {
+    AssetClass: $("calFAsset").value, StockType: $("calFSType").value,
+    Currency: $("calFCcy").value,     Account:   $("calFAcc").value
+  };
+}
+
+function renderCalendarDetail(){
+  const d = calState.selected;
+  $("calDetailDate").textContent = d;
+  if(!byDate.has(d)){ $("calDetailBody").textContent = '記録なし'; return; }
+
+  const total = sumAt(d);
+  const prev = previousRecordedDate(d);
+  const delta = prev ? (total - sumAt(prev)) : null;
+  const deltaStr = delta===null ? '—' : ((delta>=0?'+':'')+yen(delta));
+  const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
+  const f = getCalFilters();
+
+  const map = byDateName.get(d) || new Map();
+  const rows = [...map.entries()].map(([name, amt])=>{
+    if(amt===0) return null;
+    const prevDate = previousRecordedDate(d);
+    const prevAmt = prevDate ? amountOfNameAt(name, prevDate) : 0;
+    const diff = amt - prevAmt;
+    const pct  = prevAmt!==0 ? (diff/prevAmt) : null;
+    const meta = attrsOfNameAt(name, d);
+    return {Name:name, Amount:amt, Diff:diff, Pct:pct, ...meta};
+  }).filter(Boolean)
+    .filter(r => (f.AssetClass? r.AssetClass===f.AssetClass : true))
+    .filter(r => (f.StockType? r.StockType===f.StockType : true))
+    .filter(r => (f.Currency? r.Currency===f.Currency : true))
+    .filter(r => (f.Account? r.Account===f.Account : true));
+
+  const mode = $("calSort").value;
+  rows.sort((a,b)=>{
+    switch(mode){
+      case 'amount_desc': return b.Amount - a.Amount;
+      case 'delta_desc':  return b.Diff - a.Diff;
+      case 'pct_desc':    return (b.Pct??-Infinity) - (a.Pct??-Infinity);
+      case 'name_asc':    return a.Name.localeCompare(b.Name);
+    }
+  });
+
+  const list = rows.map(r=>{
+    const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
+    const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
+    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
+  }).join('');
+
+  const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
+  $("calDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
+}
+
+// ===================== Year View =====================
+function renderYearView(){
+  const y = calState.year;
+  $("yearTitle").textContent = `${y}年`;
+  const mode = calState.yearMode;
+  const months = Array.from({length:12},(_,i)=>i+1);
+  const grid = $("yearGrid");
+  grid.innerHTML = '';
+
+  if(!calState.yearSelected || !calState.yearSelected.startsWith(String(y)) || monthEndDate(y, Number(calState.yearSelected.slice(5)))==null){
+    const first = months.find(mm=>monthEndDate(y,mm)!=null);
+    calState.yearSelected = first? `${y}-${String(first).padStart(2,'0')}` : null;
+  }
+
+  for(let i=0;i<12;i++){
+    const m = months[i];
+    const card = document.createElement('div');
+    card.className = 'month-card';
+    const title = document.createElement('div');
+    title.className = 'month-title';
+    title.textContent = `${m}月`;
+    card.appendChild(title);
+
+    const ym = `${y}-${String(m).padStart(2,'0')}`;
+    if(calState.yearSelected===ym) card.classList.add('selected');
+
+    const end = monthEndDate(y,m);
+    if(end==null){
+      card.innerHTML += `<div class="muted">記録なし</div>`;
+    }else{
+      const thisTot = sumAt(end);
+      let prevEnd = null;
+      let mm = m-1, yy = y;
+      while(mm>=1 && !prevEnd){ prevEnd = monthEndDate(yy,mm); mm--; }
+      if(!prevEnd){ for(let k=12;k>=1 && !prevEnd;k--){ prevEnd = monthEndDate(y-1,k); } }
+      const prevTot = prevEnd ? sumAt(prevEnd) : null;
+      const delta = (prevTot!=null) ? (thisTot - prevTot) : null;
+      const cls = delta==null ? '' : (delta>0?'pos':(delta<0?'neg':''));
+      const deltaStr = delta==null ? '—' : ((delta>=0?'+':'')+yen(delta));
+      card.innerHTML += `<div>月末総額：${yen(thisTot)}</div>`;
+      card.innerHTML += `<div class="${cls}">前月比：${deltaStr}</div>`;
+
+      if(mode==='day'){
+        const base = dayjs(`${y}-${String(m).padStart(2,'0')}-01`);
+        const firstDowMon0 = (base.day()+6)%7;
+        const start = base.subtract(firstDowMon0,'day');
+        const cells = Array.from({length:42},(_,k)=> start.add(k,'day'));
+        const mini = document.createElement('div');
+        mini.className = 'mini-month';
+        const monthDays = cells.filter(d=>d.month()===base.month()).map(d=>d.format('YYYY-MM-DD'));
+        const diffsAbs = monthDays.map(d=>{ if(!byDate.has(d)) return 0; const prev = previousRecordedDate(d); return prev ? Math.abs(sumAt(d)-sumAt(prev)) : 0; });
+        const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
+        const q = p => (sorted.length? sorted[Math.floor((sorted.length-1)*p)] : 0);
+        const t1=q(0.33), t2=q(0.66);
+        for(const d of cells){
+          const ymd = d.format('YYYY-MM-DD');
+          const box = document.createElement('div'); box.className='mini-day';
+          if(d.month()===base.month()){
+            if(byDate.has(ymd)){
+              const prev = previousRecordedDate(ymd);
+              if(prev){
+                const diff = sumAt(ymd) - sumAt(prev);
+                if(diff===0){ box.classList.add('neutral'); }
+                else{
+                  const a = Math.abs(diff);
+                  const tag = a<=t1?'low':a<=t2?'mid':'high';
+                  box.classList.add(diff>0?`gain-${tag}`:`loss-${tag}`);
+                }
+              }else{ box.classList.add('neutral'); }
+            }
+          }else{ box.style.opacity='.25'; }
+          mini.appendChild(box);
+        }
+        card.appendChild(mini);
+      }
+    }
+
+    card.addEventListener('click', ()=>{
+      if(calState.yearSelected===ym){
+        calState.view='month'; calState.month=ym;
+        calState.selected = DATES.find(x=>x.startsWith(calState.month)) || `${calState.month}-01`;
+        syncCalUI(); renderCalendar();
+      }else{
+        calState.yearSelected = ym;
+        renderYearView();
+      }
+    });
+    grid.appendChild(card);
+  }
+
+  const firstDispMonth = months.find(mm=>monthEndDate(y,mm)!=null);
+  const lastDispMonth  = [...months].reverse().find(mm=>monthEndDate(y,mm)!=null);
+  $("yearNote").textContent = (firstDispMonth==null) ? 'この年の記録がありません' :
+    `${y}-${String(firstDispMonth).padStart(2,'0')} 〜 ${y}-${String(lastDispMonth).padStart(2,'0')}（各月の最終記録日基準）`;
+
+  if(calState.yearSelected) renderYearDetail();
+  else $("yearDetail").style.display='none';
+}
+
+function renderYearDetail(){
+  const ym = calState.yearSelected;
+  const detail = $("yearDetail");
+  if(!ym){ $("yearDetailMonth").textContent='—'; $("yearDetailBody").textContent='記録なし'; detail.style.display='none'; return; }
+  detail.style.display='';
+  const y = Number(ym.slice(0,4)), m = Number(ym.slice(5));
+  const end = monthEndDate(y,m);
+  if(!end){ $("yearDetailMonth").textContent=`${ym} 月末`; $("yearDetailBody").textContent='記録なし'; return; }
+  $("yearDetailMonth").textContent = `${ym} 月末（${end}）`;
+
+  let prevEnd = null;
+  let mm = m-1, yy = y;
+  while(mm>=1 && !prevEnd){ prevEnd = monthEndDate(yy,mm); mm--; }
+  if(!prevEnd){ for(let k=12;k>=1 && !prevEnd;k--){ prevEnd = monthEndDate(y-1,k); } }
+  const total = sumAt(end);
+  const prevTot = prevEnd ? sumAt(prevEnd) : null;
+  const delta = (prevTot!=null) ? (total-prevTot) : null;
+  const deltaStr = delta==null ? '—' : ((delta>=0?'+':'')+yen(delta));
+  const deltaColor = delta==null ? '' : (delta>=0?'#22c55e':'#ef4444');
+
+  const map = byDateName.get(end) || new Map();
+  const rows = [...map.entries()].map(([name, amt])=>{
+    if(amt===0) return null;
+    const prevAmt = prevEnd ? amountOfNameAt(name, prevEnd) : 0;
+    const diff = amt - prevAmt;
+    const pct = prevAmt!==0 ? (diff/prevAmt) : null;
+    return {Name:name, Amount:amt, Diff:diff, Pct:pct};
+  }).filter(Boolean);
+  rows.sort((a,b)=>b.Amount-a.Amount);
+
+  const list = rows.map(r=>{
+    const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
+    const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
+    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
+  }).join('');
+
+  const summary = `月末総額（${end}）：${yen(total)}<br/>前月比：<span style="color:${deltaColor}">${deltaStr}</span>${prevEnd?`（前月: ${prevEnd}）`:''}`;
+  $("yearDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
+}
+
+// ===================== 銘柄分析 =====================
+let analSort = { key: 'amount', dir: 'desc' };
+const analSelected = new Set();
+
+function drawStockAnal(){
+  if(!DATES.length) return;
+  const picker = $('analDate').value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  $('analDateNote').textContent = `${selDate} 時点`;
+
+  const totalVal = sumAt(selDate);
+  const bucket = new Map();
+  const metaBucket = new Map();
+  for(const r of (byDate.get(selDate)||[])){
+    bucket.set(r.Name, (bucket.get(r.Name)||0) + r.Amount);
+    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account});
+  }
+
+  // 不在銘柄の選択を除去
+  for(const n of analSelected){ if(!bucket.has(n)) analSelected.delete(n); }
+
+  let data = [...bucket.entries()].map(([name, amount])=>({
+    name, amount,
+    pct: totalVal > 0 ? amount/totalVal*100 : 0,
+    ...(metaBucket.get(name)||{})
+  })).filter(r => r.amount !== 0);
+
+  data.sort((a,b)=>{
+    const ka = analSort.key==='name' ? a.name : a[analSort.key];
+    const kb = analSort.key==='name' ? b.name : b[analSort.key];
+    if(typeof ka==='string') return analSort.dir==='asc' ? ka.localeCompare(kb) : kb.localeCompare(ka);
+    return analSort.dir==='asc' ? ka-kb : kb-ka;
+  });
+
+  $('analTotalVal').textContent = yen(totalVal);
+
+  const tbody = $('analTable').querySelector('tbody');
+  tbody.innerHTML = data.map(r=>{
+    const checked = analSelected.has(r.name) ? 'checked' : '';
+    const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
+    return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
+      <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
+      <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
+      <td style="text-align:right">${yen(r.amount)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pct.toFixed(1)}%</span>
+        <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pct,100)}%"></div></div>
+      </div></td>
+      <td>${escapeHtml(r.AssetClass||'')}</td>
+      <td>${escapeHtml(r.Currency||'')}</td>
+      <td>${escapeHtml(r.Account||'')}</td>
+    </tr>`;
+  }).join('');
+
+  // 全選択チェックボックスの状態を同期
+  const allNames = data.map(r=>r.name);
+  $('analChkAll').checked = allNames.length > 0 && allNames.every(n=>analSelected.has(n));
+  $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
+
+  updateSelSummary(totalVal);
+}
+
+function updateSelSummary(totalVal){
+  const count = analSelected.size;
+  if(count === 0){ $('stockSelSummary').style.display='none'; return; }
+  $('stockSelSummary').style.display='flex';
+  const picker = $('analDate').value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  if(totalVal === undefined) totalVal = sumAt(selDate);
+  let selTotal = 0;
+  for(const name of analSelected) selTotal += amountOfNameAt(name, selDate);
+  const selPct = totalVal > 0 ? selTotal/totalVal*100 : 0;
+  $('selCount').textContent  = count;
+  $('selTotal').textContent  = yen(selTotal);
+  $('selPct').textContent    = selPct.toFixed(1);
+  $('selNames').textContent  = [...analSelected].join('、');
+}
+
+// ===================== Export =====================
+function exportCsv(){
+  if(RAW.length===0) return;
+  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+  const rows = RAW.map(r=>header.map(h=>r[h]??''));
+  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='assets_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ===================== lifecycle =====================
+function fillCalFilters(){
+  const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
+  fill('calFAsset', collectDistinct(['AssetClass'], DATES));
+  fill('calFSType', collectDistinct(['StockType'], DATES));
+  fill('calFCcy',   collectDistinct(['Currency'], DATES));
+  fill('calFAcc',   collectDistinct(['Account'], DATES));
+}
+
+function onDataReady(){
+  $("totalDate").value = DATES.at(-1) || '';
+  $("fromDate").value  = DATES[0] || '';
+  $("toDate").value    = DATES.at(-1) || '';
+  $("cmpDateA").value  = DATES.at(-1) || '';
+  $("cmpDateB").value  = DATES.at(-1) || '';
+  fillCmpFilters();
+  fillCalFilters();
+  refreshKPIs(); drawPie(); drawLine(); drawCmp();
+  $('analDate').value = DATES.at(-1) || '';
+  initCalendarDefaults(); renderCalendar();
+  drawStockAnal();
+  saveToStorage();
+}
+
+// ===================== events =====================
+$("file").addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = ()=> parseCSV(reader.result); reader.readAsText(file);
+});
+$("exportCsv").addEventListener('click', exportCsv);
+$("clearData").addEventListener('click', clearStorage);
+$("totalDate").addEventListener('change', ()=>{ refreshKPIs(); drawPie(); });
+$("pieDimension").addEventListener('change', drawPie);
+$("lineDimension").addEventListener('change', drawLine);
+$("applyRange").addEventListener('click', drawLine);
+$("applyCmp").addEventListener('click', drawCmp);
+["cmpFAsset","cmpFSType","cmpFCcy","cmpFAcc"].forEach(id=> $(id).addEventListener('change', drawCmp));
+
+// 2日比較ソート
+document.addEventListener('click', e=>{
+  const th = e.target.closest('#cmpTable th.sortable');
+  if(th){
+    const key = th.dataset.key;
+    cmpSort.dir = (cmpSort.key===key && cmpSort.dir==='desc') ? 'asc' : 'desc';
+    cmpSort.key = key;
+    drawCmp();
+    return;
+  }
+  // 銘柄リンク（比較表・カレンダー詳細・年詳細）
+  // analTableのソート
+  const analTh = e.target.closest('#analTable th.sortable');
+  if(analTh){
+    const key = analTh.dataset.key;
+    analSort.dir = (analSort.key===key && analSort.dir==='desc') ? 'asc' : 'desc';
+    analSort.key = key;
+    drawStockAnal();
+    return;
+  }
+  const link = e.target.closest('.stock-link');
+  if(link && link.dataset.name) showStockChart(link.dataset.name);
+});
+
+// 銘柄分析
+$('analDate').addEventListener('change', drawStockAnal);
+$('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
+$('analChkAll').addEventListener('change', e=>{
+  $('analTable').querySelectorAll('.anal-chk[data-name]').forEach(chk=>{
+    if(e.target.checked) analSelected.add(chk.dataset.name);
+    else analSelected.delete(chk.dataset.name);
+  });
+  drawStockAnal();
+});
+$('analTable').addEventListener('change', e=>{
+  const chk = e.target.closest('.anal-chk[data-name]');
+  if(!chk) return;
+  if(chk.checked) analSelected.add(chk.dataset.name);
+  else analSelected.delete(chk.dataset.name);
+  const row = chk.closest('tr');
+  if(row) row.classList.toggle('anal-selected', chk.checked);
+  updateSelSummary();
+  // 全選択チェックボックスの indeterminate を更新
+  const allChks = [...$('analTable').querySelectorAll('.anal-chk[data-name]')];
+  $('analChkAll').checked = allChks.length > 0 && allChks.every(c=>c.checked);
+  $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
+});
+
+// calendar nav
+$("calPrev").addEventListener('click', ()=>{ calState.month = dayjs(calState.month+'-01').subtract(1,'month').format('YYYY-MM'); renderCalendar(); });
+$("calNext").addEventListener('click', ()=>{ calState.month = dayjs(calState.month+'-01').add(1,'month').format('YYYY-MM'); renderCalendar(); });
+$("calSort").addEventListener('change', ()=>{ if(calState.view==='month') renderCalendarDetail(); });
+["calFAsset","calFSType","calFCcy","calFAcc"].forEach(id=> $(id).addEventListener('change', ()=>{ if(calState.view==='month') renderCalendarDetail(); }));
+$("calView").addEventListener('change', ()=>{ calState.view=$("calView").value; syncCalUI(); renderCalendar(); });
+$("yearPrev").addEventListener('click', ()=>{ calState.year -= 1; renderCalendar(); });
+$("yearNext").addEventListener('click', ()=>{ calState.year += 1; renderCalendar(); });
+$("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").value; renderCalendar(); });
+
+// 起動時: 保存データがあれば自動復元
+tryLoadSaved();
+</script>
+</body>
+</html>
