@@ -148,6 +148,15 @@
       .day-total{font-size:8px}
       .day-num{font-size:11px}
     }
+
+    /* 銘柄分析 */
+    .pct-bar-wrap{background:#1e2638;border-radius:4px;height:6px;flex:1;min-width:60px;max-width:140px;overflow:hidden}
+    .pct-bar{height:100%;border-radius:4px;background:rgba(0,255,200,0.65);transition:width .3s}
+    .sel-summary{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.35);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .sel-summary strong{color:#93c5fd}
+    .anal-selected td{background:rgba(59,130,246,0.09)!important}
+    #analTable{min-width:640px}
+    .anal-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
   </style>
 </head>
 <body>
@@ -338,6 +347,49 @@
         <p class="detail-title" id="yearDetailMonth">—</p>
         <div id="yearDetailBody">記録なし</div>
       </div>
+    </div>
+  </section>
+
+  <!-- 銘柄別割合・合算 -->
+  <section class="panel wide">
+    <h2>銘柄別割合・合算</h2>
+    <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
+    <div class="controls" style="margin-top:8px">
+      <label>日付: <input type="date" id="analDate"/></label>
+      <span class="muted" id="analDateNote">—</span>
+    </div>
+
+    <div id="stockSelSummary" class="sel-summary" style="display:none">
+      <span>選択中: <strong id="selCount">0</strong> 銘柄</span>
+      <span>合計: <strong id="selTotal">—</strong></span>
+      <span>全体の: <strong id="selPct">—</strong>%</span>
+      <span class="muted" id="selNames" style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;margin-left:auto">選択解除</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="analTable">
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
+            <th class="sortable" data-key="name">銘柄</th>
+            <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
+            <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
+            <th>AssetClass</th>
+            <th>Currency</th>
+            <th>Account</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr style="font-weight:600">
+            <td></td><td>合計</td>
+            <td style="text-align:right" id="analTotalVal">—</td>
+            <td>100%</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   </section>
 </main>
@@ -1133,6 +1185,84 @@ function renderYearDetail(){
   $("yearDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
 }
 
+// ===================== 銘柄分析 =====================
+let analSort = { key: 'amount', dir: 'desc' };
+const analSelected = new Set();
+
+function drawStockAnal(){
+  if(!DATES.length) return;
+  const picker = $('analDate').value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  $('analDateNote').textContent = `${selDate} 時点`;
+
+  const totalVal = sumAt(selDate);
+  const bucket = new Map();
+  const metaBucket = new Map();
+  for(const r of (byDate.get(selDate)||[])){
+    bucket.set(r.Name, (bucket.get(r.Name)||0) + r.Amount);
+    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account});
+  }
+
+  // 不在銘柄の選択を除去
+  for(const n of analSelected){ if(!bucket.has(n)) analSelected.delete(n); }
+
+  let data = [...bucket.entries()].map(([name, amount])=>({
+    name, amount,
+    pct: totalVal > 0 ? amount/totalVal*100 : 0,
+    ...(metaBucket.get(name)||{})
+  })).filter(r => r.amount !== 0);
+
+  data.sort((a,b)=>{
+    const ka = analSort.key==='name' ? a.name : a[analSort.key];
+    const kb = analSort.key==='name' ? b.name : b[analSort.key];
+    if(typeof ka==='string') return analSort.dir==='asc' ? ka.localeCompare(kb) : kb.localeCompare(ka);
+    return analSort.dir==='asc' ? ka-kb : kb-ka;
+  });
+
+  $('analTotalVal').textContent = yen(totalVal);
+
+  const tbody = $('analTable').querySelector('tbody');
+  tbody.innerHTML = data.map(r=>{
+    const checked = analSelected.has(r.name) ? 'checked' : '';
+    const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
+    return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
+      <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
+      <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
+      <td style="text-align:right">${yen(r.amount)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pct.toFixed(1)}%</span>
+        <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pct,100)}%"></div></div>
+      </div></td>
+      <td>${escapeHtml(r.AssetClass||'')}</td>
+      <td>${escapeHtml(r.Currency||'')}</td>
+      <td>${escapeHtml(r.Account||'')}</td>
+    </tr>`;
+  }).join('');
+
+  // 全選択チェックボックスの状態を同期
+  const allNames = data.map(r=>r.name);
+  $('analChkAll').checked = allNames.length > 0 && allNames.every(n=>analSelected.has(n));
+  $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
+
+  updateSelSummary(totalVal);
+}
+
+function updateSelSummary(totalVal){
+  const count = analSelected.size;
+  if(count === 0){ $('stockSelSummary').style.display='none'; return; }
+  $('stockSelSummary').style.display='flex';
+  const picker = $('analDate').value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  if(totalVal === undefined) totalVal = sumAt(selDate);
+  let selTotal = 0;
+  for(const name of analSelected) selTotal += amountOfNameAt(name, selDate);
+  const selPct = totalVal > 0 ? selTotal/totalVal*100 : 0;
+  $('selCount').textContent  = count;
+  $('selTotal').textContent  = yen(selTotal);
+  $('selPct').textContent    = selPct.toFixed(1);
+  $('selNames').textContent  = [...analSelected].join('、');
+}
+
 // ===================== Export =====================
 function exportCsv(){
   if(RAW.length===0) return;
@@ -1163,7 +1293,9 @@ function onDataReady(){
   fillCmpFilters();
   fillCalFilters();
   refreshKPIs(); drawPie(); drawLine(); drawCmp();
+  $('analDate').value = DATES.at(-1) || '';
   initCalendarDefaults(); renderCalendar();
+  drawStockAnal();
   saveToStorage();
 }
 
@@ -1192,8 +1324,41 @@ document.addEventListener('click', e=>{
     return;
   }
   // 銘柄リンク（比較表・カレンダー詳細・年詳細）
+  // analTableのソート
+  const analTh = e.target.closest('#analTable th.sortable');
+  if(analTh){
+    const key = analTh.dataset.key;
+    analSort.dir = (analSort.key===key && analSort.dir==='desc') ? 'asc' : 'desc';
+    analSort.key = key;
+    drawStockAnal();
+    return;
+  }
   const link = e.target.closest('.stock-link');
   if(link && link.dataset.name) showStockChart(link.dataset.name);
+});
+
+// 銘柄分析
+$('analDate').addEventListener('change', drawStockAnal);
+$('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
+$('analChkAll').addEventListener('change', e=>{
+  $('analTable').querySelectorAll('.anal-chk[data-name]').forEach(chk=>{
+    if(e.target.checked) analSelected.add(chk.dataset.name);
+    else analSelected.delete(chk.dataset.name);
+  });
+  drawStockAnal();
+});
+$('analTable').addEventListener('change', e=>{
+  const chk = e.target.closest('.anal-chk[data-name]');
+  if(!chk) return;
+  if(chk.checked) analSelected.add(chk.dataset.name);
+  else analSelected.delete(chk.dataset.name);
+  const row = chk.closest('tr');
+  if(row) row.classList.toggle('anal-selected', chk.checked);
+  updateSelSummary();
+  // 全選択チェックボックスの indeterminate を更新
+  const allChks = [...$('analTable').querySelectorAll('.anal-chk[data-name]')];
+  $('analChkAll').checked = allChks.length > 0 && allChks.every(c=>c.checked);
+  $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
 });
 
 // calendar nav
