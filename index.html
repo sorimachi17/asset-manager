@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>資産管理アプリ</title>
-  <!-- libs -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
@@ -23,7 +22,10 @@
     input[type="file"]{padding:8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
     button{background:#1a5fff;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
     button:disabled{opacity:.5;cursor:not-allowed}
+    .btn-danger{background:#7f1d1d}
+    .btn-ghost{background:#1e2638;border:1px solid var(--line)}
     .muted{color:var(--muted);font-size:12px}
+    .saved-badge{font-size:11px;color:#22c55e;display:none}
     main{display:grid;gap:16px}
     .kpi{display:grid;grid-template-columns:1fr;gap:12px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
@@ -107,6 +109,20 @@
     .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
     #cmpTable{min-width:720px}
 
+    /* 銘柄リンク */
+    .stock-link{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
+    .stock-link:hover{opacity:.8}
+
+    /* モーダル */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:16px}
+    .modal-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-height:90vh;overflow-y:auto}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .modal-title{font-size:18px;font-weight:600;margin:0}
+    .modal-close{background:none;border:1px solid var(--line);color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+    .map-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .map-label{width:110px;flex:0 0 110px;font-weight:500}
+    .map-row select{flex:1}
+
     /* pc */
     @media (min-width:900px){
       main{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -142,6 +158,8 @@
       <input id="file" type="file" accept=".csv" />
       <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
+      <button id="clearData" class="btn-danger" disabled>データをクリア</button>
+      <span id="savedBadge" class="saved-badge">● 保存済み</span>
     </div>
   </div>
 </header>
@@ -157,6 +175,7 @@
       <div class="big" id="totalValue">—</div>
       <div class="sub" id="kpiDoDLine" style="margin-top:4px;">—</div>
       <div class="sub" id="kpiMoMLine" style="margin-top:2px;">—</div>
+      <div class="sub" id="kpiYtdLine" style="margin-top:2px;">—</div>
     </div>
   </section>
 
@@ -223,7 +242,7 @@
     </div>
     <div class="muted" id="cmpNote">—</div>
 
-    <h3 style="margin:14px 0 6px">銘柄別の詳細</h3>
+    <h3 style="margin:14px 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
     <div class="h2-sub" id="cmpDetailNote">—</div>
     <div class="table-wrap">
       <table id="cmpTable">
@@ -323,48 +342,54 @@
   </section>
 </main>
 
+<!-- 列マッピング モーダル -->
+<div id="mapModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <h2 class="modal-title">CSV 列マッピング</h2>
+      <button id="mapCancel" class="modal-close">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 14px">CSVの列名が標準と異なります。対応する列を選択してください。</p>
+    <div id="mapBody"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="mapApply">適用して読み込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- 銘柄推移 モーダル -->
+<div id="stockModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:800px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="stockModalTitle">—</h2>
+      <button id="stockClose" class="modal-close">✕</button>
+    </div>
+    <div class="chart-wrap"><canvas id="stockCanvas" height="300"></canvas></div>
+    <p class="muted" id="stockModalNote" style="margin-top:8px"></p>
+  </div>
+</div>
+
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
 
 // --- state ---
 let RAW = []; let DATES = []; const byDate = new Map();
-const byDateName = new Map(); // date -> Map(Name -> amount)
-const META_BY_DATE_NAME = new Map(); // date -> Map(Name -> {AssetClass,...})
+const byDateName = new Map();
+const META_BY_DATE_NAME = new Map();
 
 // --- helpers ---
 const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
-// Cyberpunk-inspired blue/green palette
 const PALETTE_BASE = [
-  '0,255,255',   // cyber cyan
-  '0,180,255',   // neon blue
-  '57,255,20',   // laser green
-  '0,120,255',   // electric blue
-  '0,255,170',   // aqua green
-  '0,150,255',   // azure
-  '0,255,200',   // mint
-  '0,90,255',    // deep blue
-  '0,255,120',   // neon lime
-  '0,210,255'    // sky neon
+  '0,255,255','0,180,255','57,255,20','0,120,255','0,255,170',
+  '0,150,255','0,255,200','0,90,255','0,255,120','0,210,255'
 ];
 const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.8)`);
 
-function getPalette(n){
-  const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`);
-  return arr;
-}
-function getHoverPalette(n){
-  const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.9)`);
-  return arr;
-}
-function getBorderPalette(n){
-  const arr = [];
-  for(let i=0;i<n;i++) arr.push(`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},1)`);
-  return arr;
-}
+function getPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.8)`); }
+function getHoverPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},0.9)`); }
+function getBorderPalette(n){ return Array.from({length:n},(_,i)=>`rgba(${PALETTE_BASE[i%PALETTE_BASE.length]},1)`); }
 
 function normalizeDate(v){
   if(!v) return '';
@@ -385,32 +410,107 @@ function compactJPY(n){
   if(v>=1e4)   return sign + Math.round(v/1e4).toLocaleString('ja-JP') + '万';
   return sign + Math.round(v).toLocaleString('ja-JP');
 }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-// --- CSV parse / indexes ---
-function parseCSV(text){
-  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-  RAW = parsed.data.map(r => ({
-    Date: normalizeDate(r.Date),
-    Name: (r.Name||'').trim(),
-    Amount: Number(String(r.Amount||'0').replace(/,/g,''))||0,
-    AssetClass: (r.AssetClass||'').trim(),
-    Currency: (r.Currency||'').trim(),
-    StockType: (r.StockType||'').trim(),
-    Account: (r.Account||'').trim()
-  })).filter(r=>r.Date);
-  buildIndexes(); onDataReady(); $("exportCsv").disabled = RAW.length===0;
+// ===================== LocalStorage =====================
+const LS_KEY = 'asset_mgr_v1';
+
+function saveToStorage(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(RAW));
+    const badge = $('savedBadge');
+    badge.style.display = 'inline';
+  }catch(e){ console.warn('LocalStorage save failed:', e); }
 }
 
+function tryLoadSaved(){
+  try{
+    const saved = localStorage.getItem(LS_KEY);
+    if(!saved) return false;
+    const data = JSON.parse(saved);
+    if(!Array.isArray(data) || !data.length) return false;
+    RAW = data;
+    buildIndexes();
+    onDataReady();
+    $('exportCsv').disabled = false;
+    $('clearData').disabled = false;
+    $('savedBadge').style.display = 'inline';
+    return true;
+  }catch(e){ return false; }
+}
+
+function clearStorage(){
+  if(!confirm('保存されたデータを削除してページをリセットしますか？')) return;
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+}
+
+// ===================== CSV列マッピング =====================
+const REQUIRED_FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+
+let _pendingRawRows = null;
+
+function parseCSV(text){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const headers = parsed.meta.fields || [];
+  const missing = REQUIRED_FIELDS.filter(f => !headers.includes(f));
+  if(missing.length === 0){
+    applyMappingAndProcess(
+      Object.fromEntries(REQUIRED_FIELDS.map(f=>[f,f])),
+      parsed.data
+    );
+  } else {
+    _pendingRawRows = parsed.data;
+    showMapModal(headers);
+  }
+}
+
+function showMapModal(headers){
+  const body = $('mapBody');
+  body.innerHTML = REQUIRED_FIELDS.map(field => {
+    const opts = headers.map(h =>
+      `<option value="${escapeHtml(h)}" ${h===field?'selected':''}>${escapeHtml(h)}</option>`
+    ).join('');
+    return `<div class="map-row">
+      <span class="map-label">${field}</span>
+      <select id="map_${field}"><option value="">(なし)</option>${opts}</select>
+    </div>`;
+  }).join('');
+  $('mapModal').style.display = 'flex';
+}
+
+$('mapApply').addEventListener('click', ()=>{
+  const mapping = Object.fromEntries(REQUIRED_FIELDS.map(f => [f, $('map_'+f).value]));
+  $('mapModal').style.display = 'none';
+  if(_pendingRawRows){ applyMappingAndProcess(mapping, _pendingRawRows); _pendingRawRows = null; }
+});
+$('mapCancel').addEventListener('click', ()=>{ $('mapModal').style.display = 'none'; _pendingRawRows = null; });
+
+function applyMappingAndProcess(mapping, rawRows){
+  RAW = rawRows.map(r => ({
+    Date:      normalizeDate(r[mapping.Date] || ''),
+    Name:      (r[mapping.Name] || '').trim(),
+    Amount:    Number(String(r[mapping.Amount] || '0').replace(/,/g,'')) || 0,
+    AssetClass:(r[mapping.AssetClass] || '').trim(),
+    Currency:  (r[mapping.Currency] || '').trim(),
+    StockType: (r[mapping.StockType] || '').trim(),
+    Account:   (r[mapping.Account] || '').trim()
+  })).filter(r => r.Date);
+  buildIndexes();
+  onDataReady();
+  $('exportCsv').disabled = RAW.length === 0;
+  $('clearData').disabled = RAW.length === 0;
+}
+
+// ===================== indexes =====================
 function buildIndexes(){
   byDate.clear(); byDateName.clear(); META_BY_DATE_NAME.clear(); DATES = [];
   for(const r of RAW){
     if(!byDate.has(r.Date)){ byDate.set(r.Date, []); DATES.push(r.Date); }
     byDate.get(r.Date).push(r);
-
     if(!byDateName.has(r.Date)) byDateName.set(r.Date, new Map());
     const m = byDateName.get(r.Date);
     m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
-
     if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
     const mm = META_BY_DATE_NAME.get(r.Date);
     if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account});
@@ -422,19 +522,18 @@ function sumAt(date){ return (byDate.get(date)||[]).reduce((s,r)=>s+r.Amount,0);
 function amountOfNameAt(name, date){ if(!date) return 0; const m = byDateName.get(date); return m ? (m.get(name)||0) : 0; }
 function attrsOfNameAt(name, date){
   if(!date) return {};
-  const m = META_BY_DATE_NAME.get(date); 
+  const m = META_BY_DATE_NAME.get(date);
   if(m && m.has(name)) return m.get(name);
-  // フォールバック：その日のRAWから拾えなければ最も近い前日
   const prev = previousRecordedDate(date);
   if(prev && META_BY_DATE_NAME.get(prev)?.get(name)) return META_BY_DATE_NAME.get(prev).get(name);
   return {};
 }
 function computeMonthBase(curDate){ const t = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD'); return nearestOnOrBefore(t); }
 
-// ---------- KPIs ----------
+// ===================== KPIs =====================
 function refreshKPIs(){
   if(!DATES.length){
-    ["kpiDateLabel","totalValue","kpiDoDLine","kpiMoMLine"].forEach(id=>$(id).textContent='—');
+    ["kpiDateLabel","totalValue","kpiDoDLine","kpiMoMLine","kpiYtdLine"].forEach(id=>$(id).textContent='—');
     return;
   }
   const picker = $("totalDate").value || DATES.at(-1);
@@ -454,11 +553,20 @@ function refreshKPIs(){
   $("kpiMoMLine").textContent = monthBase
     ? `月間増減 ${(mom>=0?'+':'')}${yen(mom)}（基準: ${monthBase}）`
     : '月間増減 —';
+
+  // 年初来
+  const yearStr = curDate.slice(0,4);
+  const prevYearDates = DATES.filter(d => d.slice(0,4) < yearStr);
+  const ytdBase = prevYearDates.length ? prevYearDates[prevYearDates.length-1] : null;
+  const ytd = ytdBase ? curVal - sumAt(ytdBase) : null;
+  $("kpiYtdLine").textContent = ytdBase
+    ? `年初来 ${(ytd>=0?'+':'')}${yen(ytd)}（基準: ${ytdBase}）`
+    : '年初来 —';
 }
 
-// ---------- Pie (0円除外 + %表示 + 凡例トグル) ----------
+// ===================== Pie =====================
 let pieChart;
-let pieHidden = new Set(); // index hidden
+let pieHidden = new Set();
 
 function drawPie(){
   if(!DATES.length) return;
@@ -483,13 +591,8 @@ function drawPie(){
   }
   const rawLabels = [...bucket.keys()];
   const rawData   = rawLabels.map(k=>bucket.get(k));
-  // 0を除外
   const labels = [], data=[];
   rawLabels.forEach((k,i)=>{ if(rawData[i]!==0){ labels.push(k); data.push(rawData[i]); } });
-
-  const colors = getPalette(labels.length);
-  const hoverColors = getHoverPalette(labels.length);
-  const borderColors = getBorderPalette(labels.length);
 
   if(pieChart) pieChart.destroy();
   pieHidden.clear();
@@ -497,10 +600,10 @@ function drawPie(){
     type:'doughnut',
     data:{labels, datasets:[{
       data,
-      backgroundColor: colors,
-      hoverBackgroundColor: hoverColors,
-      borderColor: borderColors,
-      hoverBorderColor: borderColors,
+      backgroundColor: getPalette(labels.length),
+      hoverBackgroundColor: getHoverPalette(labels.length),
+      borderColor: getBorderPalette(labels.length),
+      hoverBorderColor: getBorderPalette(labels.length),
       borderWidth: 1
     }]},
     options:{
@@ -510,35 +613,30 @@ function drawPie(){
         tooltip:{callbacks:{
           label: (ctx)=>{
             const total = ctx.dataset.data.reduce((s,v,idx)=> s + (pieHidden.has(idx)?0:v), 0);
-            const val = ctx.parsed;
-            const pct = total ? (val/total*100) : 0;
-            return `${ctx.label}: ${yen(val)} (${pct.toFixed(1)}%)`;
+            const pct = total ? (ctx.parsed/total*100) : 0;
+            return `${ctx.label}: ${yen(ctx.parsed)} (${pct.toFixed(1)}%)`;
           }
         }}
       }
     }
   });
 
-  // 凡例生成（トグル）
-  const dots = labels.map((k,i)=>{
+  $("pieLegend").innerHTML = labels.map((k,i)=>{
     const c = pieChart.getDatasetMeta(0).controller.getStyle(i,false).backgroundColor;
     return `<span class="legend-item" data-idx="${i}"><span class="dot" style="background:${c}"></span>${k}</span>`;
   }).join('');
-  $("pieLegend").innerHTML = dots;
-
   $("pieLegend").querySelectorAll('.legend-item').forEach(el=>{
     el.addEventListener('click', ()=>{
       const i = Number(el.dataset.idx);
       if(pieHidden.has(i)) pieHidden.delete(i); else pieHidden.add(i);
       el.classList.toggle('inactive');
-      // Chart.js v4 でのデータ可視性切替
       pieChart.toggleDataVisibility(i);
       pieChart.update();
     });
   });
 }
 
-// ---------- Line（Name時は非stock=「株式以外」に集約／StockType・Accountも非stockを「株式以外」と表示／最新日0は除外） ----------
+// ===================== Line =====================
 let lineChart;
 function drawLine(){
   if(!DATES.length) return;
@@ -549,42 +647,30 @@ function drawLine(){
   if(labels.length===0) return;
   $("lineRangeNote").textContent = `${from} 〜 ${to}`;
 
-  let cats = [];
-  let series = [];
+  let cats = [], series = [];
   const totals = labels.map(d=> sumAt(d));
 
   if(dim === 'Name'){
     const stockNames = new Set();
     for(const d of labels){
       for(const r of (byDate.get(d)||[])){
-        const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
-        if(isStock) stockNames.add(r.Name||'(blank)');
+        if((r.AssetClass||'').toLowerCase() === 'stock') stockNames.add(r.Name||'(blank)');
       }
     }
     cats = [...stockNames].sort();
     series = cats.map(name => labels.map(d=>{
-      const rows = byDate.get(d)||[];
-      return rows.filter(r => ((r.AssetClass||'').toLowerCase()==='stock') && (r.Name||'(blank)')===name)
+      return (byDate.get(d)||[]).filter(r => ((r.AssetClass||'').toLowerCase()==='stock') && (r.Name||'(blank)')===name)
                  .reduce((s,r)=>s+r.Amount,0);
     }));
-    // 「株式以外」
-    const nonStockSeries = labels.map(d=>{
-      const rows = byDate.get(d)||[];
-      return rows.filter(r => (r.AssetClass||'').toLowerCase()!=='stock')
-                 .reduce((s,r)=>s+r.Amount,0);
-    });
-    if(nonStockSeries.some(v=>v!==0)){
-      cats.push('株式以外');
-      series.push(nonStockSeries);
-    }
+    const nonStockSeries = labels.map(d=>(byDate.get(d)||[]).filter(r=>(r.AssetClass||'').toLowerCase()!=='stock').reduce((s,r)=>s+r.Amount,0));
+    if(nonStockSeries.some(v=>v!==0)){ cats.push('株式以外'); series.push(nonStockSeries); }
   }else{
     const set = new Set();
     for(const d of labels){
       for(const r of (byDate.get(d)||[])){
         if(dim === 'StockType' || dim === 'Account'){
           const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
-          const key = isStock ? (r[dim] || '(blank)') : '株式以外';
-          set.add(key);
+          set.add(isStock ? (r[dim] || '(blank)') : '株式以外');
         }else{
           set.add(r[dim]||'(blank)');
         }
@@ -594,73 +680,52 @@ function drawLine(){
     series = cats.map(c => labels.map(d => (byDate.get(d)||[]).filter(r => {
       if(dim === 'StockType' || dim === 'Account'){
         const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
-        const key = isStock ? (r[dim] || '(blank)') : '株式以外';
-        return key === c;
-      }else{
-        return (r[dim]||'(blank)') === c;
+        return (isStock ? (r[dim] || '(blank)') : '株式以外') === c;
       }
+      return (r[dim]||'(blank)') === c;
     }).reduce((s,r)=>s+r.Amount,0)));
   }
 
-  // 最新日の値が0の系列は除外
-  const filtered = [];
-  const filteredCats = [];
-  series.forEach((arr,i)=>{
-    const last = arr[arr.length-1];
-    if(last !== 0){
-      filtered.push(arr);
-      filteredCats.push(cats[i]);
-    }
-  });
+  const filtered = [], filteredCats = [];
+  series.forEach((arr,i)=>{ if(arr[arr.length-1] !== 0){ filtered.push(arr); filteredCats.push(cats[i]); } });
 
   if(lineChart) lineChart.destroy();
   lineChart = new Chart($("lineChart"), {
     type:'line',
-    data:{labels,
-      datasets:[
-        ...filteredCats.map((c,i)=>({
-          label:c,
-          data:filtered[i],
-          tension:0.35,
-          borderWidth:1.5,
-          fill:false,
-          pointRadius:0,
-          pointHitRadius:8,
-          borderColor:COLORS[i%COLORS.length],
-          backgroundColor:COLORS[i%COLORS.length]
-        })),
-        {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
-      ]},
+    data:{labels, datasets:[
+      ...filteredCats.map((c,i)=>({
+        label:c, data:filtered[i], tension:0.35, borderWidth:1.5, fill:false,
+        pointRadius:0, pointHitRadius:8,
+        borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]
+      })),
+      {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
+    ]},
     options:{
       responsive:true,
-      scales:{x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
-              y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}},
+      scales:{
+        x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
+        y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}
+      },
       plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
     }
   });
 }
 
-// ---------- 2日比較（フィルタ付き） ----------
+// ===================== 2日比較 =====================
 let cmpSort = {key:'diff', dir:'desc'};
 
 function collectDistinct(keys, dates){
   const set = new Set();
-  for(const d of dates){
-    for(const r of (byDate.get(d)||[])){
-      keys.forEach(k=> set.add((r[k]||'').trim()));
-    }
-  }
+  for(const d of dates){ for(const r of (byDate.get(d)||[])){ keys.forEach(k=> set.add((r[k]||'').trim())); } }
   set.delete('');
   return [...set].sort();
 }
 function fillCmpFilters(){
-  const ds = DATES;
-  const aset = collectDistinct(['AssetClass'], ds);
-  const sset = collectDistinct(['StockType'], ds);
-  const cset = collectDistinct(['Currency'], ds);
-  const accs = collectDistinct(['Account'], ds);
   const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
-  fill('cmpFAsset', aset); fill('cmpFSType', sset); fill('cmpFCcy', cset); fill('cmpFAcc', accs);
+  fill('cmpFAsset', collectDistinct(['AssetClass'], DATES));
+  fill('cmpFSType', collectDistinct(['StockType'], DATES));
+  fill('cmpFCcy',   collectDistinct(['Currency'], DATES));
+  fill('cmpFAcc',   collectDistinct(['Account'], DATES));
 }
 
 function drawCmp(){
@@ -670,28 +735,18 @@ function drawCmp(){
   if(a===b){ const idx = DATES.indexOf(b); if(idx>0) a = DATES[idx-1]; }
   const ta = sumAt(a), tb = sumAt(b);
   $("cmpNote").textContent = `合計: A=${a} ${yen(ta)} / B=${b} ${yen(tb)}（差分: ${(tb-ta>=0?'+':'')+yen(tb-ta)}）`;
-
   $("cmpDetailNote").textContent = `銘柄別（Name）: A=${a} / B=${b}`;
 
-  // 全銘柄集合
   const names = new Set();
   const pushNames = d => { for(const [nm] of (byDateName.get(d)||new Map())) names.add(nm); };
   pushNames(a); pushNames(b);
 
-  // フィルタ値
-  const fA = $("cmpFAsset").value, fS=$("cmpFSType").value, fC=$("cmpFCcy").value, fAcc=$("cmpFAcc").value;
-
+  const fA=$("cmpFAsset").value, fS=$("cmpFSType").value, fC=$("cmpFCcy").value, fAcc=$("cmpFAcc").value;
   const rows = [...names].map(nm=>{
-    const av = amountOfNameAt(nm,a);
-    const bv = amountOfNameAt(nm,b);
+    const av = amountOfNameAt(nm,a), bv = amountOfNameAt(nm,b);
     const diff = bv - av;
     const pct = av!==0 ? diff/av : null;
-
-    // 属性はB優先→A
-    const metaB = attrsOfNameAt(nm,b);
-    const metaA = attrsOfNameAt(nm,a);
-    const meta = {...metaA, ...metaB};
-
+    const meta = {...attrsOfNameAt(nm,a), ...attrsOfNameAt(nm,b)};
     return {Name:nm, a:av, b:bv, diff, pct, ...meta};
   })
   .filter(r => !(r.a===0 && r.b===0))
@@ -706,14 +761,11 @@ function drawCmp(){
 
 function sortRows(arr, key, dir){
   arr.sort((x,y)=>{
-    const ax = (key==='Name') ? x.Name : x[key];
-    const ay = (key==='Name') ? y.Name : y[key];
-    if(ax===null) return 1;
-    if(ay===null) return -1;
-    if(typeof ax==='string'){
-      return dir==='asc' ? ax.localeCompare(ay) : ay.localeCompare(ax);
-    }
-    return dir==='asc' ? (ax - ay) : (ay - ax);
+    const ax = key==='Name' ? x.Name : x[key];
+    const ay = key==='Name' ? y.Name : y[key];
+    if(ax===null) return 1; if(ay===null) return -1;
+    if(typeof ax==='string') return dir==='asc' ? ax.localeCompare(ay) : ay.localeCompare(ax);
+    return dir==='asc' ? (ax-ay) : (ay-ax);
   });
 }
 
@@ -721,9 +773,9 @@ function renderCmpTable(rows){
   const tbody = $("cmpTable").querySelector('tbody');
   tbody.innerHTML = rows.map(r=>{
     const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
-    const pctStr = (r.pct===null) ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
+    const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
     return `<tr>
-      <td>${escapeHtml(r.Name)}</td>
+      <td><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
       <td style="text-align:right">${yen(r.a)}</td>
       <td style="text-align:right">${yen(r.b)}</td>
       <td style="text-align:right" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
@@ -732,9 +784,42 @@ function renderCmpTable(rows){
   }).join('');
 }
 
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+// ===================== 銘柄推移グラフ =====================
+let stockChart = null;
 
-// ---------- Calendar（Month/Year切替 + 年2モード） ----------
+function showStockChart(name){
+  $('stockModalTitle').textContent = name;
+  $('stockModal').style.display = 'flex';
+  const dates = DATES.filter(d => (byDateName.get(d)||new Map()).has(name));
+  const values = dates.map(d => amountOfNameAt(name, d));
+  if(stockChart){ stockChart.destroy(); stockChart = null; }
+  if(!dates.length){ $('stockModalNote').textContent = 'データなし'; return; }
+  $('stockModalNote').textContent = `${dates[0]} 〜 ${dates.at(-1)}（${dates.length}件）`;
+  stockChart = new Chart($('stockCanvas'), {
+    type:'line',
+    data:{labels:dates, datasets:[{
+      label:name, data:values,
+      borderColor:'rgba(0,255,200,1)', backgroundColor:'rgba(0,255,200,0.07)',
+      fill:true, tension:0.35,
+      pointRadius: dates.length <= 60 ? 3 : 0,
+      pointHitRadius:8, borderWidth:2
+    }]},
+    options:{
+      responsive:true,
+      scales:{
+        x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
+        y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:v=>'¥'+fmt(v)}}
+      },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${name}: ${yen(ctx.parsed.y)}`}}}
+    }
+  });
+}
+
+$('stockClose').addEventListener('click', ()=>{ $('stockModal').style.display='none'; });
+$('stockModal').addEventListener('click', e=>{ if(e.target===$('stockModal')){ $('stockModal').style.display='none'; } });
+$('mapModal').addEventListener('click', e=>{ if(e.target===$('mapModal')){ $('mapModal').style.display='none'; _pendingRawRows=null; } });
+
+// ===================== Calendar =====================
 const calState = { view:'month', month:null, selected:null, year:null, yearMode:'month', yearSelected:null };
 
 function initCalendarDefaults(){
@@ -767,15 +852,14 @@ function renderCalendar(){
     $("yearDetailMonth").textContent='—'; $("yearDetailBody").textContent='記録なし'; $("yearDetail").style.display='none';
     return;
   }
-  if(calState.view==='month'){ renderMonthCalendar(); }
-  else { renderYearView(); }
+  if(calState.view==='month') renderMonthCalendar();
+  else renderYearView();
 }
 
-function monthEndDate(yy,mm){ // mm:1-12
+function monthEndDate(yy,mm){
   const prefix = `${yy}-${String(mm).padStart(2,'0')}`;
   const ds = DATES.filter(d=>d.startsWith(prefix));
-  if(ds.length===0) return null;
-  return ds[ds.length-1];
+  return ds.length ? ds[ds.length-1] : null;
 }
 
 function renderMonthCalendar(){
@@ -783,35 +867,25 @@ function renderMonthCalendar(){
   const base = dayjs(ym+'-01');
   $("calTitle").textContent = base.format('YYYY年M月');
 
-  // 月単位増減（ヘッダ右に表示）
   const endThis = monthEndDate(base.year(), base.month()+1);
   const prevMonth = base.subtract(1,'month');
   const endPrev  = monthEndDate(prevMonth.year(), prevMonth.month()+1);
   let monthHdr = '';
   if(endThis){
     const thisSum = sumAt(endThis);
-    if(endPrev){
-      const prevSum = sumAt(endPrev);
-      const dv = thisSum - prevSum;
-      monthHdr = `月末総額：${yen(thisSum)} ／ 前月比 ${(dv>=0?'+':'')}${yen(dv)}`;
-    }else{
-      monthHdr = `月末総額：${yen(thisSum)} ／ 前月比 —`;
-    }
+    const dv = endPrev ? thisSum - sumAt(endPrev) : null;
+    monthHdr = `月末総額：${yen(thisSum)} ／ 前月比 ${dv!=null ? (dv>=0?'+':'')+yen(dv) : '—'}`;
   }else{
     monthHdr = 'この月の月末記録がありません';
   }
   $("monthHeaderDelta").textContent = monthHdr;
 
-  // 最新日との差で色分け（基準=全体の最新日）
   const latest = DATES.at(-1);
   const latestTotal = sumAt(latest);
-
-  // 6週固定グリッド
-  const firstDowMon0 = (base.day()+6)%7; // 月=0
+  const firstDowMon0 = (base.day()+6)%7;
   const start = base.subtract(firstDowMon0,'day');
   const cells = Array.from({length:42},(_,i)=> start.add(i,'day'));
 
-  // 分位の閾値
   const monthDays = cells.filter(d=>d.month()===base.month()).map(d=>d.format('YYYY-MM-DD'));
   const diffsAbs = monthDays.map(d=> Math.abs((byDate.has(d)? sumAt(d):latestTotal) - latestTotal));
   const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
@@ -826,21 +900,18 @@ function renderMonthCalendar(){
     cell.className = 'day-cell' + (inMonth?'':' disabled');
     if(ymd===calState.selected) cell.classList.add('selected');
 
-    // 草カラー
     const total = byDate.has(ymd)? sumAt(ymd) : latestTotal;
     const diff  = latestTotal - total;
     let cls = '';
-    if(byDate.has(ymd) && diff === 0){
-      cls = 'eq';
-    }else{
+    if(byDate.has(ymd) && diff === 0){ cls = 'eq'; }
+    else{
       const a = Math.abs(diff);
       let level = '';
-      if(a>0 && a<=t1) level='1'; else if(a>t1 && a<=t2) level='2'; else if(a>t2 && a<=t3) level='3'; else if(a>t3 && a<=t4) level='4'; else if(a>t4) level='5';
+      if(a>0&&a<=t1) level='1'; else if(a>t1&&a<=t2) level='2'; else if(a>t2&&a<=t3) level='3'; else if(a>t3&&a<=t4) level='4'; else if(a>t4) level='5';
       if(level) cls = diff>0?('up'+level):('dn'+level);
     }
     if(cls) cell.classList.add(cls);
 
-    // 表示
     const head = document.createElement('div'); head.className='day-head';
     const num = document.createElement('div');  num.className='day-num'; num.textContent = String(d.date());
     const totalEl = document.createElement('div'); totalEl.className='day-total'; totalEl.textContent = byDate.has(ymd)? compactJPY(total) : '';
@@ -864,18 +935,15 @@ function renderMonthCalendar(){
   }
 
   if(!calState.selected || calState.selected.slice(0,7)!==ym){
-    const firstInMonth = DATES.find(x=>x.startsWith(ym)) || ym+'-01';
-    calState.selected = firstInMonth;
+    calState.selected = DATES.find(x=>x.startsWith(ym)) || ym+'-01';
   }
   renderCalendarDetail();
 }
 
 function getCalFilters(){
   return {
-    AssetClass: $("calFAsset").value,
-    StockType: $("calFSType").value,
-    Currency: $("calFCcy").value,
-    Account: $("calFAcc").value
+    AssetClass: $("calFAsset").value, StockType: $("calFSType").value,
+    Currency: $("calFCcy").value,     Account:   $("calFAcc").value
   };
 }
 
@@ -889,14 +957,11 @@ function renderCalendarDetail(){
   const delta = prev ? (total - sumAt(prev)) : null;
   const deltaStr = delta===null ? '—' : ((delta>=0?'+':'')+yen(delta));
   const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
-
-  // フィルタ
   const f = getCalFilters();
 
-  // 銘柄ごと：選択日の金額 vs 直前記録日の金額
   const map = byDateName.get(d) || new Map();
   const rows = [...map.entries()].map(([name, amt])=>{
-    if(amt===0) return null; // 0円は表示しない
+    if(amt===0) return null;
     const prevDate = previousRecordedDate(d);
     const prevAmt = prevDate ? amountOfNameAt(name, prevDate) : 0;
     const diff = amt - prevAmt;
@@ -909,7 +974,6 @@ function renderCalendarDetail(){
     .filter(r => (f.Currency? r.Currency===f.Currency : true))
     .filter(r => (f.Account? r.Account===f.Account : true));
 
-  // 並び替え
   const mode = $("calSort").value;
   rows.sort((a,b)=>{
     switch(mode){
@@ -923,24 +987,22 @@ function renderCalendarDetail(){
   const list = rows.map(r=>{
     const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
     const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
-    return `<div>${escapeHtml(r.Name)}: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
+    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
   }).join('');
 
   const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
   $("calDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
 }
 
-// ---- 年表示（2モード：月タイル / 日タイル）----
+// ===================== Year View =====================
 function renderYearView(){
   const y = calState.year;
   $("yearTitle").textContent = `${y}年`;
-
-  const mode = calState.yearMode; // 'month' or 'day'
+  const mode = calState.yearMode;
   const months = Array.from({length:12},(_,i)=>i+1);
   const grid = $("yearGrid");
   grid.innerHTML = '';
 
-  // 選択状態の初期化（記録がない場合はnull）
   if(!calState.yearSelected || !calState.yearSelected.startsWith(String(y)) || monthEndDate(y, Number(calState.yearSelected.slice(5)))==null){
     const first = months.find(mm=>monthEndDate(y,mm)!=null);
     calState.yearSelected = first? `${y}-${String(first).padStart(2,'0')}` : null;
@@ -963,14 +1025,10 @@ function renderYearView(){
       card.innerHTML += `<div class="muted">記録なし</div>`;
     }else{
       const thisTot = sumAt(end);
-      // 前月末（前年補完あり）
       let prevEnd = null;
       let mm = m-1, yy = y;
       while(mm>=1 && !prevEnd){ prevEnd = monthEndDate(yy,mm); mm--; }
-      if(!prevEnd){
-        // 前年末から後退して探す
-        for(let k=12;k>=1 && !prevEnd;k--){ prevEnd = monthEndDate(y-1,k); }
-      }
+      if(!prevEnd){ for(let k=12;k>=1 && !prevEnd;k--){ prevEnd = monthEndDate(y-1,k); } }
       const prevTot = prevEnd ? sumAt(prevEnd) : null;
       const delta = (prevTot!=null) ? (thisTot - prevTot) : null;
       const cls = delta==null ? '' : (delta>0?'pos':(delta<0?'neg':''));
@@ -979,48 +1037,34 @@ function renderYearView(){
       card.innerHTML += `<div class="${cls}">前月比：${deltaStr}</div>`;
 
       if(mode==='day'){
-        // ミニ月間カレンダー（極小草）
         const base = dayjs(`${y}-${String(m).padStart(2,'0')}-01`);
         const firstDowMon0 = (base.day()+6)%7;
         const start = base.subtract(firstDowMon0,'day');
         const cells = Array.from({length:42},(_,k)=> start.add(k,'day'));
         const mini = document.createElement('div');
         mini.className = 'mini-month';
-        // しきい値 (前日比の絶対値)
         const monthDays = cells.filter(d=>d.month()===base.month()).map(d=>d.format('YYYY-MM-DD'));
-        const diffsAbs = monthDays.map(d=>{
-          if(!byDate.has(d)) return 0;
-          const prev = previousRecordedDate(d);
-          return prev ? Math.abs(sumAt(d) - sumAt(prev)) : 0;
-        });
+        const diffsAbs = monthDays.map(d=>{ if(!byDate.has(d)) return 0; const prev = previousRecordedDate(d); return prev ? Math.abs(sumAt(d)-sumAt(prev)) : 0; });
         const sorted = diffsAbs.filter(v=>v>0).sort((a,b)=>a-b);
         const q = p => (sorted.length? sorted[Math.floor((sorted.length-1)*p)] : 0);
         const t1=q(0.33), t2=q(0.66);
-
         for(const d of cells){
           const ymd = d.format('YYYY-MM-DD');
           const box = document.createElement('div'); box.className='mini-day';
-            if(d.month()===base.month()){
-              if(byDate.has(ymd)){
-                const prev = previousRecordedDate(ymd);
-                if(prev){
-                  const diff = sumAt(ymd) - sumAt(prev);
-                  if(diff===0){ box.classList.add('neutral'); }
-                  else{
-                    const a = Math.abs(diff);
-                    let tag = '';
-                    if(a<=t1) tag='low';
-                    else if(a<=t2) tag='mid';
-                    else tag='high';
-                    box.classList.add(diff>0 ? `gain-${tag}` : `loss-${tag}`);
-                  }
-                }else{
-                  box.classList.add('neutral');
+          if(d.month()===base.month()){
+            if(byDate.has(ymd)){
+              const prev = previousRecordedDate(ymd);
+              if(prev){
+                const diff = sumAt(ymd) - sumAt(prev);
+                if(diff===0){ box.classList.add('neutral'); }
+                else{
+                  const a = Math.abs(diff);
+                  const tag = a<=t1?'low':a<=t2?'mid':'high';
+                  box.classList.add(diff>0?`gain-${tag}`:`loss-${tag}`);
                 }
-              }
-            }else{
-              box.style.opacity=.25;
+              }else{ box.classList.add('neutral'); }
             }
+          }else{ box.style.opacity='.25'; }
           mini.appendChild(box);
         }
         card.appendChild(mini);
@@ -1029,17 +1073,14 @@ function renderYearView(){
 
     card.addEventListener('click', ()=>{
       if(calState.yearSelected===ym){
-        calState.view='month';
-        calState.month = ym;
-        const firstInMonth = DATES.find(x=>x.startsWith(calState.month)) || `${calState.month}-01`;
-        calState.selected = firstInMonth;
+        calState.view='month'; calState.month=ym;
+        calState.selected = DATES.find(x=>x.startsWith(calState.month)) || `${calState.month}-01`;
         syncCalUI(); renderCalendar();
       }else{
         calState.yearSelected = ym;
         renderYearView();
       }
     });
-
     grid.appendChild(card);
   }
 
@@ -1048,38 +1089,29 @@ function renderYearView(){
   $("yearNote").textContent = (firstDispMonth==null) ? 'この年の記録がありません' :
     `${y}-${String(firstDispMonth).padStart(2,'0')} 〜 ${y}-${String(lastDispMonth).padStart(2,'0')}（各月の最終記録日基準）`;
 
-  if(calState.yearSelected){ renderYearDetail(); }
-  else { $("yearDetail").style.display='none'; }
+  if(calState.yearSelected) renderYearDetail();
+  else $("yearDetail").style.display='none';
 }
 
 function renderYearDetail(){
   const ym = calState.yearSelected;
   const detail = $("yearDetail");
-  const titleEl = $("yearDetailMonth");
-  const bodyEl = $("yearDetailBody");
-  if(!ym){
-    titleEl.textContent = '—';
-    bodyEl.textContent = '記録なし';
-    detail.style.display='none';
-    return;
-  }
+  if(!ym){ $("yearDetailMonth").textContent='—'; $("yearDetailBody").textContent='記録なし'; detail.style.display='none'; return; }
   detail.style.display='';
-  const y = Number(ym.slice(0,4));
-  const m = Number(ym.slice(5));
+  const y = Number(ym.slice(0,4)), m = Number(ym.slice(5));
   const end = monthEndDate(y,m);
-  if(!end){ titleEl.textContent = `${ym} 月末`; bodyEl.textContent='記録なし'; return; }
-  titleEl.textContent = `${ym} 月末（${end}）`;
+  if(!end){ $("yearDetailMonth").textContent=`${ym} 月末`; $("yearDetailBody").textContent='記録なし'; return; }
+  $("yearDetailMonth").textContent = `${ym} 月末（${end}）`;
 
-  // 前月末（前年補完あり）
   let prevEnd = null;
   let mm = m-1, yy = y;
   while(mm>=1 && !prevEnd){ prevEnd = monthEndDate(yy,mm); mm--; }
   if(!prevEnd){ for(let k=12;k>=1 && !prevEnd;k--){ prevEnd = monthEndDate(y-1,k); } }
   const total = sumAt(end);
   const prevTot = prevEnd ? sumAt(prevEnd) : null;
-  const delta = (prevTot!=null) ? (total - prevTot) : null;
+  const delta = (prevTot!=null) ? (total-prevTot) : null;
   const deltaStr = delta==null ? '—' : ((delta>=0?'+':'')+yen(delta));
-  const deltaColor = delta==null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
+  const deltaColor = delta==null ? '' : (delta>=0?'#22c55e':'#ef4444');
 
   const map = byDateName.get(end) || new Map();
   const rows = [...map.entries()].map(([name, amt])=>{
@@ -1087,62 +1119,61 @@ function renderYearDetail(){
     const prevAmt = prevEnd ? amountOfNameAt(name, prevEnd) : 0;
     const diff = amt - prevAmt;
     const pct = prevAmt!==0 ? (diff/prevAmt) : null;
-    const meta = attrsOfNameAt(name, end);
-    return {Name:name, Amount:amt, Diff:diff, Pct:pct, ...meta};
+    return {Name:name, Amount:amt, Diff:diff, Pct:pct};
   }).filter(Boolean);
-  rows.sort((a,b)=>b.Amount - a.Amount);
+  rows.sort((a,b)=>b.Amount-a.Amount);
 
   const list = rows.map(r=>{
     const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
     const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
-    return `<div>${escapeHtml(r.Name)}: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
+    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
   }).join('');
 
   const summary = `月末総額（${end}）：${yen(total)}<br/>前月比：<span style="color:${deltaColor}">${deltaStr}</span>${prevEnd?`（前月: ${prevEnd}）`:''}`;
-  bodyEl.innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
+  $("yearDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
 }
 
-// ---------- Export ----------
+// ===================== Export =====================
 function exportCsv(){
   if(RAW.length===0) return;
   const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
-  const rows = RAW.map(r=>header.map(h=>r[h]??'')); const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'assets_export.csv'; a.click(); URL.revokeObjectURL(url);
+  const rows = RAW.map(r=>header.map(h=>r[h]??''));
+  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='assets_export.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 
-// ---------- lifecycle ----------
+// ===================== lifecycle =====================
+function fillCalFilters(){
+  const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
+  fill('calFAsset', collectDistinct(['AssetClass'], DATES));
+  fill('calFSType', collectDistinct(['StockType'], DATES));
+  fill('calFCcy',   collectDistinct(['Currency'], DATES));
+  fill('calFAcc',   collectDistinct(['Account'], DATES));
+}
+
 function onDataReady(){
   $("totalDate").value = DATES.at(-1) || '';
   $("fromDate").value  = DATES[0] || '';
   $("toDate").value    = DATES.at(-1) || '';
   $("cmpDateA").value  = DATES.at(-1) || '';
   $("cmpDateB").value  = DATES.at(-1) || '';
-
-  // フィルタ候補充填
   fillCmpFilters();
   fillCalFilters();
-
   refreshKPIs(); drawPie(); drawLine(); drawCmp();
   initCalendarDefaults(); renderCalendar();
+  saveToStorage();
 }
 
-function fillCalFilters(){
-  const ds = DATES;
-  const aset = collectDistinct(['AssetClass'], ds);
-  const sset = collectDistinct(['StockType'], ds);
-  const cset = collectDistinct(['Currency'], ds);
-  const accs = collectDistinct(['Account'], ds);
-  const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
-  fill('calFAsset', aset); fill('calFSType', sset); fill('calFCcy', cset); fill('calFAcc', accs);
-}
-
-// events
+// ===================== events =====================
 $("file").addEventListener('change', e=>{
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader(); reader.onload = ()=> parseCSV(reader.result); reader.readAsText(file);
 });
 $("exportCsv").addEventListener('click', exportCsv);
+$("clearData").addEventListener('click', clearStorage);
 $("totalDate").addEventListener('change', ()=>{ refreshKPIs(); drawPie(); });
 $("pieDimension").addEventListener('change', drawPie);
 $("lineDimension").addEventListener('change', drawLine);
@@ -1150,14 +1181,19 @@ $("applyRange").addEventListener('click', drawLine);
 $("applyCmp").addEventListener('click', drawCmp);
 ["cmpFAsset","cmpFSType","cmpFCcy","cmpFAcc"].forEach(id=> $(id).addEventListener('change', drawCmp));
 
-// 2日比較表のヘッダー並び替え
-document.addEventListener('click', (e)=>{
+// 2日比較ソート
+document.addEventListener('click', e=>{
   const th = e.target.closest('#cmpTable th.sortable');
-  if(!th) return;
-  const key = th.dataset.key;
-  cmpSort.dir = (cmpSort.key===key && cmpSort.dir==='desc') ? 'asc' : 'desc';
-  cmpSort.key = key;
-  drawCmp();
+  if(th){
+    const key = th.dataset.key;
+    cmpSort.dir = (cmpSort.key===key && cmpSort.dir==='desc') ? 'asc' : 'desc';
+    cmpSort.key = key;
+    drawCmp();
+    return;
+  }
+  // 銘柄リンク（比較表・カレンダー詳細・年詳細）
+  const link = e.target.closest('.stock-link');
+  if(link && link.dataset.name) showStockChart(link.dataset.name);
 });
 
 // calendar nav
@@ -1165,15 +1201,13 @@ $("calPrev").addEventListener('click', ()=>{ calState.month = dayjs(calState.mon
 $("calNext").addEventListener('click', ()=>{ calState.month = dayjs(calState.month+'-01').add(1,'month').format('YYYY-MM'); renderCalendar(); });
 $("calSort").addEventListener('change', ()=>{ if(calState.view==='month') renderCalendarDetail(); });
 ["calFAsset","calFSType","calFCcy","calFAcc"].forEach(id=> $(id).addEventListener('change', ()=>{ if(calState.view==='month') renderCalendarDetail(); }));
-
-$("calView").addEventListener('change', ()=>{
-  calState.view = $("calView").value;
-  syncCalUI();
-  renderCalendar();
-});
+$("calView").addEventListener('change', ()=>{ calState.view=$("calView").value; syncCalUI(); renderCalendar(); });
 $("yearPrev").addEventListener('click', ()=>{ calState.year -= 1; renderCalendar(); });
 $("yearNext").addEventListener('click', ()=>{ calState.year += 1; renderCalendar(); });
-$("yearMode").addEventListener('change', ()=>{ calState.yearMode = $("yearMode").value; renderCalendar(); });
+$("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").value; renderCalendar(); });
+
+// 起動時: 保存データがあれば自動復元
+tryLoadSaved();
 </script>
 </body>
 </html>
