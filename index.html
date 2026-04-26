@@ -157,12 +157,13 @@
       select{max-width:100%;box-sizing:border-box;padding:6px;font-size:13px}
       input[type="date"]{max-width:100%;box-sizing:border-box;padding:6px;font-size:13px}
 
-      /* controls（フィルター行）を縦積みに */
-      .controls{flex-direction:column;align-items:stretch;gap:6px}
+      /* controls（フィルター行）を2列グリッドに */
+      .controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center}
       .controls > label{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
       .controls > label select,
-      .controls > label input[type="date"]{flex:1 1 110px;min-width:0}
-      .controls > button{width:100%}
+      .controls > label input[type="date"]{flex:1 1 90px;min-width:0;width:100%;box-sizing:border-box}
+      .controls > button{grid-column:1/-1;width:100%}
+      .controls > span{grid-column:1/-1}
 
       /* カレンダーヘッダーのコントロール */
       .cal-header{flex-direction:column;align-items:flex-start;gap:6px}
@@ -276,6 +277,65 @@
     </div>
     <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
     <div class="muted">※ 記録日のみ表示（点マーカーは非表示）／最新日が¥0の系列は非表示</div>
+  </section>
+
+  <!-- 銘柄別割合・合算 -->
+  <section class="panel wide">
+    <h2>銘柄別割合・合算</h2>
+    <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
+    <div class="controls" style="margin-top:8px">
+      <label>日付: <input type="date" id="analDate"/></label>
+      <span class="muted" id="analDateNote">—</span>
+    </div>
+
+    <div id="stockSelSummary" class="sel-summary">
+      <div id="selEmptyMsg" class="muted" style="font-size:12px;width:100%">銘柄を選択すると合計・割合を表示します</div>
+      <div id="selStats" style="display:none;width:100%">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <span>選択中: <strong id="selCount">0</strong> 銘柄</span>
+          <span>合計: <strong id="selTotal">—</strong></span>
+          <span class="muted" id="selNames" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0"></span>
+          <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;margin-left:auto">選択解除</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">全体の割合</span>
+            <div class="pct-bar-wrap" style="flex:1;max-width:none"><div class="pct-bar" id="barTotal" style="width:0%"></div></div>
+            <span style="font-size:12px;min-width:48px;text-align:right"><strong id="selPct">—</strong>%</span>
+          </div>
+          <div id="stockBarRow" style="display:none;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">株式内割合</span>
+            <div class="pct-bar-wrap" style="flex:1;max-width:none"><div class="pct-bar" id="barStock" style="width:0%;background:rgba(255,200,0,0.7)"></div></div>
+            <span style="font-size:12px;min-width:48px;text-align:right"><strong id="selStockPct">—</strong>%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="analTable">
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
+            <th class="sortable" data-key="name">銘柄</th>
+            <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
+            <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
+            <th>AssetClass</th>
+            <th>Currency</th>
+            <th>Account</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr style="font-weight:600">
+            <td></td><td>合計</td>
+            <td style="text-align:right" id="analTotalVal">—</td>
+            <td>100%</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </section>
 
   <!-- 2日間比較（表のみ） -->
@@ -400,48 +460,6 @@
     </div>
   </section>
 
-  <!-- 銘柄別割合・合算 -->
-  <section class="panel wide">
-    <h2>銘柄別割合・合算</h2>
-    <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
-    <div class="controls" style="margin-top:8px">
-      <label>日付: <input type="date" id="analDate"/></label>
-      <span class="muted" id="analDateNote">—</span>
-    </div>
-
-    <div id="stockSelSummary" class="sel-summary" style="display:none">
-      <span>選択中: <strong id="selCount">0</strong> 銘柄</span>
-      <span>合計: <strong id="selTotal">—</strong></span>
-      <span>全体の: <strong id="selPct">—</strong>%</span>
-      <span class="muted" id="selNames" style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;margin-left:auto">選択解除</button>
-    </div>
-
-    <div class="table-wrap">
-      <table id="analTable">
-        <thead>
-          <tr>
-            <th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
-            <th class="sortable" data-key="name">銘柄</th>
-            <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
-            <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
-            <th>AssetClass</th>
-            <th>Currency</th>
-            <th>Account</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-        <tfoot>
-          <tr style="font-weight:600">
-            <td></td><td>合計</td>
-            <td style="text-align:right" id="analTotalVal">—</td>
-            <td>100%</td>
-            <td colspan="3"></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </section>
 </main>
 
 <!-- 列マッピング モーダル -->
@@ -1299,18 +1317,39 @@ function drawStockAnal(){
 
 function updateSelSummary(totalVal){
   const count = analSelected.size;
-  if(count === 0){ $('stockSelSummary').style.display='none'; return; }
-  $('stockSelSummary').style.display='flex';
+  const emptyMsg = $('selEmptyMsg');
+  const selStats = $('selStats');
+  if(count === 0){
+    emptyMsg.style.display = '';
+    selStats.style.display = 'none';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  selStats.style.display = '';
   const picker = $('analDate').value || DATES.at(-1);
   const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
   if(totalVal === undefined) totalVal = sumAt(selDate);
   let selTotal = 0;
   for(const name of analSelected) selTotal += amountOfNameAt(name, selDate);
   const selPct = totalVal > 0 ? selTotal/totalVal*100 : 0;
-  $('selCount').textContent  = count;
-  $('selTotal').textContent  = yen(selTotal);
-  $('selPct').textContent    = selPct.toFixed(1);
-  $('selNames').textContent  = [...analSelected].join('、');
+
+  // stock-only ratio
+  const entries = byDate.get(selDate) || [];
+  const stockNames = new Set(entries.filter(r => r.AssetClass === 'stock').map(r => r.Name));
+  let totalStockAmt = 0;
+  for(const name of stockNames) totalStockAmt += amountOfNameAt(name, selDate);
+  let selStockAmt = 0;
+  for(const name of analSelected){ if(stockNames.has(name)) selStockAmt += amountOfNameAt(name, selDate); }
+  const stockPct = totalStockAmt > 0 ? selStockAmt/totalStockAmt*100 : 0;
+
+  $('selCount').textContent     = count;
+  $('selTotal').textContent     = yen(selTotal);
+  $('selPct').textContent       = selPct.toFixed(1);
+  $('selNames').textContent     = [...analSelected].join('、');
+  $('selStockPct').textContent  = stockPct.toFixed(1);
+  $('barTotal').style.width     = Math.min(selPct, 100) + '%';
+  $('barStock').style.width     = Math.min(stockPct, 100) + '%';
+  $('stockBarRow').style.display = totalStockAmt > 0 ? 'flex' : 'none';
 }
 
 // ===================== Export =====================
