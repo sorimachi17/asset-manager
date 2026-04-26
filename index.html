@@ -24,6 +24,7 @@
     button:disabled{opacity:.5;cursor:not-allowed}
     .btn-danger{background:#7f1d1d}
     .btn-ghost{background:#1e2638;border:1px solid var(--line)}
+    .btn-ghost.active{background:rgba(59,130,246,0.2);border-color:rgba(59,130,246,0.5);color:var(--accent)}
     .muted{color:var(--muted);font-size:12px}
     .saved-badge{font-size:11px;color:#22c55e;display:none}
     main{display:grid;gap:16px}
@@ -189,7 +190,11 @@
       #analTable{min-width:100%;font-size:11px}
       #analTable th,#analTable td{padding:4px 3px}
       #analTable th:nth-child(n+5),#analTable td:nth-child(n+5){display:none}
-      .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px}
+      .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
+      #selStats{min-width:0;overflow:hidden}
+      #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
+      #analQuickSel{overflow:hidden}
+      #analQuickSel .btn-ghost,#analSetsWrap .btn-ghost{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
       /* モーダル */
       .modal-overlay{padding:8px}
@@ -296,24 +301,35 @@
 
     <div id="stockSelSummary" class="sel-summary">
       <div id="selEmptyMsg" class="muted" style="font-size:12px;width:100%">銘柄を選択すると合計・割合を表示します</div>
-      <div id="selStats" style="display:none;width:100%">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div id="selStats" style="display:none;width:100%;min-width:0">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;min-width:0">
           <span>選択中: <strong id="selCount">0</strong> 銘柄</span>
           <span>合計: <strong id="selTotal">—</strong></span>
           <span class="muted" id="selNames" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0"></span>
-          <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;margin-left:auto">選択解除</button>
+          <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;flex-shrink:0">選択解除</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">全体の割合</span>
-            <div class="pct-bar-wrap" style="flex:1;max-width:none"><div class="pct-bar" id="barTotal" style="width:0%"></div></div>
-            <span style="font-size:12px;min-width:48px;text-align:right"><strong id="selPct">—</strong>%</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="muted" style="font-size:11px">表示:</span>
+          <button id="vizModeBar" class="btn-ghost active" style="font-size:11px;padding:3px 8px">バー</button>
+          <button id="vizModePie" class="btn-ghost" style="font-size:11px;padding:3px 8px">円グラフ</button>
+        </div>
+        <div id="selBarView">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">全体の割合</span>
+              <div class="pct-bar-wrap" style="flex:1;max-width:none;min-width:0"><div class="pct-bar" id="barTotal" style="width:0%"></div></div>
+              <span style="font-size:12px;width:48px;text-align:right;flex-shrink:0"><strong id="selPct">—</strong>%</span>
+            </div>
+            <div id="stockBarRow" style="display:none;align-items:center;gap:8px;min-width:0">
+              <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">株式内割合</span>
+              <div class="pct-bar-wrap" style="flex:1;max-width:none;min-width:0"><div class="pct-bar" id="barStock" style="width:0%;background:rgba(255,200,0,0.7)"></div></div>
+              <span style="font-size:12px;width:48px;text-align:right;flex-shrink:0"><strong id="selStockPct">—</strong>%</span>
+            </div>
           </div>
-          <div id="stockBarRow" style="display:none;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--muted);width:72px;flex-shrink:0">株式内割合</span>
-            <div class="pct-bar-wrap" style="flex:1;max-width:none"><div class="pct-bar" id="barStock" style="width:0%;background:rgba(255,200,0,0.7)"></div></div>
-            <span style="font-size:12px;min-width:48px;text-align:right"><strong id="selStockPct">—</strong>%</span>
-          </div>
+        </div>
+        <div id="selPieView" style="display:none">
+          <div class="chart-wrap" style="max-width:260px;margin:0 auto"><canvas id="selPieCanvas" height="200"></canvas></div>
+          <div id="selPieLegend" style="font-size:11px;margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
       </div>
     </div>
@@ -706,7 +722,7 @@ const pieLabelsPlugin = {
       if(!chart.getDataVisibility(i)) return;
       const val = data.datasets[0].data[i];
       const pct = val/total*100;
-      if(pct < 4) return;
+      if(pct < 1) return;
       const pos = arc.tooltipPosition();
       const raw = data.labels[i];
       const label = raw.length > 10 ? raw.slice(0,10)+'…' : raw;
@@ -977,6 +993,7 @@ $('mapModal').addEventListener('click', e=>{ if(e.target===$('mapModal')){ $('ma
 
 // ===================== Calendar =====================
 const calState = { view:'month', month:null, selected:null, year:null, yearMode:'month', yearSelected:null };
+let calDetailSort = { key:'amount', dir:'desc' };
 
 function initCalendarDefaults(){
   const last = DATES.at(-1) || dayjs().format('YYYY-MM-DD');
@@ -1130,22 +1147,32 @@ function renderCalendarDetail(){
     .filter(r => (f.Currency? r.Currency===f.Currency : true))
     .filter(r => (f.Account? r.Account===f.Account : true));
 
-  const mode = $("calSort").value;
+  const {key:dsk, dir:dsd} = calDetailSort;
   rows.sort((a,b)=>{
-    switch(mode){
-      case 'amount_desc': return b.Amount - a.Amount;
-      case 'delta_desc':  return b.Diff - a.Diff;
-      case 'pct_desc':    return (b.Pct??-Infinity) - (a.Pct??-Infinity);
-      case 'name_asc':    return a.Name.localeCompare(b.Name);
+    let va, vb;
+    switch(dsk){
+      case 'name':   va=a.Name;             vb=b.Name;             break;
+      case 'amount': va=a.Amount;           vb=b.Amount;           break;
+      case 'diff':   va=a.Diff;             vb=b.Diff;             break;
+      case 'pct':    va=a.Pct??-Infinity;   vb=b.Pct??-Infinity;   break;
+      default:       va=b.Amount;           vb=a.Amount;
     }
+    if(typeof va==='string') return dsd==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    return dsd==='asc'?va-vb:vb-va;
   });
+
+  function dth(label, key, align='right'){
+    const active = calDetailSort.key===key;
+    const ind = active ? (calDetailSort.dir==='desc'?' ↓':' ↑') : '';
+    return `<th class="detail-sort-th" data-key="${key}" style="text-align:${align};padding:3px 4px;border-bottom:1px solid var(--line);color:${active?'var(--fg)':'var(--muted)'};font-weight:${active?600:400};cursor:pointer;user-select:none;white-space:nowrap">${label}${ind}</th>`;
+  }
 
   const list = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
     <thead><tr>
-      <th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">銘柄</th>
-      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">評価額</th>
-      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">前回比</th>
-      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">変化率</th>
+      ${dth('銘柄','name','left')}
+      ${dth('評価額','amount')}
+      ${dth('前回比','diff')}
+      ${dth('変化率','pct')}
     </tr></thead>
     <tbody>${rows.map(r=>{
       const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
@@ -1433,6 +1460,9 @@ function drawStockAnal(){
   updateSelSummary(totalVal);
 }
 
+let selVizMode = 'bar';
+let selPieChart = null;
+
 function updateSelSummary(totalVal){
   const count = analSelected.size;
   const emptyMsg = $('selEmptyMsg');
@@ -1440,6 +1470,7 @@ function updateSelSummary(totalVal){
   if(count === 0){
     emptyMsg.style.display = '';
     selStats.style.display = 'none';
+    if(selPieChart){ selPieChart.destroy(); selPieChart=null; }
     return;
   }
   emptyMsg.style.display = 'none';
@@ -1464,10 +1495,50 @@ function updateSelSummary(totalVal){
   $('selTotal').textContent     = yen(selTotal);
   $('selPct').textContent       = selPct.toFixed(1);
   $('selNames').textContent     = [...analSelected].join('、');
-  $('selStockPct').textContent  = stockPct.toFixed(1);
-  $('barTotal').style.width     = Math.min(selPct, 100) + '%';
-  $('barStock').style.width     = Math.min(stockPct, 100) + '%';
-  $('stockBarRow').style.display = totalStockAmt > 0 ? 'flex' : 'none';
+
+  if(selVizMode === 'bar'){
+    $('selBarView').style.display = '';
+    $('selPieView').style.display = 'none';
+    if(selPieChart){ selPieChart.destroy(); selPieChart=null; }
+    $('selStockPct').textContent  = stockPct.toFixed(1);
+    $('barTotal').style.width     = Math.min(selPct, 100) + '%';
+    $('barStock').style.width     = Math.min(stockPct, 100) + '%';
+    $('stockBarRow').style.display = totalStockAmt > 0 ? 'flex' : 'none';
+  } else {
+    $('selBarView').style.display = 'none';
+    $('selPieView').style.display = '';
+    renderSelPie(selTotal, totalVal, selDate);
+  }
+}
+
+function renderSelPie(selTotal, totalVal, selDate){
+  const names = [...analSelected];
+  const dataVals = names.map(n=>amountOfNameAt(n,selDate));
+  const rest = Math.max(0, totalVal - selTotal);
+  const allLabels = [...names, 'その他'];
+  const allData   = [...dataVals, rest];
+  const palette   = getPalette(names.length);
+  palette.push('rgba(80,80,100,0.5)');
+
+  if(selPieChart){ selPieChart.destroy(); selPieChart=null; }
+  selPieChart = new Chart($('selPieCanvas'), {
+    type:'doughnut',
+    data:{ labels:allLabels, datasets:[{ data:allData, backgroundColor:palette, borderWidth:1 }] },
+    options:{
+      cutout:'35%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{ label:(ctx)=>{ const t=ctx.dataset.data.reduce((s,v)=>s+v,0); return `${ctx.label}: ${yen(ctx.parsed)} (${(t?ctx.parsed/t*100:0).toFixed(1)}%)`; } }}
+      }
+    },
+    plugins:[pieLabelsPlugin]
+  });
+
+  $('selPieLegend').innerHTML = names.map((n,i)=>{
+    const c = palette[i];
+    const lbl = n.length>12 ? n.slice(0,12)+'…' : n;
+    return `<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block;flex-shrink:0"></span>${escapeHtml(lbl)}</span>`;
+  }).join('');
 }
 
 // ===================== Export =====================
@@ -1548,6 +1619,16 @@ document.addEventListener('click', e=>{
 // 銘柄分析
 $('analDate').addEventListener('change', drawStockAnal);
 $('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
+$('vizModeBar').addEventListener('click', ()=>{
+  selVizMode='bar';
+  $('vizModeBar').classList.add('active'); $('vizModePie').classList.remove('active');
+  updateSelSummary();
+});
+$('vizModePie').addEventListener('click', ()=>{
+  selVizMode='pie';
+  $('vizModePie').classList.add('active'); $('vizModeBar').classList.remove('active');
+  updateSelSummary();
+});
 $('saveSet').addEventListener('click', ()=>{
   if(analSelected.size === 0){ alert('銘柄を選択してからセットを保存してください'); return; }
   const name = prompt('セット名を入力してください');
@@ -1576,6 +1657,16 @@ $('analTable').addEventListener('change', e=>{
   const allChks = [...$('analTable').querySelectorAll('.anal-chk[data-name]')];
   $('analChkAll').checked = allChks.length > 0 && allChks.every(c=>c.checked);
   $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
+});
+
+// calendar detail sort
+$("calDetailBody").addEventListener('click', e=>{
+  const th = e.target.closest('.detail-sort-th');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(calDetailSort.key===key) calDetailSort.dir = calDetailSort.dir==='desc'?'asc':'desc';
+  else { calDetailSort.key=key; calDetailSort.dir='desc'; }
+  renderCalendarDetail();
 });
 
 // calendar nav
