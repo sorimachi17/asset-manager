@@ -272,7 +272,7 @@
           <option value="Account">Account（口座）</option>
         </select>
       </label>
-      <label>期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
+      <label style="grid-column:1/-1">期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
       <button id="applyRange">反映</button>
     </div>
     <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
@@ -286,6 +286,12 @@
     <div class="controls" style="margin-top:8px">
       <label>日付: <input type="date" id="analDate"/></label>
       <span class="muted" id="analDateNote">—</span>
+    </div>
+    <div id="analQuickSel" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 8px">
+      <span class="muted" style="font-size:11px;flex-shrink:0">セット:</span>
+      <span id="analSetsWrap" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+      <button id="saveSet" class="btn-ghost" style="font-size:12px;padding:4px 10px">+ 保存</button>
     </div>
 
     <div id="stockSelSummary" class="sel-summary">
@@ -688,6 +694,35 @@ function refreshKPIs(){
 let pieChart;
 let pieHidden = new Set();
 
+const pieLabelsPlugin = {
+  id: 'pieLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, data } = chart;
+    const meta = chart.getDatasetMeta(0);
+    const total = data.datasets[0].data.reduce((s,v,i)=>s+(chart.getDataVisibility(i)?v:0),0);
+    if(!total) return;
+    ctx.save();
+    meta.data.forEach((arc, i) => {
+      if(!chart.getDataVisibility(i)) return;
+      const val = data.datasets[0].data[i];
+      const pct = val/total*100;
+      if(pct < 4) return;
+      const pos = arc.tooltipPosition();
+      const raw = data.labels[i];
+      const label = raw.length > 10 ? raw.slice(0,10)+'…' : raw;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, pos.x, pos.y - 6);
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillText(pct.toFixed(1)+'%', pos.x, pos.y + 6);
+    });
+    ctx.restore();
+  }
+};
+
 function drawPie(){
   if(!DATES.length) return;
   const picker = $("totalDate").value || DATES.at(-1);
@@ -738,7 +773,8 @@ function drawPie(){
           }
         }}
       }
-    }
+    },
+    plugins:[pieLabelsPlugin]
   });
 
   $("pieLegend").innerHTML = labels.map((k,i)=>{
@@ -1104,14 +1140,26 @@ function renderCalendarDetail(){
     }
   });
 
-  const list = rows.map(r=>{
-    const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
-    const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
-    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
-  }).join('');
+  const list = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
+    <thead><tr>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">銘柄</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">評価額</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">前回比</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">変化率</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
+      const pctStr = r.Pct===null ? '—' : `${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%`;
+      return `<tr>
+        <td style="padding:3px 4px"><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
+        <td style="text-align:right;padding:3px 4px">${yen(r.Amount)}</td>
+        <td style="text-align:right;padding:3px 4px" class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}</td>
+        <td style="text-align:right;padding:3px 4px" class="${cls}">${pctStr}</td>
+      </tr>`;
+    }).join('')}</tbody></table>` : '';
 
   const summary = `総額：${yen(total)}<br/>前回比：<span style="color:${deltaColor}">${deltaStr}</span>${prev?`（前回: ${prev}）`:''}`;
-  $("calDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
+  $("calDetailBody").innerHTML = summary + (list ? `<div style="margin-top:8px">${list}</div>` : '');
 }
 
 // ===================== Year View =====================
@@ -1243,19 +1291,88 @@ function renderYearDetail(){
   }).filter(Boolean);
   rows.sort((a,b)=>b.Amount-a.Amount);
 
-  const list = rows.map(r=>{
-    const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
-    const pctStr = (r.Pct===null) ? '' : ` (${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%)`;
-    return `<div><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>: ${yen(r.Amount)} <span class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}${pctStr}</span></div>`;
-  }).join('');
+  const list = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
+    <thead><tr>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">銘柄</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">評価額</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">前月比</th>
+      <th style="text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:400">変化率</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
+      const pctStr = r.Pct===null ? '—' : `${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%`;
+      return `<tr>
+        <td style="padding:3px 4px"><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
+        <td style="text-align:right;padding:3px 4px">${yen(r.Amount)}</td>
+        <td style="text-align:right;padding:3px 4px" class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}</td>
+        <td style="text-align:right;padding:3px 4px" class="${cls}">${pctStr}</td>
+      </tr>`;
+    }).join('')}</tbody></table>` : '';
 
   const summary = `月末総額（${end}）：${yen(total)}<br/>前月比：<span style="color:${deltaColor}">${deltaStr}</span>${prevEnd?`（前月: ${prevEnd}）`:''}`;
-  $("yearDetailBody").innerHTML = summary + (list ? `<hr style="margin:8px 0;border:1px solid var(--line)">${list}` : '');
+  $("yearDetailBody").innerHTML = summary + (list ? `<div style="margin-top:8px">${list}</div>` : '');
 }
 
 // ===================== 銘柄分析 =====================
 let analSort = { key: 'amount', dir: 'desc' };
 const analSelected = new Set();
+
+const LS_SETS_KEY = 'asset_mgr_v1_sets';
+function loadSets(){ try{ return JSON.parse(localStorage.getItem(LS_SETS_KEY)||'[]'); }catch(e){ return []; } }
+function saveSets(s){ localStorage.setItem(LS_SETS_KEY, JSON.stringify(s)); }
+
+function renderQuickSel(){
+  const picker = $('analDate').value || DATES.at(-1);
+  const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
+  const classes = new Map();
+  for(const r of (byDate.get(selDate)||[])){
+    if(!r.Amount) continue;
+    const cls = r.AssetClass || '(blank)';
+    if(!classes.has(cls)) classes.set(cls, []);
+    classes.get(cls).push(r.Name);
+  }
+  const wrap = $('analQuickSel');
+  wrap.innerHTML = '<span class="muted" style="font-size:11px;align-self:center;flex-shrink:0">一括選択:</span>' +
+    [...classes.keys()].map(cls =>
+      `<button class="btn-ghost anal-class-btn" data-class="${escapeHtml(cls)}" style="font-size:12px;padding:4px 10px">${escapeHtml(cls)}</button>`
+    ).join('');
+  wrap.querySelectorAll('.anal-class-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const cls = btn.dataset.class;
+      const sd = nearestOnOrBefore($('analDate').value || DATES.at(-1)) || DATES.at(-1);
+      (byDate.get(sd)||[]).filter(r=>r.AssetClass===cls && r.Amount).forEach(r=>analSelected.add(r.Name));
+      drawStockAnal();
+    });
+  });
+}
+
+function renderSavedSets(){
+  const sets = loadSets();
+  const wrap = $('analSetsWrap');
+  wrap.innerHTML = sets.map((s,i)=>
+    `<span style="display:inline-flex;align-items:center;gap:1px">` +
+    `<button class="btn-ghost anal-set-btn" data-idx="${i}" style="font-size:12px;padding:4px 10px">${escapeHtml(s.name)}</button>` +
+    `<button class="anal-set-del" data-idx="${i}" title="削除" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 4px;line-height:1">✕</button>` +
+    `</span>`
+  ).join('');
+  wrap.querySelectorAll('.anal-set-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const s = loadSets()[Number(btn.dataset.idx)];
+      if(!s) return;
+      analSelected.clear();
+      s.names.forEach(n=>analSelected.add(n));
+      drawStockAnal();
+    });
+  });
+  wrap.querySelectorAll('.anal-set-del').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const all = loadSets();
+      all.splice(Number(btn.dataset.idx), 1);
+      saveSets(all);
+      renderSavedSets();
+    });
+  });
+}
 
 function drawStockAnal(){
   if(!DATES.length) return;
@@ -1312,6 +1429,7 @@ function drawStockAnal(){
   $('analChkAll').checked = allNames.length > 0 && allNames.every(n=>analSelected.has(n));
   $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
 
+  renderQuickSel();
   updateSelSummary(totalVal);
 }
 
@@ -1385,6 +1503,7 @@ function onDataReady(){
   $('analDate').value = DATES.at(-1) || '';
   initCalendarDefaults(); renderCalendar();
   drawStockAnal();
+  renderSavedSets();
   saveToStorage();
 }
 
@@ -1429,6 +1548,15 @@ document.addEventListener('click', e=>{
 // 銘柄分析
 $('analDate').addEventListener('change', drawStockAnal);
 $('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
+$('saveSet').addEventListener('click', ()=>{
+  if(analSelected.size === 0){ alert('銘柄を選択してからセットを保存してください'); return; }
+  const name = prompt('セット名を入力してください');
+  if(!name) return;
+  const all = loadSets();
+  all.push({ name: name.trim(), names: [...analSelected] });
+  saveSets(all);
+  renderSavedSets();
+});
 $('analChkAll').addEventListener('change', e=>{
   $('analTable').querySelectorAll('.anal-chk[data-name]').forEach(chk=>{
     if(e.target.checked) analSelected.add(chk.dataset.name);
