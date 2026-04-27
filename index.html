@@ -28,7 +28,7 @@
     .muted{color:var(--muted);font-size:12px}
     .saved-badge{font-size:11px;color:#22c55e;display:none}
     main{display:grid;gap:16px}
-    .kpi{display:grid;grid-template-columns:1fr;gap:12px}
+    .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
     .big{font-size:22px;font-weight:700;margin-top:6px}
     .sub{font-size:12px;color:var(--muted)}
@@ -130,7 +130,7 @@
     .sel-summary{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.35);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
     .sel-summary strong{color:#93c5fd}
     .anal-selected td{background:rgba(59,130,246,0.09)!important}
-    #analTable{min-width:640px}
+    #analTable{min-width:800px}
     .anal-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
 
     /* pc */
@@ -244,6 +244,12 @@
       <div class="sub" id="kpiMoMLine" style="margin-top:2px;">—</div>
       <div class="sub" id="kpiYtdLine" style="margin-top:2px;">—</div>
     </div>
+    <div class="card" id="kpiPnlCard" style="display:none">
+      <div class="muted">総含み損益</div>
+      <div class="big" id="pnlValue">—</div>
+      <div class="sub" id="pnlPctLine" style="margin-top:4px;">—</div>
+      <div class="sub" id="pnlCostLine" style="margin-top:2px;">—</div>
+    </div>
   </section>
 
   <!-- 資産分類 -->
@@ -310,6 +316,10 @@
           <span class="muted" id="selNames" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0"></span>
           <button id="clearSel" class="btn-ghost" style="padding:6px 10px;font-size:12px;flex-shrink:0">選択解除</button>
         </div>
+        <div id="selPnlRow" style="display:none;font-size:12px;margin-bottom:8px">
+          含み損益: <strong id="selPnlValue">—</strong>
+          <span class="muted" id="selPnlPct" style="margin-left:4px"></span>
+        </div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
           <span class="muted" style="font-size:11px">表示:</span>
           <button id="vizModeBar" class="btn-ghost active" style="font-size:11px;padding:3px 8px">バー</button>
@@ -344,6 +354,8 @@
             <th class="sortable" data-key="name">銘柄</th>
             <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
             <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
+            <th class="sortable" data-key="pnl" style="text-align:right">含み損益</th>
+            <th class="sortable" data-key="pnlPct" style="text-align:right">損益率</th>
             <th>AssetClass</th>
             <th>Currency</th>
             <th>Account</th>
@@ -355,6 +367,8 @@
             <td></td><td>合計</td>
             <td style="text-align:right" id="analTotalVal">—</td>
             <td>100%</td>
+            <td style="text-align:right" id="analTotalPnl"></td>
+            <td style="text-align:right" id="analTotalPnlPct"></td>
             <td colspan="3"></td>
           </tr>
         </tfoot>
@@ -638,7 +652,9 @@ function applyMappingAndProcess(mapping, rawRows){
     AssetClass:(r[mapping.AssetClass] || '').trim(),
     Currency:  (r[mapping.Currency] || '').trim(),
     StockType: (r[mapping.StockType] || '').trim(),
-    Account:   (r[mapping.Account] || '').trim()
+    Account:   (r[mapping.Account] || '').trim(),
+    Quantity:  Number(String(r[mapping.Quantity || 'Quantity'] || '0').replace(/,/g,'')) || 0,
+    CostBasis: Number(String(r[mapping.CostBasis || 'CostBasis'] || '0').replace(/,/g,'')) || 0
   })).filter(r => r.Date);
   buildIndexes();
   onDataReady();
@@ -657,7 +673,7 @@ function buildIndexes(){
     m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
     if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
     const mm = META_BY_DATE_NAME.get(r.Date);
-    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account});
+    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:r.Quantity, CostBasis:r.CostBasis});
   }
   DATES.sort();
 }
@@ -673,6 +689,17 @@ function attrsOfNameAt(name, date){
   return {};
 }
 function computeMonthBase(curDate){ const t = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD'); return nearestOnOrBefore(t); }
+function pnlOfNameAt(name, date){
+  const attrs = attrsOfNameAt(name, date);
+  const qty = attrs.Quantity || 0;
+  const costBasis = attrs.CostBasis || 0;
+  if(!qty && !costBasis) return null;
+  const amount = amountOfNameAt(name, date);
+  const cost = qty * costBasis;
+  const pnl = amount - cost;
+  const pnlPct = cost > 0 ? pnl / cost * 100 : null;
+  return { qty, costBasis, cost, pnl, pnlPct };
+}
 
 // ===================== KPIs =====================
 function refreshKPIs(){
@@ -706,6 +733,27 @@ function refreshKPIs(){
   $("kpiYtdLine").textContent = ytdBase
     ? `年初来 ${(ytd>=0?'+':'')}${yen(ytd)}（基準: ${ytdBase}）`
     : '年初来 —';
+
+  // 含み損益
+  const names = [...(byDateName.get(curDate)||new Map()).keys()];
+  let totalPnl = 0, totalCost = 0, hasPnl = false;
+  for(const name of names){
+    const p = pnlOfNameAt(name, curDate);
+    if(p){ totalPnl += p.pnl; totalCost += p.cost; hasPnl = true; }
+  }
+  const pnlCard = $('kpiPnlCard');
+  if(hasPnl){
+    pnlCard.style.display = '';
+    const pnlPct = totalCost > 0 ? totalPnl / totalCost * 100 : 0;
+    const sign = totalPnl >= 0 ? '+' : '';
+    $('pnlValue').textContent = sign + yen(totalPnl);
+    $('pnlValue').className = 'big ' + (totalPnl >= 0 ? 'pos' : 'neg');
+    $('pnlPctLine').textContent = `損益率 ${sign}${pnlPct.toFixed(2)}%`;
+    $('pnlPctLine').className = 'sub ' + (totalPnl >= 0 ? 'pos' : 'neg');
+    $('pnlCostLine').textContent = `取得総額 ${yen(totalCost)}`;
+  } else {
+    pnlCard.style.display = 'none';
+  }
 }
 
 // ===================== Pie =====================
@@ -1479,21 +1527,29 @@ function drawStockAnal(){
   const metaBucket = new Map();
   for(const r of (byDate.get(selDate)||[])){
     bucket.set(r.Name, (bucket.get(r.Name)||0) + r.Amount);
-    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account});
+    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account, Quantity:r.Quantity, CostBasis:r.CostBasis});
   }
 
   // 不在銘柄の選択を除去
   for(const n of analSelected){ if(!bucket.has(n)) analSelected.delete(n); }
 
-  let data = [...bucket.entries()].map(([name, amount])=>({
-    name, amount,
-    pct: totalVal > 0 ? amount/totalVal*100 : 0,
-    ...(metaBucket.get(name)||{})
-  })).filter(r => r.amount !== 0);
+  let data = [...bucket.entries()].map(([name, amount])=>{
+    const meta = metaBucket.get(name) || {};
+    const qty = meta.Quantity || 0;
+    const costBasis = meta.CostBasis || 0;
+    const hasPnlData = qty > 0 || costBasis > 0;
+    const cost = qty * costBasis;
+    const pnl = hasPnlData ? amount - cost : null;
+    const pnlPct = (hasPnlData && cost > 0) ? pnl / cost * 100 : null;
+    return { name, amount, pct: totalVal > 0 ? amount/totalVal*100 : 0, pnl, pnlPct, cost, ...meta };
+  }).filter(r => r.amount !== 0);
 
   data.sort((a,b)=>{
     const ka = analSort.key==='name' ? a.name : a[analSort.key];
     const kb = analSort.key==='name' ? b.name : b[analSort.key];
+    if(ka === null && kb === null) return 0;
+    if(ka === null) return 1;
+    if(kb === null) return -1;
     if(typeof ka==='string') return analSort.dir==='asc' ? ka.localeCompare(kb) : kb.localeCompare(ka);
     return analSort.dir==='asc' ? ka-kb : kb-ka;
   });
@@ -1504,6 +1560,9 @@ function drawStockAnal(){
   tbody.innerHTML = data.map(r=>{
     const checked = analSelected.has(r.name) ? 'checked' : '';
     const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
+    const pnlCls  = r.pnl !== null ? (r.pnl >= 0 ? 'pos' : 'neg') : '';
+    const pnlStr  = r.pnl !== null ? (r.pnl >= 0 ? '+' : '') + yen(r.pnl) : '—';
+    const pnlPctStr = r.pnlPct !== null ? (r.pnlPct >= 0 ? '+' : '') + r.pnlPct.toFixed(2) + '%' : '—';
     return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
       <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
       <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
@@ -1512,11 +1571,29 @@ function drawStockAnal(){
         <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pct.toFixed(1)}%</span>
         <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pct,100)}%"></div></div>
       </div></td>
+      <td style="text-align:right" class="${pnlCls}">${pnlStr}</td>
+      <td style="text-align:right" class="${pnlCls}">${pnlPctStr}</td>
       <td>${escapeHtml(r.AssetClass||'')}</td>
       <td>${escapeHtml(r.Currency||'')}</td>
       <td>${escapeHtml(r.Account||'')}</td>
     </tr>`;
   }).join('');
+
+  // tfoot P&L合計
+  let footPnl = 0, footCost = 0, footHasPnl = false;
+  for(const r of data){ if(r.pnl !== null){ footPnl += r.pnl; footCost += r.cost; footHasPnl = true; } }
+  if(footHasPnl){
+    const fpSign = footPnl >= 0 ? '+' : '';
+    const fpCls  = footPnl >= 0 ? 'pos' : 'neg';
+    const fpPct  = footCost > 0 ? footPnl / footCost * 100 : 0;
+    $('analTotalPnl').textContent = fpSign + yen(footPnl);
+    $('analTotalPnl').className = fpCls;
+    $('analTotalPnlPct').textContent = fpSign + fpPct.toFixed(2) + '%';
+    $('analTotalPnlPct').className = fpCls;
+  } else {
+    $('analTotalPnl').textContent = '';
+    $('analTotalPnlPct').textContent = '';
+  }
 
   // 全選択チェックボックスの状態を同期
   const allNames = data.map(r=>r.name);
@@ -1563,6 +1640,24 @@ function updateSelSummary(totalVal){
   $('selPct').textContent       = selPct.toFixed(1);
   const _names = [...analSelected];
   $('selNames').textContent = _names.length > 4 ? _names.slice(0,4).join('、') + ` 他${_names.length-4}銘柄` : _names.join('、');
+
+  // 選択銘柄の含み損益合計
+  let selPnl = 0, selCost = 0, selHasPnl = false;
+  for(const name of analSelected){
+    const p = pnlOfNameAt(name, selDate);
+    if(p){ selPnl += p.pnl; selCost += p.cost; selHasPnl = true; }
+  }
+  const pnlRow = $('selPnlRow');
+  if(selHasPnl){
+    pnlRow.style.display = '';
+    const sign = selPnl >= 0 ? '+' : '';
+    $('selPnlValue').textContent = sign + yen(selPnl);
+    $('selPnlValue').className = selPnl >= 0 ? 'pos' : 'neg';
+    const pctStr = selCost > 0 ? ` (${sign}${(selPnl/selCost*100).toFixed(2)}%)` : '';
+    $('selPnlPct').textContent = pctStr;
+  } else {
+    pnlRow.style.display = 'none';
+  }
 
   if(selVizMode === 'bar'){
     $('selBarView').style.display = '';
