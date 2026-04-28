@@ -189,8 +189,13 @@
       /* 銘柄分析（base の min-width:800px を上書き） */
       #analTable{min-width:100%;font-size:11px}
       #analTable th,#analTable td{padding:4px 3px}
-      #analTable th:nth-child(4),#analTable td:nth-child(4){display:none}
+      #analTable th:nth-child(5),#analTable td:nth-child(5){display:none}
       #analTable th:nth-child(n+6),#analTable td:nth-child(n+6){display:none}
+      #analTable th:nth-child(4){min-width:0!important}
+      #analTable td:nth-child(4) .pct-bar-wrap{min-width:20px}
+      #analTable.show-pnl th:nth-child(4),#analTable.show-pnl td:nth-child(4){display:none}
+      #analTable.show-pnl th:nth-child(5),#analTable.show-pnl td:nth-child(5){display:table-cell}
+      #analColToggle{display:flex!important}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
@@ -345,6 +350,11 @@
       </div>
     </div>
 
+    <div id="analColToggle" style="display:none;gap:6px;align-items:center;margin-bottom:6px">
+      <span class="muted" style="font-size:11px">表示列:</span>
+      <button id="analColPct" class="btn-ghost active" style="font-size:11px;padding:3px 8px">割合</button>
+      <button id="analColPnl" class="btn-ghost" style="font-size:11px;padding:3px 8px">含み損益</button>
+    </div>
     <div class="table-wrap">
       <table id="analTable">
         <thead>
@@ -1781,6 +1791,14 @@ document.addEventListener('click', e=>{
 // 銘柄分析
 $('analDate').addEventListener('change', drawStockAnal);
 $('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
+$('analColPct').addEventListener('click', ()=>{
+  $('analTable').classList.remove('show-pnl');
+  $('analColPct').classList.add('active'); $('analColPnl').classList.remove('active');
+});
+$('analColPnl').addEventListener('click', ()=>{
+  $('analTable').classList.add('show-pnl');
+  $('analColPnl').classList.add('active'); $('analColPct').classList.remove('active');
+});
 $('vizModeBar').addEventListener('click', ()=>{
   selVizMode='bar';
   $('vizModeBar').classList.add('active'); $('vizModePie').classList.remove('active');
