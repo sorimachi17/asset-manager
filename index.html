@@ -739,7 +739,11 @@ function buildIndexes(){
     m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
     if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
     const mm = META_BY_DATE_NAME.get(r.Date);
-    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:r.Quantity, CostBasis:r.CostBasis});
+    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0});
+    const _m = mm.get(r.Name);
+    const _qty = r.Quantity || 0; const _cost = _qty * (r.CostBasis || 0);
+    _m.Quantity += _qty; _m._totalCost += _cost;
+    _m.CostBasis = _m.Quantity > 0 ? _m._totalCost / _m.Quantity : 0;
   }
   DATES.sort();
 }
@@ -1623,7 +1627,11 @@ function drawStockAnal(){
   const metaBucket = new Map();
   for(const r of (byDate.get(selDate)||[])){
     bucket.set(r.Name, (bucket.get(r.Name)||0) + r.Amount);
-    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account, Quantity:r.Quantity, CostBasis:r.CostBasis});
+    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0});
+    const _mb = metaBucket.get(r.Name);
+    const _mq = r.Quantity || 0; const _mc = _mq * (r.CostBasis || 0);
+    _mb.Quantity += _mq; _mb._totalCost += _mc;
+    _mb.CostBasis = _mb.Quantity > 0 ? _mb._totalCost / _mb.Quantity : 0;
   }
 
   // 不在銘柄の選択を除去
