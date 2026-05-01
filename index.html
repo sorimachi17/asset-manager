@@ -131,6 +131,8 @@
     .sel-summary strong{color:#93c5fd}
     .anal-selected td{background:rgba(59,130,246,0.09)!important}
     #analTable{min-width:800px}
+    #analTable.cmp-mode{min-width:920px}
+    .anal-cmp-hide{display:none!important}
     .anal-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
 
     /* pc */
@@ -196,6 +198,11 @@
       #analTable.show-pnl th:nth-child(4),#analTable.show-pnl td:nth-child(4){display:none}
       #analTable.show-pnl th:nth-child(5),#analTable.show-pnl td:nth-child(5){display:table-cell}
       #analColToggle{display:flex!important}
+      /* 比較モード（モバイル）*/
+      #analTable.cmp-mode th:nth-child(3),#analTable.cmp-mode td:nth-child(3){display:none}
+      #analTable.cmp-mode th:nth-child(5),#analTable.cmp-mode td:nth-child(5){display:none}
+      #analTable.cmp-mode th:nth-child(6),#analTable.cmp-mode td:nth-child(6){display:table-cell}
+      #analTable.cmp-mode th:nth-child(7),#analTable.cmp-mode td:nth-child(7){display:table-cell}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
@@ -313,8 +320,10 @@
     <h2>銘柄別割合・合算</h2>
     <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
     <div class="controls" style="margin-top:8px">
-      <label>日付: <input type="date" id="analDate"/></label>
+      <label><span id="analDateALabel">日付</span>: <input type="date" id="analDate"/></label>
       <span class="muted" id="analDateNote">—</span>
+      <button id="analCmpToggle" class="btn-ghost" style="font-size:12px;padding:6px 12px">2日比較</button>
+      <label id="analDateBWrap" style="display:none">日付B: <input type="date" id="analDateB"/></label>
     </div>
     <div id="analQuickSel" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center"></div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 8px">
@@ -1557,7 +1566,25 @@ function renderYearDetail(){
 
 // ===================== 銘柄分析 =====================
 let analSort = { key: 'amount', dir: 'desc' };
+let analCmpMode = false;
+let analCmpSort = { key: 'diff', dir: 'desc' };
 const analSelected = new Set();
+
+const _ANAL_NORMAL_THEAD = `<th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
+    <th class="sortable" data-key="name">銘柄</th>
+    <th class="sortable" data-key="amount" style="text-align:right">評価額</th>
+    <th class="sortable" data-key="pct" style="min-width:160px">割合</th>
+    <th class="sortable" data-key="pnl" style="text-align:right">含み損益</th>
+    <th class="sortable" data-key="pnlPct" style="text-align:right">損益率</th>
+    <th>AssetClass</th>
+    <th>Currency</th>
+    <th>Account</th>`;
+const _ANAL_NORMAL_TFOOT = `<td></td><td>合計</td>
+    <td style="text-align:right" id="analTotalVal">—</td>
+    <td>100%</td>
+    <td style="text-align:right" id="analTotalPnl"></td>
+    <td style="text-align:right" id="analTotalPnlPct"></td>
+    <td colspan="3"></td>`;
 
 const LS_SETS_KEY = 'asset_mgr_v1_sets';
 function loadSets(){ try{ return JSON.parse(localStorage.getItem(LS_SETS_KEY)||'[]'); }catch(e){ return []; } }
@@ -1621,6 +1648,15 @@ function drawStockAnal(){
   const picker = $('analDate').value || DATES.at(-1);
   const selDate = nearestOnOrBefore(picker) || DATES.at(-1);
   $('analDateNote').textContent = `${selDate} 時点`;
+
+  if(analCmpMode){ drawStockAnalCmp(selDate); return; }
+
+  // 比較モードから通常モードに戻る場合はヘッダーを復元
+  if($('analTable').classList.contains('cmp-mode')){
+    $('analTable').classList.remove('cmp-mode');
+    $('analTable').querySelector('thead tr').innerHTML = _ANAL_NORMAL_THEAD;
+    $('analTable').querySelector('tfoot tr').innerHTML = _ANAL_NORMAL_TFOOT;
+  }
 
   const totalVal = sumAt(selDate);
   const bucket = new Map();
@@ -1706,6 +1742,79 @@ function drawStockAnal(){
 
   renderQuickSel();
   updateSelSummary(totalVal);
+}
+
+function drawStockAnalCmp(dateA){
+  const pickerB = $('analDateB').value || '';
+  const dateB = (pickerB ? nearestOnOrBefore(pickerB) : null) || DATES.at(-1);
+  const totalA = sumAt(dateA);
+  const totalB = sumAt(dateB);
+  const shortA = dateA.slice(5).replace('-', '/');
+  const shortB = dateB.slice(5).replace('-', '/');
+
+  $('analTable').classList.add('cmp-mode');
+  $('analTable').querySelector('thead tr').innerHTML = `<th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
+    <th class="sortable" data-key="name">銘柄</th>
+    <th class="sortable" data-key="amtA" style="text-align:right">評価額 (${shortA})</th>
+    <th class="sortable" data-key="pctA" style="min-width:130px">割合A</th>
+    <th class="sortable" data-key="amtB" style="text-align:right">評価額 (${shortB})</th>
+    <th class="sortable" data-key="pctB" style="min-width:130px">割合B</th>
+    <th class="sortable" data-key="diff" style="text-align:right">変化(pp)</th>`;
+  $('analTable').querySelector('tfoot tr').innerHTML = `<td></td><td>合計</td>
+    <td style="text-align:right" id="analTotalVal">${yen(totalA)}</td>
+    <td>100%</td>
+    <td style="text-align:right">${yen(totalB)}</td>
+    <td>100%</td>
+    <td id="analTotalPnl"></td>`;
+
+  const names = new Set();
+  for(const [nm] of (byDateName.get(dateA)||new Map())) names.add(nm);
+  for(const [nm] of (byDateName.get(dateB)||new Map())) names.add(nm);
+
+  let data = [...names].map(name => {
+    const amtA = amountOfNameAt(name, dateA);
+    const amtB = amountOfNameAt(name, dateB);
+    const pctA = totalA > 0 ? amtA/totalA*100 : 0;
+    const pctB = totalB > 0 ? amtB/totalB*100 : 0;
+    return { name, amtA, amtB, pctA, pctB, diff: pctB - pctA };
+  }).filter(r => r.amtA !== 0 || r.amtB !== 0);
+
+  data.sort((a,b)=>{
+    const ka = analCmpSort.key==='name' ? a.name : a[analCmpSort.key];
+    const kb = analCmpSort.key==='name' ? b.name : b[analCmpSort.key];
+    if(typeof ka==='string') return analCmpSort.dir==='asc' ? ka.localeCompare(kb) : kb.localeCompare(ka);
+    return analCmpSort.dir==='asc' ? ka-kb : kb-ka;
+  });
+
+  const tbody = $('analTable').querySelector('tbody');
+  tbody.innerHTML = data.map(r=>{
+    const checked = analSelected.has(r.name) ? 'checked' : '';
+    const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
+    const diffCls = r.diff > 0.005 ? 'pos' : r.diff < -0.005 ? 'neg' : '';
+    const diffStr = (r.diff >= 0 ? '+' : '') + r.diff.toFixed(2) + 'pp';
+    return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
+      <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
+      <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
+      <td style="text-align:right">${yen(r.amtA)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pctA.toFixed(1)}%</span>
+        <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pctA,100)}%"></div></div>
+      </div></td>
+      <td style="text-align:right">${yen(r.amtB)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pctB.toFixed(1)}%</span>
+        <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pctB,100)}%;background:rgba(100,200,255,0.65)"></div></div>
+      </div></td>
+      <td style="text-align:right" class="${diffCls}">${diffStr}</td>
+    </tr>`;
+  }).join('');
+
+  const allNames = data.map(r=>r.name);
+  $('analChkAll').checked = allNames.length > 0 && allNames.every(n=>analSelected.has(n));
+  $('analChkAll').indeterminate = analSelected.size > 0 && !$('analChkAll').checked;
+
+  renderQuickSel();
+  updateSelSummary(totalA);
 }
 
 let selVizMode = 'bar';
@@ -2046,8 +2155,13 @@ document.addEventListener('click', e=>{
   const analTh = e.target.closest('#analTable th.sortable');
   if(analTh){
     const key = analTh.dataset.key;
-    analSort.dir = (analSort.key===key && analSort.dir==='desc') ? 'asc' : 'desc';
-    analSort.key = key;
+    if(analCmpMode){
+      analCmpSort.dir = (analCmpSort.key===key && analCmpSort.dir==='desc') ? 'asc' : 'desc';
+      analCmpSort.key = key;
+    } else {
+      analSort.dir = (analSort.key===key && analSort.dir==='desc') ? 'asc' : 'desc';
+      analSort.key = key;
+    }
     drawStockAnal();
     return;
   }
@@ -2057,6 +2171,20 @@ document.addEventListener('click', e=>{
 
 // 銘柄分析
 $('analDate').addEventListener('change', drawStockAnal);
+$('analDateB').addEventListener('change', ()=>{ if(analCmpMode) drawStockAnal(); });
+$('analCmpToggle').addEventListener('click', ()=>{
+  analCmpMode = !analCmpMode;
+  $('analCmpToggle').classList.toggle('active', analCmpMode);
+  $('analDateALabel').textContent = analCmpMode ? '日付A' : '日付';
+  $('analDateBWrap').style.display = analCmpMode ? '' : 'none';
+  $('analColToggle').classList.toggle('anal-cmp-hide', analCmpMode);
+  if(analCmpMode && !$('analDateB').value){
+    const selDate = nearestOnOrBefore($('analDate').value || DATES.at(-1)) || DATES.at(-1);
+    const idx = DATES.indexOf(selDate);
+    if(idx > 0) $('analDateB').value = DATES[idx-1];
+  }
+  drawStockAnal();
+});
 $('clearSel').addEventListener('click', ()=>{ analSelected.clear(); drawStockAnal(); });
 $('analColPct').addEventListener('click', ()=>{
   $('analTable').classList.remove('show-pnl');
@@ -2085,14 +2213,15 @@ $('saveSet').addEventListener('click', ()=>{
   saveSets(all);
   renderSavedSets();
 });
-$('analChkAll').addEventListener('change', e=>{
-  $('analTable').querySelectorAll('.anal-chk[data-name]').forEach(chk=>{
-    if(e.target.checked) analSelected.add(chk.dataset.name);
-    else analSelected.delete(chk.dataset.name);
-  });
-  drawStockAnal();
-});
 $('analTable').addEventListener('change', e=>{
+  if(e.target.id === 'analChkAll'){
+    $('analTable').querySelectorAll('.anal-chk[data-name]').forEach(chk=>{
+      if(e.target.checked) analSelected.add(chk.dataset.name);
+      else analSelected.delete(chk.dataset.name);
+    });
+    drawStockAnal();
+    return;
+  }
   const chk = e.target.closest('.anal-chk[data-name]');
   if(!chk) return;
   if(chk.checked) analSelected.add(chk.dataset.name);
