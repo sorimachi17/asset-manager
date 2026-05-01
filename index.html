@@ -1752,13 +1752,14 @@ function drawStockAnalCmp(dateA){
   const shortA = dateA.slice(5).replace('-', '/');
   const shortB = dateB.slice(5).replace('-', '/');
 
+  $('analDateNote').textContent = `A: ${dateA} / B: ${dateB}`;
   $('analTable').classList.add('cmp-mode');
   $('analTable').querySelector('thead tr').innerHTML = `<th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
     <th class="sortable" data-key="name">銘柄</th>
-    <th class="sortable" data-key="amtA" style="text-align:right">評価額 (${shortA})</th>
-    <th class="sortable" data-key="pctA" style="min-width:130px">割合A</th>
-    <th class="sortable" data-key="amtB" style="text-align:right">評価額 (${shortB})</th>
-    <th class="sortable" data-key="pctB" style="min-width:130px">割合B</th>
+    <th class="sortable" data-key="amtA" style="text-align:right">評価額 (A)</th>
+    <th class="sortable" data-key="pctA" style="min-width:130px">割合 (A: ${shortA})</th>
+    <th class="sortable" data-key="amtB" style="text-align:right">評価額 (B)</th>
+    <th class="sortable" data-key="pctB" style="min-width:130px">割合 (B: ${shortB})</th>
     <th class="sortable" data-key="diff" style="text-align:right">変化(pp)</th>`;
   $('analTable').querySelector('tfoot tr').innerHTML = `<td></td><td>合計</td>
     <td style="text-align:right" id="analTotalVal">${yen(totalA)}</td>
