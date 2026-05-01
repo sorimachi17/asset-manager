@@ -1838,7 +1838,7 @@ function drawStockAnalCmp(selDate){
     c.amtA += r.amtA; c.amtB += r.amtB;
   }
   const classSummary = [...classMap.entries()].map(([cls, v])=>({
-    cls,
+    cls, amtA: v.amtA, amtB: v.amtB,
     pctA: totalA > 0 ? v.amtA/totalA*100 : 0,
     pctB: totalB > 0 ? v.amtB/totalB*100 : 0,
     diff: (totalB > 0 ? v.amtB/totalB*100 : 0) - (totalA > 0 ? v.amtA/totalA*100 : 0)
@@ -1852,7 +1852,9 @@ function drawStockAnalCmp(selDate){
       <table style="font-size:12px">
         <thead><tr>
           <th style="text-align:left">分類</th>
+          <th style="text-align:right">評価額 (${shortA})</th>
           <th style="text-align:right">割合 (${shortA})</th>
+          <th style="text-align:right">評価額 (${shortB})</th>
           <th style="text-align:right">割合 (${shortB})</th>
           <th style="text-align:right">変化(pp)</th>
         </tr></thead>
@@ -1860,7 +1862,9 @@ function drawStockAnalCmp(selDate){
           const dc = r.diff > 0.005 ? 'pos' : r.diff < -0.005 ? 'neg' : '';
           return `<tr>
             <td style="text-align:left">${escapeHtml(r.cls)}</td>
+            <td style="text-align:right">${yen(r.amtA)}</td>
             <td style="text-align:right">${r.pctA.toFixed(1)}%</td>
+            <td style="text-align:right">${yen(r.amtB)}</td>
             <td style="text-align:right">${r.pctB.toFixed(1)}%</td>
             <td style="text-align:right" class="${dc}">${(r.diff>=0?'+':'')+r.diff.toFixed(2)}pp</td>
           </tr>`;
