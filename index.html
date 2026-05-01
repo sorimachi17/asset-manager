@@ -207,6 +207,7 @@
       #analTable.cmp-mode .pct-bar-wrap{display:none}
       #analTable.cmp-mode th:nth-child(4){min-width:0!important}
       #analTable.cmp-mode th:nth-child(6){min-width:0!important}
+      #analTable.cmp-mode th:nth-child(7){min-width:0!important}
       #analTable.cmp-mode td:nth-child(2){white-space:normal;word-break:break-word}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
@@ -1749,23 +1750,27 @@ function drawStockAnal(){
   updateSelSummary(totalVal);
 }
 
-function drawStockAnalCmp(dateA){
+function drawStockAnalCmp(selDate){
   const pickerB = $('analDateB').value || '';
-  const dateB = (pickerB ? nearestOnOrBefore(pickerB) : null) || DATES.at(-1);
+  const rawB = (pickerB ? nearestOnOrBefore(pickerB) : null) || DATES.at(-1);
+
+  // 古い日付を左（A）、新しい日付を右（B）に固定
+  const dateA = selDate <= rawB ? selDate : rawB;
+  const dateB = selDate <= rawB ? rawB : selDate;
   const totalA = sumAt(dateA);
   const totalB = sumAt(dateB);
   const shortA = dateA.slice(5).replace('-', '/');
   const shortB = dateB.slice(5).replace('-', '/');
 
-  $('analDateNote').textContent = `A: ${dateA} / B: ${dateB}`;
+  $('analDateNote').textContent = `過去: ${dateA} → 直近: ${dateB}`;
   $('analTable').classList.add('cmp-mode');
   $('analTable').querySelector('thead tr').innerHTML = `<th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
     <th class="sortable" data-key="name">銘柄</th>
-    <th class="sortable" data-key="amtA" style="text-align:right">評価額 (A)</th>
-    <th class="sortable" data-key="pctA" style="min-width:130px">割合 (A: ${shortA})</th>
-    <th class="sortable" data-key="amtB" style="text-align:right">評価額 (B)</th>
-    <th class="sortable" data-key="pctB" style="min-width:130px">割合 (B: ${shortB})</th>
-    <th class="sortable" data-key="diff" style="text-align:right">変化(pp)</th>`;
+    <th class="sortable" data-key="amtA" style="text-align:right">評価額 (過去)</th>
+    <th class="sortable" data-key="pctA" style="min-width:130px">割合 (${shortA})</th>
+    <th class="sortable" data-key="amtB" style="text-align:right">評価額 (直近)</th>
+    <th class="sortable" data-key="pctB" style="min-width:130px">割合 (${shortB})</th>
+    <th class="sortable" data-key="diff" style="min-width:120px;text-align:right">変化(pp)</th>`;
   $('analTable').querySelector('tfoot tr').innerHTML = `<td></td><td>合計</td>
     <td style="text-align:right" id="analTotalVal">${yen(totalA)}</td>
     <td>100%</td>
@@ -1792,12 +1797,21 @@ function drawStockAnalCmp(dateA){
     return analCmpSort.dir==='asc' ? ka-kb : kb-ka;
   });
 
+  const maxAbsDiff = data.length ? Math.max(...data.map(r => Math.abs(r.diff)), 0.01) : 1;
+
   const tbody = $('analTable').querySelector('tbody');
   tbody.innerHTML = data.map(r=>{
     const checked = analSelected.has(r.name) ? 'checked' : '';
     const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
     const diffCls = r.diff > 0.005 ? 'pos' : r.diff < -0.005 ? 'neg' : '';
     const diffStr = (r.diff >= 0 ? '+' : '') + r.diff.toFixed(2) + 'pp';
+    const barW = Math.min(Math.abs(r.diff) / maxAbsDiff * 50, 50);
+    const diffBarInner = r.diff > 0.005
+      ? `<div style="position:absolute;left:50%;width:${barW}%;height:100%;background:rgba(34,197,94,0.75);border-radius:0 3px 3px 0"></div>`
+      : r.diff < -0.005
+      ? `<div style="position:absolute;right:50%;width:${barW}%;height:100%;background:rgba(239,68,68,0.75);border-radius:3px 0 0 3px"></div>`
+      : '';
+    const diffBar = `<div style="position:relative;width:64px;height:6px;background:#1e2638;border-radius:3px;flex-shrink:0">${diffBarInner}<div style="position:absolute;left:50%;top:0;width:1px;height:100%;background:rgba(255,255,255,0.25)"></div></div>`;
     return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
       <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
       <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
@@ -1811,7 +1825,9 @@ function drawStockAnalCmp(dateA){
         <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pctB.toFixed(1)}%</span>
         <div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(r.pctB,100)}%;background:rgba(100,200,255,0.65)"></div></div>
       </div></td>
-      <td style="text-align:right" class="${diffCls}">${diffStr}</td>
+      <td style="text-align:right" class="${diffCls}">
+        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">${diffBar}<span>${diffStr}</span></div>
+      </td>
     </tr>`;
   }).join('');
 
