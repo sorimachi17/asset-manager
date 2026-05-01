@@ -198,15 +198,14 @@
       #analTable.show-pnl th:nth-child(4),#analTable.show-pnl td:nth-child(4){display:none}
       #analTable.show-pnl th:nth-child(5),#analTable.show-pnl td:nth-child(5){display:table-cell}
       #analColToggle{display:flex!important}
-      /* 比較モード（モバイル）*/
+      /* 比較モード（モバイル）列構成: 1=chk 2=銘柄 3=分類 4=評価額A 5=割合A 6=評価額B 7=割合B 8=変化 */
       #analTable.cmp-mode{min-width:100%}
-      #analTable.cmp-mode th:nth-child(3),#analTable.cmp-mode td:nth-child(3){display:none}
-      #analTable.cmp-mode th:nth-child(5),#analTable.cmp-mode td:nth-child(5){display:none}
-      #analTable.cmp-mode th:nth-child(6),#analTable.cmp-mode td:nth-child(6){display:table-cell}
+      #analTable.cmp-mode th:nth-child(4),#analTable.cmp-mode td:nth-child(4){display:none}
+      #analTable.cmp-mode th:nth-child(5),#analTable.cmp-mode td:nth-child(5){display:table-cell}
       #analTable.cmp-mode th:nth-child(7),#analTable.cmp-mode td:nth-child(7){display:table-cell}
+      #analTable.cmp-mode th:nth-child(8),#analTable.cmp-mode td:nth-child(8){display:table-cell}
       #analTable.cmp-mode .pct-bar-wrap{display:none}
-      #analTable.cmp-mode th:nth-child(4){min-width:0!important}
-      #analTable.cmp-mode th:nth-child(6){min-width:0!important}
+      #analTable.cmp-mode th:nth-child(5){min-width:0!important}
       #analTable.cmp-mode th:nth-child(7){min-width:0!important}
       #analTable.cmp-mode td:nth-child(2){white-space:normal;word-break:break-word}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
@@ -1766,12 +1765,13 @@ function drawStockAnalCmp(selDate){
   $('analTable').classList.add('cmp-mode');
   $('analTable').querySelector('thead tr').innerHTML = `<th style="width:36px;text-align:center"><input type="checkbox" id="analChkAll" class="anal-chk" title="全選択/解除"></th>
     <th class="sortable" data-key="name">銘柄</th>
+    <th>分類</th>
     <th class="sortable" data-key="amtA" style="text-align:right">評価額 (過去)</th>
     <th class="sortable" data-key="pctA" style="min-width:130px">割合 (${shortA})</th>
     <th class="sortable" data-key="amtB" style="text-align:right">評価額 (直近)</th>
     <th class="sortable" data-key="pctB" style="min-width:130px">割合 (${shortB})</th>
     <th class="sortable" data-key="diff" style="text-align:right">変化(pp)</th>`;
-  $('analTable').querySelector('tfoot tr').innerHTML = `<td></td><td>合計</td>
+  $('analTable').querySelector('tfoot tr').innerHTML = `<td></td><td>合計</td><td></td>
     <td style="text-align:right" id="analTotalVal">${yen(totalA)}</td>
     <td>100%</td>
     <td style="text-align:right">${yen(totalB)}</td>
@@ -1806,10 +1806,8 @@ function drawStockAnalCmp(selDate){
     const diffStr = (r.diff >= 0 ? '+' : '') + r.diff.toFixed(2) + 'pp';
     return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
       <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
-      <td>
-        <span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
-        ${r.assetClass ? `<span class="muted" style="font-size:10px;margin-left:4px">${escapeHtml(r.assetClass)}</span>` : ''}
-      </td>
+      <td><span class="stock-link" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span></td>
+      <td style="color:var(--muted);font-size:11px">${escapeHtml(r.assetClass)}</td>
       <td style="text-align:right">${yen(r.amtA)}</td>
       <td><div style="display:flex;align-items:center;gap:6px">
         <span style="min-width:42px;text-align:right;flex:0 0 auto">${r.pctA.toFixed(1)}%</span>
