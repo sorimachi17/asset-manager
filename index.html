@@ -199,10 +199,15 @@
       #analTable.show-pnl th:nth-child(5),#analTable.show-pnl td:nth-child(5){display:table-cell}
       #analColToggle{display:flex!important}
       /* 比較モード（モバイル）*/
+      #analTable.cmp-mode{min-width:100%}
       #analTable.cmp-mode th:nth-child(3),#analTable.cmp-mode td:nth-child(3){display:none}
       #analTable.cmp-mode th:nth-child(5),#analTable.cmp-mode td:nth-child(5){display:none}
       #analTable.cmp-mode th:nth-child(6),#analTable.cmp-mode td:nth-child(6){display:table-cell}
       #analTable.cmp-mode th:nth-child(7),#analTable.cmp-mode td:nth-child(7){display:table-cell}
+      #analTable.cmp-mode .pct-bar-wrap{display:none}
+      #analTable.cmp-mode th:nth-child(4){min-width:0!important}
+      #analTable.cmp-mode th:nth-child(6){min-width:0!important}
+      #analTable.cmp-mode td:nth-child(2){white-space:normal;word-break:break-word}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
