@@ -109,6 +109,8 @@
     /* 2日比較：モバイル対応 */
     .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
     #cmpTable{min-width:720px;table-layout:fixed}
+    .sticky-col{position:sticky;left:0;z-index:1;background:var(--panel)}
+    .sticky-col-head{position:sticky;left:0;z-index:2;background:var(--panel)}
 
     /* 銘柄リンク */
     .stock-link{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
@@ -417,8 +419,8 @@
         <thead>
           <tr>
           <tr>
-            <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle;max-width:40px;width:40px">銘柄</th>
-            <th rowspan="2" style="vertical-align:middle;white-space:nowrap">分類</th>
+            <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
+            <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap">分類</th>
             <th class="sortable" data-key="b" style="text-align:right">B日額</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
             <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
@@ -1180,7 +1182,7 @@ function renderCmpTable(rows){
 
   thead.innerHTML = `
     <tr>
-      <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle;max-width:40px;width:40px">銘柄</th>
+      <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
       <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap">分類</th>
       <th class="sortable" data-key="a" style="text-align:right">A日額</th>
       <th class="sortable" data-key="b" style="text-align:right">B日額</th>
@@ -1206,7 +1208,7 @@ function renderCmpTable(rows){
     const badge = r.a===0 ? ' <span style="font-size:10px;color:var(--muted)">NEW</span>'
                 : r.b===0 ? ' <span style="font-size:10px;color:var(--muted)">EXIT</span>' : '';
     return `<tr style="${rowBg}">
-      <td rowspan="2" style="vertical-align:middle;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+      <td rowspan="2" class="sticky-col" style="vertical-align:middle;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${badge}
       </td>
       <td rowspan="2" style="vertical-align:middle;font-size:11px;color:${col};white-space:nowrap;font-weight:500">${escapeHtml(ac)}</td>
@@ -1308,7 +1310,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     const bold   = isTotal ? ';font-weight:600' : '';
 
     const amtRow = `<tr>
-      <td rowspan="${isTotal?1:2}" style="${labelStyle}">${label}</td>
+      <td rowspan="${isTotal?1:2}" class="sticky-col" style="${labelStyle}">${label}</td>
       <td style="text-align:right${bold}">${yen(r.a)}</td>
       <td style="text-align:right${bold}">${yen(r.b)}</td>
       <td style="text-align:right${bold}" class="${amtCls}"><strong>${(r.diff>=0?'+':'')+yen(r.diff)}</strong></td>
@@ -1331,7 +1333,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     if(!data.length) return '';
     const theadHtml = `
       <tr>
-        <th rowspan="2" style="vertical-align:middle;white-space:nowrap">分類</th>
+        <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap">分類</th>
         <th style="text-align:right">A日額</th>
         <th style="text-align:right">B日額</th>
         <th style="text-align:right">差額</th>
