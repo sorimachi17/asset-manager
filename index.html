@@ -410,23 +410,19 @@
 
     <div id="cmpSummaries" style="display:none;margin-top:14px"></div>
 
-    <div style="display:flex;gap:6px;margin:12px 0 6px">
-      <button id="cmpTabAmt" class="btn-ghost active" style="font-size:12px;padding:4px 10px">金額</button>
-      <button id="cmpTabPct" class="btn-ghost" style="font-size:12px;padding:4px 10px">割合</button>
-    </div>
     <h3 style="margin:0 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
     <div class="h2-sub" id="cmpDetailNote">—</div>
     <div class="table-wrap">
       <table id="cmpTable">
         <thead>
           <tr>
-            <th class="sortable" data-key="Name">銘柄</th>
+            <th rowspan="2" style="vertical-align:middle">分類</th>
+            <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle">銘柄</th>
             <th class="sortable" data-key="a" style="text-align:right">A日額</th>
             <th class="sortable" data-key="b" style="text-align:right">B日額</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
             <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
-          </tr>
-        </thead>
+          </tr><tr><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(A)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(B)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">変化(pp)</th><th></th>
         <tbody></tbody>
       </table>
     </div>
@@ -545,7 +541,7 @@
     <div id="patContent" style="display:none">
 
       <!-- Row 1: day/week charts -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
         <div>
           <div class="muted" style="font-size:12px;margin-bottom:6px">曜日別 取引回数</div>
           <canvas id="patDayCanvas" height="200"></canvas>
@@ -557,7 +553,7 @@
       </div>
 
       <!-- Row 2: ticker / cumulative -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
         <div>
           <div class="muted" style="font-size:12px;margin-bottom:6px">銘柄別 取引回数</div>
           <canvas id="patTickerCanvas" height="200"></canvas>
@@ -571,9 +567,9 @@
       <!-- Recent trades table -->
       <div style="margin-top:4px">
         <div class="muted" style="font-size:12px;margin-bottom:6px">直近50件 取引履歴</div>
-        <div class="table-wrap">
+        <div class="table-wrap" style="max-height:320px;overflow-y:auto">
           <table id="patTradeTable" style="font-size:12px">
-            <thead><tr>
+            <thead style="position:sticky;top:0;background:var(--panel);z-index:1"><tr>
               <th style="text-align:left">日付</th>
               <th style="text-align:left">銘柄</th>
               <th style="text-align:right">単価</th>
@@ -586,7 +582,6 @@
         </div>
       </div>
     </div>
-  </section>
   </section>
 
 </main>
@@ -1174,63 +1169,62 @@ function sortRows(arr, key, dir){
   });
 }
 
-let cmpViewMode = 'amount';
-
 function renderCmpTable(rows){
-  const thead = $('cmpTable').querySelector('thead tr');
+  const thead = $('cmpTable').querySelector('thead');
   const tbody = $('cmpTable').querySelector('tbody');
 
-  // AssetClass color chips
   const AC_COLORS = {
     cash:'rgba(100,200,255,0.8)', stock:'rgba(255,200,80,0.8)',
     pension:'rgba(160,100,255,0.8)', crypto:'rgba(80,220,160,0.8)'
   };
-  function acChip(r){
+
+  thead.innerHTML = `
+    <tr>
+      <th rowspan="2" style="vertical-align:middle;width:20px">分類</th>
+      <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle">銘柄</th>
+      <th class="sortable" data-key="a" style="text-align:right">A日額</th>
+      <th class="sortable" data-key="b" style="text-align:right">B日額</th>
+      <th class="sortable" data-key="diff" style="text-align:right">差額</th>
+      <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
+    </tr>
+    <tr>
+      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(A)</th>
+      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(B)</th>
+      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">変化(pp)</th>
+      <th></th>
+    </tr>`;
+
+  tbody.innerHTML = rows.map(r=>{
     const ac = (r.AssetClass||'').toLowerCase();
     const col = AC_COLORS[ac] || 'rgba(180,180,180,0.6)';
-    return `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};margin-right:5px;flex-shrink:0"></span>`;
-  }
-
-  if(cmpViewMode === 'pct'){
-    thead.innerHTML = `
-      <th class="sortable" data-key="Name">銘柄</th>
-      <th class="sortable" data-key="pctA" style="text-align:right;white-space:nowrap">割合 A</th>
-      <th class="sortable" data-key="pctB" style="text-align:right;white-space:nowrap">割合 B</th>
-      <th class="sortable" data-key="diffPp" style="text-align:right;white-space:nowrap">変化</th>`;
-    tbody.innerHTML = rows.map(r=>{
-      const dc = r.diffPp > 0.05 ? 'pos' : r.diffPp < -0.05 ? 'neg' : '';
-      const diffStr = (r.diffPp >= 0 ? '+' : '') + r.diffPp.toFixed(2) + 'pp';
-      const rowHighlight = Math.abs(r.diffPp) > 1 ? 'background:rgba(255,255,255,0.03)' : '';
-      return `<tr style="${rowHighlight}">
-        <td><div style="display:flex;align-items:center">${acChip(r)}<span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></div></td>
-        <td style="text-align:right;color:var(--muted)">${r.pctA.toFixed(2)}%</td>
-        <td style="text-align:right">${r.pctB.toFixed(2)}%</td>
-        <td style="text-align:right" class="${dc}"><strong>${diffStr}</strong></td>
-      </tr>`;
-    }).join('');
-  } else {
-    thead.innerHTML = `
-      <th class="sortable" data-key="Name">銘柄</th>
-      <th class="sortable" data-key="a" style="text-align:right;white-space:nowrap">A日額</th>
-      <th class="sortable" data-key="b" style="text-align:right;white-space:nowrap">B日額</th>
-      <th class="sortable" data-key="diff" style="text-align:right;white-space:nowrap">差額</th>
-      <th class="sortable" data-key="pct" style="text-align:right;white-space:nowrap">変化率</th>`;
-    tbody.innerHTML = rows.map(r=>{
-      const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
-      const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
-      const bigMove = r.pct !== null && Math.abs(r.pct) >= 0.1;
-      const rowHighlight = bigMove ? (r.diff>0 ? 'background:rgba(34,197,94,0.04)' : 'background:rgba(239,68,68,0.04)') : '';
-      const nameExtra = r.a===0 ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">NEW</span>'
-                      : r.b===0 ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">EXIT</span>' : '';
-      return `<tr style="${rowHighlight}">
-        <td><div style="display:flex;align-items:center;gap:2px">${acChip(r)}<span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${nameExtra}</div></td>
-        <td style="text-align:right;color:var(--muted)">${r.a ? yen(r.a) : '—'}</td>
-        <td style="text-align:right">${r.b ? yen(r.b) : '—'}</td>
-        <td style="text-align:right" class="${cls}"><strong>${(r.diff>=0?'+':'')+yen(r.diff)}</strong></td>
-        <td style="text-align:right" class="${cls}">${pctStr}</td>
-      </tr>`;
-    }).join('');
-  }
+    const acLabel = escapeHtml(r.AssetClass || '—');
+    const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
+    const dcCls = r.diffPp > 0.05 ? 'pos' : r.diffPp < -0.05 ? 'neg' : '';
+    const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
+    const ppStr = (r.diffPp >= 0 ? '+' : '') + r.diffPp.toFixed(2) + 'pp';
+    const bigMove = r.pct !== null && Math.abs(r.pct) >= 0.1;
+    const rowBg = bigMove ? (r.diff>0 ? 'background:rgba(34,197,94,0.04)' : 'background:rgba(239,68,68,0.04)') : '';
+    const badge = r.a===0 ? ' <span style="font-size:10px;color:var(--muted)">NEW</span>'
+                : r.b===0 ? ' <span style="font-size:10px;color:var(--muted)">EXIT</span>' : '';
+    return `<tr style="${rowBg}">
+      <td rowspan="2" style="vertical-align:middle;text-align:center;padding:6px 4px">
+        <div style="width:10px;height:10px;border-radius:3px;background:${col};margin:0 auto" title="${acLabel}"></div>
+      </td>
+      <td rowspan="2" style="vertical-align:middle">
+        <span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${badge}
+      </td>
+      <td style="text-align:right;color:var(--muted)">${r.a ? yen(r.a) : '—'}</td>
+      <td style="text-align:right">${r.b ? yen(r.b) : '—'}</td>
+      <td style="text-align:right" class="${cls}"><strong>${(r.diff>=0?'+':'')+yen(r.diff)}</strong></td>
+      <td style="text-align:right" class="${cls}">${pctStr}</td>
+    </tr>
+    <tr style="${rowBg};border-bottom:1px solid var(--line)">
+      <td style="text-align:right;font-size:11px;color:var(--muted);padding-top:1px">${r.pctA.toFixed(1)}%</td>
+      <td style="text-align:right;font-size:11px;color:var(--muted);padding-top:1px">${r.pctB.toFixed(1)}%</td>
+      <td style="text-align:right;font-size:11px;padding-top:1px" class="${dcCls}">${ppStr}</td>
+      <td></td>
+    </tr>`;
+  }).join('');
 }
 
 function renderCmpSummaries(rows, ta, tb, labelA, labelB){
@@ -2076,7 +2070,7 @@ function parseTradeCSV(text){
     const price   = parseFloat(row[6]) || 0;
     const total   = parseFloat(row[8]||'0') || 0;
     if(!name || !qty || !price) continue;
-    const tickerM    = name.match(/([A-Z]{2,5})\s*\/\s*[A-Z]+\s*$/);
+    const tickerM    = name.match(/([A-Z]{2,6})\s*\/\s*[A-Z]+\s*$/) || name.match(/\b([A-Z]{2,6})\s*$/);
     const ticker     = tickerM ? tickerM[1] : name;
     const shortNameM = name.match(/^([\s\S]+?)\s+[A-Z]{2,5}\s*\/\s*[A-Z]+\s*$/);
     const shortName  = shortNameM ? shortNameM[1].trim() : name;
@@ -2281,14 +2275,10 @@ $("pieDimension").addEventListener('change', drawPie);
 $("lineDimension").addEventListener('change', drawLine);
 $("applyRange").addEventListener('click', drawLine);
 $("applyCmp").addEventListener('click', drawCmp);
-$('cmpTabAmt').addEventListener('click', ()=>{
   cmpViewMode = 'amount';
-  $('cmpTabAmt').classList.add('active'); $('cmpTabPct').classList.remove('active');
   drawCmp();
 });
-$('cmpTabPct').addEventListener('click', ()=>{
   cmpViewMode = 'pct';
-  $('cmpTabPct').classList.add('active'); $('cmpTabAmt').classList.remove('active');
   drawCmp();
 });
 
