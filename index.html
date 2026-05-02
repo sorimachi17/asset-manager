@@ -424,6 +424,8 @@
     </div>
     <div class="muted" id="cmpNote">—</div>
 
+    <div id="cmpSummaries" style="display:none;margin-top:14px"></div>
+
     <h3 style="margin:14px 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
     <div class="h2-sub" id="cmpDetailNote">—</div>
     <div class="table-wrap">
@@ -1149,6 +1151,7 @@ function drawCmp(){
   .filter(r => (fAcc? r.Account===fAcc : true));
 
   sortRows(rows, cmpSort.key, cmpSort.dir);
+  renderCmpSummaries(rows, ta, tb);
   renderCmpTable(rows);
 }
 
@@ -1202,6 +1205,70 @@ function renderCmpTable(rows){
       </tr>`;
     }).join('');
   }
+}
+
+function renderCmpSummaries(rows, ta, tb){
+  const container = $('cmpSummaries');
+  if(!rows.length){ container.style.display='none'; return; }
+
+  function groupBy(key){
+    const m = new Map();
+    for(const r of rows){
+      const k = r[key] || '(未分類)';
+      if(!m.has(k)) m.set(k, {a:0, b:0});
+      const g = m.get(k);
+      g.a += r.a; g.b += r.b;
+    }
+    return [...m.entries()].map(([cls, v])=>({
+      cls, a:v.a, b:v.b, diff:v.b-v.a,
+      pct: v.a!==0 ? (v.b-v.a)/v.a : null,
+      pctA: ta>0 ? v.a/ta*100 : 0,
+      pctB: tb>0 ? v.b/tb*100 : 0,
+      diffPp: (tb>0?v.b/tb*100:0)-(ta>0?v.a/ta*100:0)
+    })).sort((a,b)=>b.b-a.b);
+  }
+
+  function makeTable(title, data){
+    if(!data.length) return '';
+    const theadHtml = cmpViewMode === 'pct'
+      ? `<th style="text-align:left">分類</th><th style="text-align:right">割合(A)</th><th style="text-align:right">割合(B)</th><th style="text-align:right">変化(pp)</th>`
+      : `<th style="text-align:left">分類</th><th style="text-align:right">A日額</th><th style="text-align:right">B日額</th><th style="text-align:right">差額</th><th style="text-align:right">変化率</th>`;
+    const tbodyHtml = data.map(r=>{
+      if(cmpViewMode === 'pct'){
+        const dc = r.diffPp>0.005?'pos':r.diffPp<-0.005?'neg':'';
+        return `<tr>
+          <td style="text-align:left">${escapeHtml(r.cls)}</td>
+          <td style="text-align:right">${r.pctA.toFixed(1)}%</td>
+          <td style="text-align:right">${r.pctB.toFixed(1)}%</td>
+          <td style="text-align:right" class="${dc}">${(r.diffPp>=0?'+':'')+r.diffPp.toFixed(2)}pp</td>
+        </tr>`;
+      } else {
+        const cls = r.diff>0?'pos':r.diff<0?'neg':'';
+        const pctStr = r.pct===null?'—':((r.pct>=0?'+':'')+(r.pct*100).toFixed(1)+'%');
+        return `<tr>
+          <td style="text-align:left">${escapeHtml(r.cls)}</td>
+          <td style="text-align:right">${yen(r.a)}</td>
+          <td style="text-align:right">${yen(r.b)}</td>
+          <td style="text-align:right" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
+          <td style="text-align:right" class="${cls}">${pctStr}</td>
+        </tr>`;
+      }
+    }).join('');
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">${title}</div>
+      <div class="table-wrap"><table style="font-size:12px">
+        <thead><tr>${theadHtml}</tr></thead>
+        <tbody>${tbodyHtml}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  const byAsset = groupBy('AssetClass');
+  const byType  = groupBy('StockType');
+  let html = makeTable('AssetClass 別', byAsset);
+  if(byType.length > 1) html += makeTable('StockType 別', byType);
+  container.style.display = '';
+  container.innerHTML = html;
 }
 
 // ===================== 銘柄推移グラフ =====================
