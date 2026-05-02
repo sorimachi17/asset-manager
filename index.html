@@ -108,7 +108,7 @@
 
     /* 2日比較：モバイル対応 */
     .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
-    #cmpTable{min-width:720px}
+    #cmpTable{min-width:720px;table-layout:fixed}
 
     /* 銘柄リンク */
     .stock-link{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
@@ -182,9 +182,9 @@
       .year-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 
       /* テーブル */
-      #cmpTable{min-width:100%;font-size:11px}
+      #cmpTable{min-width:100%;font-size:11px;table-layout:fixed}
       #cmpTable th,#cmpTable td{padding:4px 3px}
-      #cmpTable th:first-child,#cmpTable td:first-child{white-space:normal;word-break:break-word}
+      #cmpTable th:first-child,#cmpTable td:first-child{width:40px;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
       /* 銘柄分析（base の min-width:800px を上書き） */
       #analTable{min-width:100%;font-size:11px}
