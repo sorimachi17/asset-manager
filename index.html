@@ -1211,6 +1211,16 @@ function renderCmpSummaries(rows, ta, tb){
   const container = $('cmpSummaries');
   if(!rows.length){ container.style.display='none'; return; }
 
+  function toSummaryRow(cls, v){
+    return {
+      cls, a:v.a, b:v.b, diff:v.b-v.a,
+      pct: v.a!==0 ? (v.b-v.a)/v.a : null,
+      pctA: ta>0 ? v.a/ta*100 : 0,
+      pctB: tb>0 ? v.b/tb*100 : 0,
+      diffPp: (tb>0?v.b/tb*100:0)-(ta>0?v.a/ta*100:0)
+    };
+  }
+
   function groupBy(key){
     const m = new Map();
     for(const r of rows){
@@ -1219,40 +1229,60 @@ function renderCmpSummaries(rows, ta, tb){
       const g = m.get(k);
       g.a += r.a; g.b += r.b;
     }
-    return [...m.entries()].map(([cls, v])=>({
-      cls, a:v.a, b:v.b, diff:v.b-v.a,
-      pct: v.a!==0 ? (v.b-v.a)/v.a : null,
-      pctA: ta>0 ? v.a/ta*100 : 0,
-      pctB: tb>0 ? v.b/tb*100 : 0,
-      diffPp: (tb>0?v.b/tb*100:0)-(ta>0?v.a/ta*100:0)
-    })).sort((a,b)=>b.b-a.b);
+    return [...m.entries()].map(([cls, v])=>toSummaryRow(cls, v)).sort((a,b)=>b.b-a.b);
   }
 
-  function makeTable(title, data){
+  // Build AssetClass → StockType sub-grouping
+  const assetSubMap = new Map();
+  for(const r of rows){
+    const ac = r.AssetClass || '(未分類)';
+    const st = r.StockType  || '(未分類)';
+    if(!assetSubMap.has(ac)) assetSubMap.set(ac, new Map());
+    const sub = assetSubMap.get(ac);
+    if(!sub.has(st)) sub.set(st, {a:0, b:0});
+    const g = sub.get(st);
+    g.a += r.a; g.b += r.b;
+  }
+
+  function renderRow(r, indent){
+    const label = (indent ? '└ ' : '') + escapeHtml(r.cls);
+    const style = indent ? 'padding-left:18px;font-size:11px;color:var(--muted)' : '';
+    if(cmpViewMode === 'pct'){
+      const dc = r.diffPp>0.005?'pos':r.diffPp<-0.005?'neg':'';
+      return `<tr>
+        <td style="text-align:left;${style}">${label}</td>
+        <td style="text-align:right${indent?';font-size:11px':''}">${r.pctA.toFixed(1)}%</td>
+        <td style="text-align:right${indent?';font-size:11px':''}">${r.pctB.toFixed(1)}%</td>
+        <td style="text-align:right${indent?';font-size:11px':''}" class="${dc}">${(r.diffPp>=0?'+':'')+r.diffPp.toFixed(2)}pp</td>
+      </tr>`;
+    } else {
+      const cls = r.diff>0?'pos':r.diff<0?'neg':'';
+      const pctStr = r.pct===null?'—':((r.pct>=0?'+':'')+(r.pct*100).toFixed(1)+'%');
+      return `<tr>
+        <td style="text-align:left;${style}">${label}</td>
+        <td style="text-align:right${indent?';font-size:11px':''}">${yen(r.a)}</td>
+        <td style="text-align:right${indent?';font-size:11px':''}">${yen(r.b)}</td>
+        <td style="text-align:right${indent?';font-size:11px':''}" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
+        <td style="text-align:right${indent?';font-size:11px':''}" class="${cls}">${pctStr}</td>
+      </tr>`;
+    }
+  }
+
+  function makeTable(title, data, subMap){
     if(!data.length) return '';
     const theadHtml = cmpViewMode === 'pct'
       ? `<th style="text-align:left">分類</th><th style="text-align:right">割合(A)</th><th style="text-align:right">割合(B)</th><th style="text-align:right">変化(pp)</th>`
       : `<th style="text-align:left">分類</th><th style="text-align:right">A日額</th><th style="text-align:right">B日額</th><th style="text-align:right">差額</th><th style="text-align:right">変化率</th>`;
     const tbodyHtml = data.map(r=>{
-      if(cmpViewMode === 'pct'){
-        const dc = r.diffPp>0.005?'pos':r.diffPp<-0.005?'neg':'';
-        return `<tr>
-          <td style="text-align:left">${escapeHtml(r.cls)}</td>
-          <td style="text-align:right">${r.pctA.toFixed(1)}%</td>
-          <td style="text-align:right">${r.pctB.toFixed(1)}%</td>
-          <td style="text-align:right" class="${dc}">${(r.diffPp>=0?'+':'')+r.diffPp.toFixed(2)}pp</td>
-        </tr>`;
-      } else {
-        const cls = r.diff>0?'pos':r.diff<0?'neg':'';
-        const pctStr = r.pct===null?'—':((r.pct>=0?'+':'')+(r.pct*100).toFixed(1)+'%');
-        return `<tr>
-          <td style="text-align:left">${escapeHtml(r.cls)}</td>
-          <td style="text-align:right">${yen(r.a)}</td>
-          <td style="text-align:right">${yen(r.b)}</td>
-          <td style="text-align:right" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
-          <td style="text-align:right" class="${cls}">${pctStr}</td>
-        </tr>`;
+      let html = renderRow(r, false);
+      if(subMap){
+        const sub = subMap.get(r.cls);
+        if(sub && sub.size > 1){
+          const subRows = [...sub.entries()].map(([st, v])=>toSummaryRow(st, v)).sort((a,b)=>b.b-a.b);
+          html += subRows.map(sr=>renderRow(sr, true)).join('');
+        }
       }
+      return html;
     }).join('');
     return `<div style="margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">${title}</div>
@@ -1265,7 +1295,7 @@ function renderCmpSummaries(rows, ta, tb){
 
   const byAsset = groupBy('AssetClass');
   const byType  = groupBy('StockType');
-  let html = makeTable('AssetClass 別', byAsset);
+  let html = makeTable('AssetClass 別', byAsset, assetSubMap);
   if(byType.length > 1) html += makeTable('StockType 別', byType);
   container.style.display = '';
   container.innerHTML = html;
