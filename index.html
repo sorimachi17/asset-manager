@@ -1151,7 +1151,7 @@ function drawCmp(){
   .filter(r => (fAcc? r.Account===fAcc : true));
 
   sortRows(rows, cmpSort.key, cmpSort.dir);
-  renderCmpSummaries(rows, ta, tb);
+  renderCmpSummaries(rows, ta, tb, a, b);
   renderCmpTable(rows);
 }
 
@@ -1207,9 +1207,19 @@ function renderCmpTable(rows){
   }
 }
 
-function renderCmpSummaries(rows, ta, tb){
+function renderCmpSummaries(rows, ta, tb, labelA, labelB){
   const container = $('cmpSummaries');
   if(!rows.length){ container.style.display='none'; return; }
+
+  const PALETTE = [
+    'rgba(100,200,255,0.8)',
+    'rgba(255,200,80,0.8)',
+    'rgba(160,100,255,0.8)',
+    'rgba(80,220,160,0.8)',
+    'rgba(255,120,100,0.8)',
+    'rgba(200,200,100,0.8)',
+    'rgba(255,160,200,0.8)',
+  ];
 
   function toSummaryRow(cls, v){
     return {
@@ -1244,6 +1254,37 @@ function renderCmpSummaries(rows, ta, tb){
     g.a += r.a; g.b += r.b;
   }
 
+  // Stacked bar chart: 2 bars (A vs B) segmented by AssetClass
+  function buildStackedBars(data, labelA, labelB){
+    const colorMap = {};
+    data.forEach((r, i) => { colorMap[r.cls] = PALETTE[i % PALETTE.length]; });
+
+    function oneBar(label, getVal, total){
+      const segs = data.map(r => {
+        const w = total > 0 ? (getVal(r) / total * 100).toFixed(2) : 0;
+        const tip = `${r.cls}: ${(+w).toFixed(1)}%`;
+        return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0" title="${tip}"></div>`;
+      }).join('');
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="font-size:10px;color:var(--muted);width:28px;flex-shrink:0;text-align:right">${escapeHtml(label)}</span>
+        <div style="flex:1;height:16px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">${segs}</div>
+      </div>`;
+    }
+
+    const legend = data.map(r =>
+      `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--fg)">
+        <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorMap[r.cls]};flex-shrink:0"></span>
+        ${escapeHtml(r.cls)}
+      </span>`
+    ).join('');
+
+    return `<div style="margin-bottom:14px">
+      ${oneBar(labelA, r=>r.a, ta)}
+      ${oneBar(labelB, r=>r.b, tb)}
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${legend}</div>
+    </div>`;
+  }
+
   // Renders 2 rows per item: amount row + percentage row underneath
   function renderDualRows(r, indent, isTotal){
     const label = (indent ? '└ ' : '') + escapeHtml(r.cls);
@@ -1275,7 +1316,7 @@ function renderCmpSummaries(rows, ta, tb){
     return amtRow + pctRow;
   }
 
-  function makeTable(title, data){
+  function makeTable(title, data, labelA, labelB){
     if(!data.length) return '';
     const theadHtml = `<th style="text-align:left">分類</th><th style="text-align:right">A日額</th><th style="text-align:right">B日額</th><th style="text-align:right">差額</th><th style="text-align:right">変化率</th>`;
 
@@ -1296,7 +1337,8 @@ function renderCmpSummaries(rows, ta, tb){
     tbodyHtml += renderDualRows(totalRow, false, true);
 
     return `<div style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">${title}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">${title}</div>
+      ${buildStackedBars(data, labelA, labelB)}
       <div class="table-wrap"><table style="font-size:12px">
         <thead><tr>${theadHtml}</tr></thead>
         <tbody>${tbodyHtml}</tbody>
@@ -1305,8 +1347,11 @@ function renderCmpSummaries(rows, ta, tb){
   }
 
   const byAsset = groupBy('AssetClass');
+  // Build date labels from the caller-provided totals context (fall back to A/B)
+  const dA = labelA || 'A';
+  const dB = labelB || 'B';
   container.style.display = '';
-  container.innerHTML = makeTable('AssetClass 別', byAsset);
+  container.innerHTML = makeTable('AssetClass 別', byAsset, dA, dB);
 }
 
 // ===================== 銘柄推移グラフ =====================
