@@ -416,9 +416,9 @@
       <table id="cmpTable">
         <thead>
           <tr>
-            <th rowspan="2" style="vertical-align:middle">分類</th>
-            <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle">銘柄</th>
-            <th class="sortable" data-key="a" style="text-align:right">A日額</th>
+          <tr>
+            <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle;max-width:110px;width:110px">銘柄</th>
+            <th rowspan="2" style="vertical-align:middle;white-space:nowrap">分類</th>
             <th class="sortable" data-key="b" style="text-align:right">B日額</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
             <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
@@ -1174,14 +1174,14 @@ function renderCmpTable(rows){
   const tbody = $('cmpTable').querySelector('tbody');
 
   const AC_COLORS = {
-    cash:'rgba(100,200,255,0.8)', stock:'rgba(255,200,80,0.8)',
-    pension:'rgba(160,100,255,0.8)', crypto:'rgba(80,220,160,0.8)'
+    cash:'#64c8ff', stock:'#ffc850', pension:'#a064ff', crypto:'#50dca0'
   };
+  function acColor(ac){ return AC_COLORS[(ac||'').toLowerCase()] || '#b4b4b4'; }
 
   thead.innerHTML = `
     <tr>
-      <th rowspan="2" style="vertical-align:middle;width:20px">分類</th>
-      <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle">銘柄</th>
+      <th rowspan="2" class="sortable" data-key="Name" style="vertical-align:middle;max-width:110px;width:110px">銘柄</th>
+      <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap">分類</th>
       <th class="sortable" data-key="a" style="text-align:right">A日額</th>
       <th class="sortable" data-key="b" style="text-align:right">B日額</th>
       <th class="sortable" data-key="diff" style="text-align:right">差額</th>
@@ -1195,9 +1195,8 @@ function renderCmpTable(rows){
     </tr>`;
 
   tbody.innerHTML = rows.map(r=>{
-    const ac = (r.AssetClass||'').toLowerCase();
-    const col = AC_COLORS[ac] || 'rgba(180,180,180,0.6)';
-    const acLabel = escapeHtml(r.AssetClass || '—');
+    const ac = r.AssetClass || '—';
+    const col = acColor(ac);
     const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
     const dcCls = r.diffPp > 0.05 ? 'pos' : r.diffPp < -0.05 ? 'neg' : '';
     const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
@@ -1207,12 +1206,10 @@ function renderCmpTable(rows){
     const badge = r.a===0 ? ' <span style="font-size:10px;color:var(--muted)">NEW</span>'
                 : r.b===0 ? ' <span style="font-size:10px;color:var(--muted)">EXIT</span>' : '';
     return `<tr style="${rowBg}">
-      <td rowspan="2" style="vertical-align:middle;text-align:center;padding:6px 4px">
-        <div style="width:10px;height:10px;border-radius:3px;background:${col};margin:0 auto" title="${acLabel}"></div>
-      </td>
-      <td rowspan="2" style="vertical-align:middle">
+      <td rowspan="2" style="vertical-align:middle;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${badge}
       </td>
+      <td rowspan="2" style="vertical-align:middle;font-size:11px;color:${col};white-space:nowrap;font-weight:500">${escapeHtml(ac)}</td>
       <td style="text-align:right;color:var(--muted)">${r.a ? yen(r.a) : '—'}</td>
       <td style="text-align:right">${r.b ? yen(r.b) : '—'}</td>
       <td style="text-align:right" class="${cls}"><strong>${(r.diff>=0?'+':'')+yen(r.diff)}</strong></td>
