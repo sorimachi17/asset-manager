@@ -401,32 +401,20 @@
   <section class="panel wide">
     <h2>2日間比較</h2>
     <div class="h2-sub">指定した2日間の銘柄別比較（A・Bともに0の行は表示しません）</div>
-    <div style="display:flex;gap:6px;margin:8px 0 4px">
-      <button id="cmpTabAmt" class="btn-ghost active" style="font-size:12px;padding:4px 10px">金額</button>
-      <button id="cmpTabPct" class="btn-ghost" style="font-size:12px;padding:4px 10px">割合</button>
-    </div>
     <div class="controls">
       <label>日付A: <input type="date" id="cmpDateA"></label>
       <label>日付B: <input type="date" id="cmpDateB"></label>
-      <label>AssetClass:
-        <select id="cmpFAsset"><option value="">(すべて)</option></select>
-      </label>
-      <label>StockType:
-        <select id="cmpFSType"><option value="">(すべて)</option></select>
-      </label>
-      <label>Currency:
-        <select id="cmpFCcy"><option value="">(すべて)</option></select>
-      </label>
-      <label>Account:
-        <select id="cmpFAcc"><option value="">(すべて)</option></select>
-      </label>
       <button id="applyCmp">比較</button>
     </div>
     <div class="muted" id="cmpNote">—</div>
 
     <div id="cmpSummaries" style="display:none;margin-top:14px"></div>
 
-    <h3 style="margin:14px 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
+    <div style="display:flex;gap:6px;margin:12px 0 6px">
+      <button id="cmpTabAmt" class="btn-ghost active" style="font-size:12px;padding:4px 10px">金額</button>
+      <button id="cmpTabPct" class="btn-ghost" style="font-size:12px;padding:4px 10px">割合</button>
+    </div>
+    <h3 style="margin:0 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
     <div class="h2-sub" id="cmpDetailNote">—</div>
     <div class="table-wrap">
       <table id="cmpTable">
@@ -555,17 +543,50 @@
     <div class="h2-sub">約定履歴から取引タイミングの傾向を分析</div>
     <div id="patEmpty" class="muted" style="padding:16px 0">約定履歴CSVを読み込むと表示されます</div>
     <div id="patContent" style="display:none">
-      <div class="pat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+      <!-- Row 1: day/week charts -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
         <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">曜日別 取引株数</div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px">曜日別 取引回数</div>
           <canvas id="patDayCanvas" height="200"></canvas>
         </div>
         <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">週別 取引株数（月内）</div>
-          <canvas id="patWeekCanvas" height="200"></canvas>
+          <div class="muted" style="font-size:12px;margin-bottom:6px">月別 投資金額</div>
+          <canvas id="patMonthCanvas" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 2: ticker / cumulative -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px">銘柄別 取引回数</div>
+          <canvas id="patTickerCanvas" height="200"></canvas>
+        </div>
+        <div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px">累計投資額推移</div>
+          <canvas id="patCumCanvas" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent trades table -->
+      <div style="margin-top:4px">
+        <div class="muted" style="font-size:12px;margin-bottom:6px">直近50件 取引履歴</div>
+        <div class="table-wrap">
+          <table id="patTradeTable" style="font-size:12px">
+            <thead><tr>
+              <th style="text-align:left">日付</th>
+              <th style="text-align:left">銘柄</th>
+              <th style="text-align:right">単価</th>
+              <th style="text-align:right">数量</th>
+              <th style="text-align:right">約定金額</th>
+              <th style="text-align:left">口座</th>
+            </tr></thead>
+            <tbody id="patTradeBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
+  </section>
   </section>
 
 </main>
@@ -942,9 +963,9 @@ function drawPie(){
     if(dim === 'Name'){
       const isCash = (r.AssetClass||'').toLowerCase() === 'cash';
       k = isCash ? '現金' : (r.Name || '(blank)');
-    }else if(dim === 'StockType' || dim === 'Account'){
+    }else if(dim === 'StockType'){
       const isStock = (r.AssetClass||'').toLowerCase() === 'stock';
-      k = isStock ? (r[dim] || '(blank)') : '株式以外';
+      k = isStock ? (r[dim] || '(blank)') : (r.AssetClass || '(blank)');
     }else{
       k = r[dim] || '(blank)';
     }
@@ -1113,13 +1134,6 @@ function collectDistinct(keys, dates){
   set.delete('');
   return [...set].sort();
 }
-function fillCmpFilters(){
-  const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
-  fill('cmpFAsset', collectDistinct(['AssetClass'], DATES));
-  fill('cmpFSType', collectDistinct(['StockType'], DATES));
-  fill('cmpFCcy',   collectDistinct(['Currency'], DATES));
-  fill('cmpFAcc',   collectDistinct(['Account'], DATES));
-}
 
 function drawCmp(){
   if(!DATES.length) return;
@@ -1134,7 +1148,6 @@ function drawCmp(){
   const pushNames = d => { for(const [nm] of (byDateName.get(d)||new Map())) names.add(nm); };
   pushNames(a); pushNames(b);
 
-  const fA=$("cmpFAsset").value, fS=$("cmpFSType").value, fC=$("cmpFCcy").value, fAcc=$("cmpFAcc").value;
   const rows = [...names].map(nm=>{
     const av = amountOfNameAt(nm,a), bv = amountOfNameAt(nm,b);
     const diff = bv - av;
@@ -1145,10 +1158,6 @@ function drawCmp(){
     return {Name:nm, a:av, b:bv, diff, pct, pctA, pctB, diffPp: pctB-pctA, ...meta};
   })
   .filter(r => !(r.a===0 && r.b===0))
-  .filter(r => (fA? r.AssetClass===fA : true))
-  .filter(r => (fS? r.StockType===fS : true))
-  .filter(r => (fC? r.Currency===fC : true))
-  .filter(r => (fAcc? r.Account===fAcc : true));
 
   sortRows(rows, cmpSort.key, cmpSort.dir);
   renderCmpSummaries(rows, ta, tb, a, b);
@@ -1170,37 +1179,54 @@ let cmpViewMode = 'amount';
 function renderCmpTable(rows){
   const thead = $('cmpTable').querySelector('thead tr');
   const tbody = $('cmpTable').querySelector('tbody');
+
+  // AssetClass color chips
+  const AC_COLORS = {
+    cash:'rgba(100,200,255,0.8)', stock:'rgba(255,200,80,0.8)',
+    pension:'rgba(160,100,255,0.8)', crypto:'rgba(80,220,160,0.8)'
+  };
+  function acChip(r){
+    const ac = (r.AssetClass||'').toLowerCase();
+    const col = AC_COLORS[ac] || 'rgba(180,180,180,0.6)';
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};margin-right:5px;flex-shrink:0"></span>`;
+  }
+
   if(cmpViewMode === 'pct'){
     thead.innerHTML = `
       <th class="sortable" data-key="Name">銘柄</th>
-      <th class="sortable" data-key="pctA" style="text-align:right">割合(A)</th>
-      <th class="sortable" data-key="pctB" style="text-align:right">割合(B)</th>
-      <th class="sortable" data-key="diffPp" style="text-align:right">変化(pp)</th>`;
+      <th class="sortable" data-key="pctA" style="text-align:right;white-space:nowrap">割合 A</th>
+      <th class="sortable" data-key="pctB" style="text-align:right;white-space:nowrap">割合 B</th>
+      <th class="sortable" data-key="diffPp" style="text-align:right;white-space:nowrap">変化</th>`;
     tbody.innerHTML = rows.map(r=>{
-      const dc = r.diffPp > 0.005 ? 'pos' : r.diffPp < -0.005 ? 'neg' : '';
+      const dc = r.diffPp > 0.05 ? 'pos' : r.diffPp < -0.05 ? 'neg' : '';
       const diffStr = (r.diffPp >= 0 ? '+' : '') + r.diffPp.toFixed(2) + 'pp';
-      return `<tr>
-        <td><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
-        <td style="text-align:right">${r.pctA.toFixed(1)}%</td>
-        <td style="text-align:right">${r.pctB.toFixed(1)}%</td>
-        <td style="text-align:right" class="${dc}">${diffStr}</td>
+      const rowHighlight = Math.abs(r.diffPp) > 1 ? 'background:rgba(255,255,255,0.03)' : '';
+      return `<tr style="${rowHighlight}">
+        <td><div style="display:flex;align-items:center">${acChip(r)}<span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></div></td>
+        <td style="text-align:right;color:var(--muted)">${r.pctA.toFixed(2)}%</td>
+        <td style="text-align:right">${r.pctB.toFixed(2)}%</td>
+        <td style="text-align:right" class="${dc}"><strong>${diffStr}</strong></td>
       </tr>`;
     }).join('');
   } else {
     thead.innerHTML = `
       <th class="sortable" data-key="Name">銘柄</th>
-      <th class="sortable" data-key="a" style="text-align:right">A日額</th>
-      <th class="sortable" data-key="b" style="text-align:right">B日額</th>
-      <th class="sortable" data-key="diff" style="text-align:right">差額</th>
-      <th class="sortable" data-key="pct" style="text-align:right">変化率</th>`;
+      <th class="sortable" data-key="a" style="text-align:right;white-space:nowrap">A日額</th>
+      <th class="sortable" data-key="b" style="text-align:right;white-space:nowrap">B日額</th>
+      <th class="sortable" data-key="diff" style="text-align:right;white-space:nowrap">差額</th>
+      <th class="sortable" data-key="pct" style="text-align:right;white-space:nowrap">変化率</th>`;
     tbody.innerHTML = rows.map(r=>{
       const cls = r.diff>0 ? 'pos' : (r.diff<0 ? 'neg' : '');
       const pctStr = r.pct===null ? '—' : ((r.pct>=0?'+':'') + (r.pct*100).toFixed(1) + '%');
-      return `<tr>
-        <td><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
-        <td style="text-align:right">${yen(r.a)}</td>
-        <td style="text-align:right">${yen(r.b)}</td>
-        <td style="text-align:right" class="${cls}">${(r.diff>=0?'+':'')+yen(r.diff)}</td>
+      const bigMove = r.pct !== null && Math.abs(r.pct) >= 0.1;
+      const rowHighlight = bigMove ? (r.diff>0 ? 'background:rgba(34,197,94,0.04)' : 'background:rgba(239,68,68,0.04)') : '';
+      const nameExtra = r.a===0 ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">NEW</span>'
+                      : r.b===0 ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">EXIT</span>' : '';
+      return `<tr style="${rowHighlight}">
+        <td><div style="display:flex;align-items:center;gap:2px">${acChip(r)}<span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${nameExtra}</div></td>
+        <td style="text-align:right;color:var(--muted)">${r.a ? yen(r.a) : '—'}</td>
+        <td style="text-align:right">${r.b ? yen(r.b) : '—'}</td>
+        <td style="text-align:right" class="${cls}"><strong>${(r.diff>=0?'+':'')+yen(r.diff)}</strong></td>
         <td style="text-align:right" class="${cls}">${pctStr}</td>
       </tr>`;
     }).join('');
@@ -2019,7 +2045,6 @@ function onDataReady(){
   $("toDate").value    = DATES.at(-1) || '';
   $("cmpDateA").value  = DATES.at(-1) || '';
   $("cmpDateB").value  = DATES.at(-1) || '';
-  fillCmpFilters();
   fillCalFilters();
   refreshKPIs(); drawPie(); drawLine(); drawCmp();
   $('analDate').value = DATES.at(-1) || '';
@@ -2102,8 +2127,8 @@ function drawDCA(){
 
   const labels  = trades.map(t=>t.date);
   const prices  = trades.map(t=>t.unitPrice);
-  const bgColors = trades.map(t=> t.account==='NISA' ? 'rgba(34,197,94,0.7)' : 'rgba(59,130,246,0.7)');
-  const bdColors = trades.map(t=> t.account==='NISA' ? 'rgba(34,197,94,1)'   : 'rgba(59,130,246,1)');
+  const bgColors = trades.map(t=> (t.account||'').includes('NISA') ? 'rgba(34,197,94,0.7)' : 'rgba(59,130,246,0.7)');
+  const bdColors = trades.map(t=> (t.account||'').includes('NISA') ? 'rgba(34,197,94,1)'   : 'rgba(59,130,246,1)');
 
   const totalQty = trades.reduce((s,t)=>s+t.quantity, 0);
   const avgPrice = totalQty ? trades.reduce((s,t)=>s+t.unitPrice*t.quantity, 0)/totalQty : 0;
@@ -2144,35 +2169,78 @@ function drawDCA(){
   $('dcaCount').textContent   = `${trades.length}回`;
 }
 
-let patDayChart = null, patWeekChart = null;
+let patDayChart = null, patMonthChart = null, patTickerChart = null, patCumChart = null;
 function drawTradePatterns(){
   if(!TRADES.length) return;
+
+  const sorted = [...TRADES].sort((a,b)=>a.date.localeCompare(b.date));
+
+  // --- 1. 曜日別取引回数 ---
   const dayNames  = ['日','月','火','水','木','金','土'];
-  const weekNames = ['第1週','第2週','第3週','第4週','第5週'];
-  const dayCounts  = Array(7).fill(0);
-  const weekCounts = Array(5).fill(0);
-  for(const t of TRADES){
-    const d = dayjs(t.date);
-    dayCounts[d.day()] += t.quantity;
-    weekCounts[Math.min(4, Math.floor((d.date()-1)/7))] += t.quantity;
+  const dayCounts = Array(7).fill(0);
+  for(const t of sorted){ dayCounts[dayjs(t.date).day()]++; }
+
+  // --- 2. 月別投資金額 ---
+  const monthMap = new Map();
+  for(const t of sorted){
+    const ym = t.date.slice(0,7);
+    monthMap.set(ym, (monthMap.get(ym)||0) + t.totalAmount);
   }
-  const mkChart = (id, labels, data, existing) => {
-    if(existing){ existing.destroy(); }
+  const monthLabels = [...monthMap.keys()].sort();
+  const monthData   = monthLabels.map(k=>monthMap.get(k));
+
+  // --- 3. 銘柄別取引回数 ---
+  const tickerMap = new Map();
+  for(const t of sorted){ tickerMap.set(t.ticker, (tickerMap.get(t.ticker)||0)+1); }
+  const tickerEntries = [...tickerMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const tickerLabels = tickerEntries.map(e=>e[0]);
+  const tickerCounts = tickerEntries.map(e=>e[1]);
+
+  // --- 4. 累計投資額推移 ---
+  let cumulative = 0;
+  const cumLabels = [], cumData = [];
+  for(const t of sorted){
+    cumulative += t.totalAmount;
+    cumLabels.push(t.date);
+    cumData.push(cumulative);
+  }
+
+  const mkBar = (id, labels, data, existing, color) => {
+    if(existing) existing.destroy();
     return new Chart($(id), {
       type:'bar',
-      data:{labels, datasets:[{label:'取引株数',data,backgroundColor:'rgba(59,130,246,0.6)',borderColor:'rgba(59,130,246,1)',borderWidth:1}]},
-      options:{
-        responsive:true,
-        scales:{
-          x:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'}},
-          y:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}
-        },
-        plugins:{legend:{display:false}}
-      }
+      data:{labels, datasets:[{label:'',data,backgroundColor:color||'rgba(59,130,246,0.6)',borderColor:color||'rgba(59,130,246,1)',borderWidth:1}]},
+      options:{responsive:true,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#aaa',autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.05)'}},
+                y:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}}}
     });
   };
-  patDayChart  = mkChart('patDayCanvas',  dayNames,  dayCounts,  patDayChart);
-  patWeekChart = mkChart('patWeekCanvas', weekNames, weekCounts, patWeekChart);
+
+  patDayChart    = mkBar('patDayCanvas',    dayNames,    dayCounts,    patDayChart);
+  patMonthChart  = mkBar('patMonthCanvas',  monthLabels, monthData,    patMonthChart, 'rgba(251,146,60,0.65)');
+  patTickerChart = mkBar('patTickerCanvas', tickerLabels,tickerCounts, patTickerChart,'rgba(34,197,94,0.65)');
+
+  if(patCumChart) patCumChart.destroy();
+  patCumChart = new Chart($('patCumCanvas'), {
+    type:'line',
+    data:{labels:cumLabels, datasets:[{label:'累計投資額',data:cumData,
+      borderColor:'rgba(139,92,246,1)',backgroundColor:'rgba(139,92,246,0.15)',
+      fill:true,pointRadius:0,tension:0.3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#aaa',autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.05)'}},
+              y:{ticks:{color:'#aaa',callback:v=>yen(v)},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}}}
+  });
+
+  // --- 5. Recent trades table ---
+  const recent = [...sorted].reverse().slice(0,50);
+  $('patTradeBody').innerHTML = recent.map(t=>`<tr>
+    <td style="white-space:nowrap">${t.date}</td>
+    <td>${escapeHtml(t.ticker)}</td>
+    <td style="text-align:right">$${t.unitPrice.toFixed(2)}</td>
+    <td style="text-align:right">${t.quantity}</td>
+    <td style="text-align:right">${t.totalAmount ? yen(t.totalAmount) : '—'}</td>
+    <td style="color:var(--muted)">${escapeHtml(t.account||'')}</td>
+  </tr>`).join('');
 }
 
 // ===================== events =====================
@@ -2223,7 +2291,6 @@ $('cmpTabPct').addEventListener('click', ()=>{
   $('cmpTabPct').classList.add('active'); $('cmpTabAmt').classList.remove('active');
   drawCmp();
 });
-["cmpFAsset","cmpFSType","cmpFCcy","cmpFAcc"].forEach(id=> $(id).addEventListener('change', drawCmp));
 
 // 2日比較ソート
 document.addEventListener('click', e=>{
