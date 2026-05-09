@@ -417,6 +417,7 @@
 
     <h3 style="margin:0 0 6px">銘柄別の詳細 <span class="muted">（銘柄名をクリックで推移グラフ）</span></h3>
     <div class="h2-sub" id="cmpDetailNote">—</div>
+    <div id="cmpDetailFilters" class="controls" style="margin:8px 0 4px;display:none;flex-wrap:wrap;gap:4px"></div>
     <div class="table-wrap">
       <table id="cmpTable">
         <thead>
@@ -612,6 +613,13 @@
     <div class="modal-header">
       <h2 class="modal-title" id="stockModalTitle">—</h2>
       <button id="stockClose" class="modal-close">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <button class="btn-ghost stock-period active" data-p="all">全期間</button>
+      <button class="btn-ghost stock-period" data-p="1Y">1年</button>
+      <button class="btn-ghost stock-period" data-p="6M">6ヶ月</button>
+      <button class="btn-ghost stock-period" data-p="3M">3ヶ月</button>
+      <button class="btn-ghost stock-period" data-p="1M">1ヶ月</button>
     </div>
     <div class="chart-wrap"><canvas id="stockCanvas" height="300"></canvas></div>
     <p class="muted" id="stockModalNote" style="margin-top:8px"></p>
@@ -1127,6 +1135,7 @@ function drawLine(){
 
 // ===================== 2日比較 =====================
 let cmpSort = {key:'diff', dir:'desc'};
+let _cmpAllRows=[], _cmpLabelA='', _cmpLabelB='';
 
 function collectDistinct(keys, dates){
   const set = new Set();
@@ -1161,7 +1170,9 @@ function drawCmp(){
 
   sortRows(rows, cmpSort.key, cmpSort.dir);
   renderCmpSummaries(rows, ta, tb, a, b);
-  renderCmpTable(rows, a, b);
+  _cmpAllRows = rows; _cmpLabelA = a; _cmpLabelB = b;
+  initCmpFilters(rows);
+  filterAndRenderCmpTable();
 }
 
 function sortRows(arr, key, dir){
@@ -1174,6 +1185,35 @@ function sortRows(arr, key, dir){
   });
 }
 
+function initCmpFilters(rows){
+  const filterDiv = $('cmpDetailFilters');
+  const keys = ['AssetClass','StockType','Currency','Account'];
+  const labels = {AssetClass:'分類', StockType:'タイプ', Currency:'通貨', Account:'口座'};
+  const saved = {};
+  keys.forEach(k => { const el = $('cmpF_'+k); if(el) saved[k] = el.value; });
+  let html = '';
+  keys.forEach(k => {
+    const vals = [...new Set(rows.map(r => r[k]||'').filter(v => v))].sort();
+    if(!vals.length) return;
+    const cur = saved[k] || '';
+    html += '<label>' + (labels[k]||k) + ': <select id="cmpF_' + k + '" onchange="filterAndRenderCmpTable()"><option value="">全て</option>' +
+      vals.map(v => '<option' + (v===cur?' selected':'') + '>' + escapeHtml(v) + '</option>').join('') + '</select></label>';
+  });
+  filterDiv.innerHTML = html;
+  filterDiv.style.display = html ? '' : 'none';
+}
+
+function filterAndRenderCmpTable(){
+  const keys = ['AssetClass','StockType','Currency','Account'];
+  let rows = _cmpAllRows.slice();
+  keys.forEach(k => {
+    const el = $('cmpF_' + k);
+    if(!el || !el.value) return;
+    rows = rows.filter(r => (r[k]||'') === el.value);
+  });
+  sortRows(rows, cmpSort.key, cmpSort.dir);
+  renderCmpTable(rows, _cmpLabelA, _cmpLabelB);
+}
 function renderCmpTable(rows, labelA, labelB){
   const thead = $('cmpTable').querySelector('thead');
   const tbody = $('cmpTable').querySelector('tbody');
@@ -1283,18 +1323,32 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     const colorMap = {};
     data.forEach((r, i) => { colorMap[r.cls] = acColor(r.cls, i); });
     function oneBar(label, getVal, total){
-      const dispLabel = (typeof label==='string' && label.length===10) ? label.slice(5).replace('-','/'): label;
-      const segs = data.map(r => {
-        const w = total > 0 ? (getVal(r) / total * 100).toFixed(2) : 0;
-        const pctLabel = +w >= 5 ? `<span style="font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,0.8);overflow:hidden">${(+w).toFixed(0)}%</span>` : '';
-        return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden" title="${r.cls}: ${(+w).toFixed(1)}%">${pctLabel}</div>`;
+      const dispLabel = (typeof label==='string' && label.length===10) ? label.slice(5).replace('-','/') : label;
+      let hasSmall = false;
+      const segDivs = data.map(r => {
+        const w = total > 0 ? (getVal(r) / total * 100) : 0;
+        if(w > 0 && w < 5) hasSmall = true;
+        const inner = w >= 5 ? '<span style="font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.8)">' + w.toFixed(0) + '%</span>' : '';
+        return '<div style="width:' + w.toFixed(2) + '%;background:' + colorMap[r.cls] + ';height:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden" title="' + r.cls + ': ' + w.toFixed(1) + '%">' + inner + '</div>';
       }).join('');
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-        <span style="font-size:10px;color:var(--muted);width:30px;flex-shrink:0;text-align:right;white-space:nowrap">${escapeHtml(dispLabel)}</span>
-        <div style="flex:1;height:20px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">${segs}</div>
-      </div>`;
-    }
-    const legend = data.map(r =>
+      let annoDivs = '';
+      if(hasSmall){
+        annoDivs = data.map(r => {
+          const w = total > 0 ? (getVal(r) / total * 100) : 0;
+          if(w <= 0) return '';
+          const txt = w < 5 ? '<span style="font-size:8px;color:' + colorMap[r.cls] + ';white-space:nowrap">' + w.toFixed(0) + '%</span>' : '';
+          const bt  = w < 5 ? 'border-top:1px solid ' + colorMap[r.cls] + ';' : '';
+          return '<div style="flex-shrink:0;width:' + w.toFixed(2) + '%;display:flex;justify-content:center;overflow:hidden;' + bt + '">' + txt + '</div>';
+        }).join('');
+      }
+      return '<div style="margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:10px;color:var(--muted);width:30px;flex-shrink:0;text-align:right;white-space:nowrap">' + escapeHtml(dispLabel) + '</span>' +
+        '<div style="flex:1;height:20px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">' + segDivs + '</div>' +
+        '</div>' +
+        (hasSmall ? '<div style="display:flex;margin-left:38px">' + annoDivs + '</div>' : '') +
+        '</div>';
+    }    const legend = data.map(r =>
       `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--fg)">
         <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorMap[r.cls]};flex-shrink:0"></span>
         ${escapeHtml(r.cls)} <span style="color:var(--muted);font-size:9px">(${ta>0?(r.a/ta*100).toFixed(0):0}%→${tb>0?(r.b/tb*100).toFixed(0):0}%)</span>
@@ -1388,11 +1442,26 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
 
 // ===================== 銘柄推移グラフ =====================
 let stockChart = null;
+let _stockName = null, _stockPeriod = 'all';
 
 function showStockChart(name){
+  _stockName = name; _stockPeriod = 'all';
+  document.querySelectorAll('.stock-period').forEach(b => b.classList.toggle('active', b.dataset.p==='all'));
   $('stockModalTitle').textContent = name;
   $('stockModal').style.display = 'flex';
-  const dates = DATES.filter(d => (byDateName.get(d)||new Map()).has(name));
+  renderStockChart();
+}
+
+function renderStockChart(){
+  const name = _stockName;
+  let dates = DATES.filter(d => (byDateName.get(d)||new Map()).has(name));
+  if(_stockPeriod !== 'all' && dates.length){
+    const end = dayjs(dates.at(-1));
+    const num = parseInt(_stockPeriod);
+    const unit = _stockPeriod.endsWith('Y') ? 'year' : 'month';
+    const start = end.subtract(num, unit);
+    dates = dates.filter(d => !dayjs(d).isBefore(start));
+  }
   const values = dates.map(d => amountOfNameAt(name, d));
   if(stockChart){ stockChart.destroy(); stockChart = null; }
   if(!dates.length){ $('stockModalNote').textContent = 'データなし'; return; }
@@ -1416,10 +1485,15 @@ function showStockChart(name){
     }
   });
 }
-
 $('stockClose').addEventListener('click', ()=>{ $('stockModal').style.display='none'; });
 $('stockModal').addEventListener('click', e=>{ if(e.target===$('stockModal')){ $('stockModal').style.display='none'; } });
-$('mapModal').addEventListener('click', e=>{ if(e.target===$('mapModal')){ $('mapModal').style.display='none'; _pendingRawRows=null; } });
+document.querySelectorAll('.stock-period').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _stockPeriod = btn.dataset.p;
+    document.querySelectorAll('.stock-period').forEach(b => b.classList.toggle('active', b===btn));
+    renderStockChart();
+  });
+});$('mapModal').addEventListener('click', e=>{ if(e.target===$('mapModal')){ $('mapModal').style.display='none'; _pendingRawRows=null; } });
 
 // ===================== Calendar =====================
 const calState = { view:'month', month:null, selected:null, year:null, yearMode:'month', yearSelected:null };
