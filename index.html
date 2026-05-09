@@ -189,6 +189,7 @@
       #cmpTable th:first-child,#cmpTable td:first-child{width:55px;max-width:55px}
       #cmpTable td{white-space:nowrap;overflow:hidden}
       #cmpTable td.sticky-col{white-space:normal;word-break:break-all;overflow:visible}
+      .cmp-sum-tbl th,.cmp-sum-tbl td{padding:4px 2px}
 
       /* 銘柄分析（base の min-width:800px を上書き） */
       #analTable{min-width:100%;font-size:11px}
@@ -423,9 +424,9 @@
           <tr>
             <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:55px;width:55px">銘柄</th>
             <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap;width:70px">分類</th>
-            <th class="sortable" data-key="b" style="text-align:right">${escapeHtml(labelB||'B')}</th>
+            <th class="sortable" data-key="b" style="text-align:right">${sB}</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
-            <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
+            <th class="sortable" data-key="pct" style="text-align:right;width:42px">変化率</th>
           </tr><tr><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">変化(pp)</th><th></th>
         <tbody></tbody>
       </table>
@@ -1181,15 +1182,17 @@ function renderCmpTable(rows, labelA, labelB){
     cash:'#64c8ff', stock:'#ffc850', pension:'#a064ff', crypto:'#50dca0'
   };
   function acColor(ac){ return AC_COLORS[(ac||'').toLowerCase()] || '#b4b4b4'; }
+  const sA = (typeof labelA==='string'&&labelA.length===10)?labelA.slice(5).replace('-','/'): labelA||'A';
+  const sB = (typeof labelB==='string'&&labelB.length===10)?labelB.slice(5).replace('-','/'): labelB||'B';
 
   thead.innerHTML = `
     <tr>
       <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:55px;width:55px">銘柄</th>
       <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap;width:38px">分類</th>
-      <th class="sortable" data-key="a" style="text-align:right">${escapeHtml(labelA||'A')}</th>
-      <th class="sortable" data-key="b" style="text-align:right">${escapeHtml(labelB||'B')}</th>
+      <th class="sortable" data-key="a" style="text-align:right">${sA}</th>
+      <th class="sortable" data-key="b" style="text-align:right">${sB}</th>
       <th class="sortable" data-key="diff" style="text-align:right">差額</th>
-      <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
+      <th class="sortable" data-key="pct" style="text-align:right;width:42px">変化率</th>
     </tr>
     <tr>
       <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
@@ -1237,6 +1240,8 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     pension:'rgba(160,100,255,0.8)', crypto:'rgba(80,220,160,0.8)'
   };
   const FALLBACK_PALETTE = ['rgba(255,120,100,0.8)','rgba(200,200,100,0.8)','rgba(255,160,200,0.8)'];
+  const sA = (typeof labelA==='string'&&labelA.length===10)?labelA.slice(5).replace('-','/'): labelA||'A';
+  const sB = (typeof labelB==='string'&&labelB.length===10)?labelB.slice(5).replace('-','/'): labelB||'B';
 
   function acColor(cls, idx){
     return AC_COLORS[(cls||'').toLowerCase()] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length];
@@ -1281,7 +1286,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
       const dispLabel = (typeof label==='string' && label.length===10) ? label.slice(5).replace('-','/'): label;
       const segs = data.map(r => {
         const w = total > 0 ? (getVal(r) / total * 100).toFixed(2) : 0;
-        const pctLabel = +w >= 10 ? `<span style="font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,0.8);overflow:hidden">${(+w).toFixed(0)}%</span>` : '';
+        const pctLabel = +w >= 5 ? `<span style="font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,0.8);overflow:hidden">${(+w).toFixed(0)}%</span>` : '';
         return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden" title="${r.cls}: ${(+w).toFixed(1)}%">${pctLabel}</div>`;
       }).join('');
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
@@ -1292,7 +1297,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     const legend = data.map(r =>
       `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--fg)">
         <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorMap[r.cls]};flex-shrink:0"></span>
-        ${escapeHtml(r.cls)}
+        ${escapeHtml(r.cls)} <span style="color:var(--muted);font-size:9px">(${ta>0?(r.a/ta*100).toFixed(0):0}%→${tb>0?(r.b/tb*100).toFixed(0):0}%)</span>
       </span>`
     ).join('');
     return `<div style="margin-bottom:14px">
@@ -1338,10 +1343,10 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     const theadHtml = `
       <tr>
         <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap;width:70px">分類</th>
-        <th style="text-align:right">${escapeHtml(labelA||'A')}</th>
-        <th style="text-align:right">${escapeHtml(labelB||'B')}</th>
+        <th style="text-align:right">${sA}</th>
+        <th style="text-align:right">${sB}</th>
         <th style="text-align:right">差額</th>
-        <th style="text-align:right">変化率</th>
+        <th style="text-align:right;width:42px">変化率</th>
       </tr>
       <tr>
         <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
@@ -1369,7 +1374,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     return `<div style="margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">${title}</div>
       ${buildStackedBars(data)}
-      <div class="table-wrap"><table style="font-size:12px;table-layout:fixed;width:100%">
+      <div class="table-wrap"><table class="cmp-sum-tbl" style="font-size:11px;table-layout:fixed;width:100%">
         <thead>${theadHtml}</thead>
         <tbody>${tbodyHtml}</tbody>
       </table></div>
