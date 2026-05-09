@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -186,7 +186,7 @@
       /* テーブル */
       #cmpTable{min-width:100%;font-size:11px;table-layout:fixed}
       #cmpTable th,#cmpTable td{padding:4px 3px}
-      #cmpTable th:first-child,#cmpTable td:first-child{width:65px;max-width:65px}
+      #cmpTable th:first-child,#cmpTable td:first-child{width:55px;max-width:55px}
       #cmpTable td{white-space:nowrap;overflow:hidden}
       #cmpTable td.sticky-col{white-space:normal;word-break:break-all;overflow:visible}
 
@@ -421,12 +421,12 @@
         <thead>
           <tr>
           <tr>
-            <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
-            <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap">分類</th>
-            <th class="sortable" data-key="b" style="text-align:right">B</th>
+            <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:55px;width:55px">銘柄</th>
+            <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap;width:70px">分類</th>
+            <th class="sortable" data-key="b" style="text-align:right">${escapeHtml(labelB||'B')}</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
             <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
-          </tr><tr><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(A)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(B)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">変化(pp)</th><th></th>
+          </tr><tr><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">変化(pp)</th><th></th>
         <tbody></tbody>
       </table>
     </div>
@@ -1160,7 +1160,7 @@ function drawCmp(){
 
   sortRows(rows, cmpSort.key, cmpSort.dir);
   renderCmpSummaries(rows, ta, tb, a, b);
-  renderCmpTable(rows);
+  renderCmpTable(rows, a, b);
 }
 
 function sortRows(arr, key, dir){
@@ -1173,7 +1173,7 @@ function sortRows(arr, key, dir){
   });
 }
 
-function renderCmpTable(rows){
+function renderCmpTable(rows, labelA, labelB){
   const thead = $('cmpTable').querySelector('thead');
   const tbody = $('cmpTable').querySelector('tbody');
 
@@ -1184,16 +1184,16 @@ function renderCmpTable(rows){
 
   thead.innerHTML = `
     <tr>
-      <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
-      <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap">分類</th>
-      <th class="sortable" data-key="a" style="text-align:right">A</th>
-      <th class="sortable" data-key="b" style="text-align:right">B</th>
+      <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:55px;width:55px">銘柄</th>
+      <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap;width:38px">分類</th>
+      <th class="sortable" data-key="a" style="text-align:right">${escapeHtml(labelA||'A')}</th>
+      <th class="sortable" data-key="b" style="text-align:right">${escapeHtml(labelB||'B')}</th>
       <th class="sortable" data-key="diff" style="text-align:right">差額</th>
       <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
     </tr>
     <tr>
-      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(A)</th>
-      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(B)</th>
+      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
+      <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
       <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">変化(pp)</th>
       <th></th>
     </tr>`;
@@ -1210,7 +1210,7 @@ function renderCmpTable(rows){
     const badge = r.a===0 ? ' <span style="font-size:10px;color:var(--muted)">NEW</span>'
                 : r.b===0 ? ' <span style="font-size:10px;color:var(--muted)">EXIT</span>' : '';
     return `<tr style="${rowBg}">
-      <td rowspan="2" class="sticky-col" style="vertical-align:middle;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+      <td rowspan="2" class="sticky-col" style="vertical-align:middle;max-width:55px;overflow:hidden;white-space:normal;word-break:break-all">
         <span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span>${badge}
       </td>
       <td rowspan="2" style="vertical-align:middle;font-size:11px;color:${col};white-space:nowrap;font-weight:500">${escapeHtml(ac)}</td>
@@ -1281,11 +1281,12 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
       const dispLabel = (typeof label==='string' && label.length===10) ? label.slice(5).replace('-','/'): label;
       const segs = data.map(r => {
         const w = total > 0 ? (getVal(r) / total * 100).toFixed(2) : 0;
-        return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0" title="${r.cls}: ${(+w).toFixed(1)}%"></div>`;
+        const pctLabel = +w >= 10 ? `<span style="font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,0.8);overflow:hidden">${(+w).toFixed(0)}%</span>` : '';
+        return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden" title="${r.cls}: ${(+w).toFixed(1)}%">${pctLabel}</div>`;
       }).join('');
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
         <span style="font-size:10px;color:var(--muted);width:30px;flex-shrink:0;text-align:right;white-space:nowrap">${escapeHtml(dispLabel)}</span>
-        <div style="flex:1;height:16px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">${segs}</div>
+        <div style="flex:1;height:20px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">${segs}</div>
       </div>`;
     }
     const legend = data.map(r =>
@@ -1336,15 +1337,15 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     if(!data.length) return '';
     const theadHtml = `
       <tr>
-        <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap">分類</th>
-        <th style="text-align:right">A日額</th>
-        <th style="text-align:right">B日額</th>
+        <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap;width:70px">分類</th>
+        <th style="text-align:right">${escapeHtml(labelA||'A')}</th>
+        <th style="text-align:right">${escapeHtml(labelB||'B')}</th>
         <th style="text-align:right">差額</th>
         <th style="text-align:right">変化率</th>
       </tr>
       <tr>
-        <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(A)</th>
-        <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率(B)</th>
+        <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
+        <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">占有率</th>
         <th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted);padding-top:0">変化(pp)</th>
         <th></th>
       </tr>`;
@@ -1368,7 +1369,7 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     return `<div style="margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">${title}</div>
       ${buildStackedBars(data)}
-      <div class="table-wrap"><table style="font-size:12px">
+      <div class="table-wrap"><table style="font-size:12px;table-layout:fixed;width:100%">
         <thead>${theadHtml}</thead>
         <tbody>${tbodyHtml}</tbody>
       </table></div>
