@@ -186,7 +186,9 @@
       /* テーブル */
       #cmpTable{min-width:100%;font-size:11px;table-layout:fixed}
       #cmpTable th,#cmpTable td{padding:4px 3px}
-      #cmpTable th:first-child,#cmpTable td:first-child{width:40px;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      #cmpTable th:first-child,#cmpTable td:first-child{width:65px;max-width:65px}
+      #cmpTable td{white-space:nowrap;overflow:hidden}
+      #cmpTable td.sticky-col{white-space:normal;word-break:break-all;overflow:visible}
 
       /* 銘柄分析（base の min-width:800px を上書き） */
       #analTable{min-width:100%;font-size:11px}
@@ -421,7 +423,7 @@
           <tr>
             <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
             <th rowspan="2" class="sticky-col-head" style="vertical-align:middle;white-space:nowrap">分類</th>
-            <th class="sortable" data-key="b" style="text-align:right">B日額</th>
+            <th class="sortable" data-key="b" style="text-align:right">B</th>
             <th class="sortable" data-key="diff" style="text-align:right">差額</th>
             <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
           </tr><tr><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(A)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">占有率(B)</th><th style="text-align:right;font-size:10px;font-weight:400;color:var(--muted)">変化(pp)</th><th></th>
@@ -1184,8 +1186,8 @@ function renderCmpTable(rows){
     <tr>
       <th rowspan="2" class="sortable sticky-col-head" data-key="Name" style="vertical-align:middle;max-width:100px;width:100px">銘柄</th>
       <th rowspan="2" class="sortable" data-key="AssetClass" style="vertical-align:middle;white-space:nowrap">分類</th>
-      <th class="sortable" data-key="a" style="text-align:right">A日額</th>
-      <th class="sortable" data-key="b" style="text-align:right">B日額</th>
+      <th class="sortable" data-key="a" style="text-align:right">A</th>
+      <th class="sortable" data-key="b" style="text-align:right">B</th>
       <th class="sortable" data-key="diff" style="text-align:right">差額</th>
       <th class="sortable" data-key="pct" style="text-align:right">変化率</th>
     </tr>
@@ -1276,12 +1278,13 @@ function renderCmpSummaries(rows, ta, tb, labelA, labelB){
     const colorMap = {};
     data.forEach((r, i) => { colorMap[r.cls] = acColor(r.cls, i); });
     function oneBar(label, getVal, total){
+      const dispLabel = (typeof label==='string' && label.length===10) ? label.slice(5).replace('-','/'): label;
       const segs = data.map(r => {
         const w = total > 0 ? (getVal(r) / total * 100).toFixed(2) : 0;
         return `<div style="width:${w}%;background:${colorMap[r.cls]};height:100%;flex-shrink:0" title="${r.cls}: ${(+w).toFixed(1)}%"></div>`;
       }).join('');
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-        <span style="font-size:10px;color:var(--muted);width:28px;flex-shrink:0;text-align:right">${escapeHtml(label)}</span>
+        <span style="font-size:10px;color:var(--muted);width:30px;flex-shrink:0;text-align:right;white-space:nowrap">${escapeHtml(dispLabel)}</span>
         <div style="flex:1;height:16px;border-radius:3px;overflow:hidden;background:#1e2638;display:flex">${segs}</div>
       </div>`;
     }
