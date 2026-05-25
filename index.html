@@ -2184,7 +2184,7 @@ function renderSelPie(selTotal, totalVal, selDate){
 // ===================== Export =====================
 function exportCsv(){
   if(RAW.length===0) return;
-  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','AmountOriginal','FxRate'];
+  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
   const rows = RAW.map(r=>header.map(h=>r[h]??''));
   const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
@@ -2432,7 +2432,9 @@ $("clearTrades").addEventListener('click', ()=>{
   $('clearTrades').disabled = true;
   if(dcaChart){ dcaChart.destroy(); dcaChart=null; }
   if(patDayChart){ patDayChart.destroy(); patDayChart=null; }
-  if(patWeekChart){ patWeekChart.destroy(); patWeekChart=null; }
+  if(patMonthChart){ patMonthChart.destroy(); patMonthChart=null; }
+  if(patTickerChart){ patTickerChart.destroy(); patTickerChart=null; }
+  if(patCumChart){ patCumChart.destroy(); patCumChart=null; }
   if(DATES.length) drawLine();
 });
 $("dcaStock").addEventListener('change', drawDCA);
