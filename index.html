@@ -236,6 +236,7 @@
       <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
       <button id="clearData" class="btn-danger" disabled>データをクリア</button>
+      <button id="importScreenshot">📷 スクショ取り込み</button>
       <span id="savedBadge" class="saved-badge">● 保存済み</span>
       <span class="muted" style="color:rgba(255,255,255,0.2)">│</span>
       <input id="tradeFile" type="file" accept=".csv" />
@@ -626,6 +627,84 @@
   </div>
 </div>
 
+<!-- スクショ取り込み モーダル -->
+<div id="importModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header">
+      <h2 class="modal-title">スクショから取り込み</h2>
+      <button id="importClose" class="modal-close">✕</button>
+    </div>
+
+    <!-- API キー設定 -->
+    <div style="background:#0e121a;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">⚙ Gemini API キー設定</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="geminiKeyInput" type="password" placeholder="AIza..." style="flex:1;background:#1a1a1a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:8px;font-size:13px" />
+        <button id="geminiKeySave" style="padding:8px 14px;font-size:13px">保存</button>
+      </div>
+      <div id="geminiKeyStatus" class="muted" style="font-size:12px;margin-top:6px"></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">
+        ※ キー未取得の場合は <span style="color:var(--accent)">https://aistudio.google.com/apikey</span> で無料取得（LocalStorage保存）
+      </div>
+    </div>
+
+    <!-- 取り込み -->
+    <div style="border-top:1px solid var(--line);padding-top:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">── 取り込み ──</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+          日付:
+          <input type="date" id="importDate" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+          画像（複数選択可）:
+          <input type="file" id="importImages" accept="image/*" multiple style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px" />
+        </label>
+        <div id="importFileCount" class="muted" style="font-size:12px"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button id="importAnalyze" disabled>解析</button>
+      </div>
+    </div>
+
+    <!-- 解析中 -->
+    <div id="importLoading" style="display:none;padding:12px;text-align:center;color:var(--muted);font-size:13px">
+      ⏳ Gemini に問い合わせ中...
+    </div>
+
+    <!-- エラー -->
+    <div id="importError" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:10px;font-size:12px;color:#fca5a5;margin-bottom:12px;white-space:pre-wrap"></div>
+
+    <!-- 解析結果プレビュー -->
+    <div id="importPreview" style="display:none">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">── 解析結果プレビュー ──</div>
+      <div id="importWarning" style="display:none;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px;font-size:12px;color:#fde68a;margin-bottom:10px"></div>
+      <div class="table-wrap" style="max-height:320px;overflow-y:auto">
+        <table id="importPreviewTable" style="font-size:12px;min-width:520px">
+          <thead style="position:sticky;top:0;background:var(--panel);z-index:1">
+            <tr>
+              <th style="width:32px;text-align:center"><input type="checkbox" id="importChkAll" style="accent-color:var(--accent)"></th>
+              <th style="text-align:left">銘柄</th>
+              <th style="text-align:right">数量</th>
+              <th style="text-align:right">USD</th>
+              <th style="text-align:right">円</th>
+              <th style="text-align:left">口座</th>
+              <th style="width:24px;text-align:center"></th>
+            </tr>
+          </thead>
+          <tbody id="importPreviewBody"></tbody>
+        </table>
+      </div>
+      <div id="importDupWarnings" style="display:none;margin-top:10px;font-size:12px"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+        <button id="importCancel" class="btn-ghost">キャンセル</button>
+        <button id="importSaveAll">すべて保存</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
 
@@ -747,15 +826,17 @@ $('mapCancel').addEventListener('click', ()=>{ $('mapModal').style.display = 'no
 
 function applyMappingAndProcess(mapping, rawRows){
   RAW = rawRows.map(r => ({
-    Date:      normalizeDate(r[mapping.Date] || ''),
-    Name:      (r[mapping.Name] || '').trim(),
-    Amount:    Number(String(r[mapping.Amount] || '0').replace(/,/g,'')) || 0,
-    AssetClass:(r[mapping.AssetClass] || '').trim(),
-    Currency:  (r[mapping.Currency] || '').trim(),
-    StockType: (r[mapping.StockType] || '').trim(),
-    Account:   (r[mapping.Account] || '').trim(),
-    Quantity:  Number(String(r[mapping.Quantity || 'Quantity'] || '0').replace(/,/g,'')) || 0,
-    CostBasis: Number(String(r[mapping.CostBasis || 'CostBasis'] || '0').replace(/,/g,'')) || 0
+    Date:           normalizeDate(r[mapping.Date] || ''),
+    Name:           (r[mapping.Name] || '').trim(),
+    Amount:         Number(String(r[mapping.Amount] || '0').replace(/,/g,'')) || 0,
+    AssetClass:     (r[mapping.AssetClass] || '').trim(),
+    Currency:       (r[mapping.Currency] || '').trim(),
+    StockType:      (r[mapping.StockType] || '').trim(),
+    Account:        (r[mapping.Account] || '').trim(),
+    Quantity:       Number(String(r[mapping.Quantity || 'Quantity'] || '0').replace(/,/g,'')) || 0,
+    CostBasis:      Number(String(r[mapping.CostBasis || 'CostBasis'] || '0').replace(/,/g,'')) || 0,
+    AmountOriginal: (r['AmountOriginal'] !== undefined && r['AmountOriginal'] !== '') ? (Number(String(r['AmountOriginal']).replace(/,/g,'')) || '') : '',
+    FxRate:         (r['FxRate']         !== undefined && r['FxRate']         !== '') ? (Number(String(r['FxRate']        ).replace(/,/g,'')) || '') : ''
   })).filter(r => r.Date);
   buildIndexes();
   onDataReady();
@@ -774,11 +855,13 @@ function buildIndexes(){
     m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
     if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
     const mm = META_BY_DATE_NAME.get(r.Date);
-    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0});
+    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0, AmountOriginal:0, FxRate:''});
     const _m = mm.get(r.Name);
     const _qty = r.Quantity || 0; const _cost = _qty * (r.CostBasis || 0);
     _m.Quantity += _qty; _m._totalCost += _cost;
     _m.CostBasis = _m.Quantity > 0 ? _m._totalCost / _m.Quantity : 0;
+    if(r.AmountOriginal) _m.AmountOriginal = (_m.AmountOriginal || 0) + Number(r.AmountOriginal);
+    if(r.FxRate) _m.FxRate = r.FxRate;
   }
   DATES.sort();
 }
@@ -2101,7 +2184,7 @@ function renderSelPie(selTotal, totalVal, selDate){
 // ===================== Export =====================
 function exportCsv(){
   if(RAW.length===0) return;
-  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
+  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','AmountOriginal','FxRate'];
   const rows = RAW.map(r=>header.map(h=>r[h]??''));
   const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
@@ -2461,6 +2544,300 @@ $("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").v
 // 起動時: 保存データがあれば自動復元
 tryLoadSaved();
 tryLoadTrades();
+
+// ===================== スクショ取り込み =====================
+const LS_GEMINI_KEY = 'gemini_api_key_v1';
+let _importedRows = [];
+
+$('importScreenshot').addEventListener('click', ()=>{
+  const savedKey = localStorage.getItem(LS_GEMINI_KEY) || '';
+  $('geminiKeyInput').value = savedKey ? '(保存済み)' : '';
+  $('geminiKeyInput').type = 'password';
+  $('geminiKeyStatus').textContent = savedKey ? '✓ APIキーが保存されています' : '';
+  $('importDate').value = new Date().toISOString().slice(0,10);
+  $('importPreview').style.display = 'none';
+  $('importError').style.display = 'none';
+  $('importLoading').style.display = 'none';
+  $('importFileCount').textContent = '';
+  $('importImages').value = '';
+  $('importAnalyze').disabled = true;
+  $('importModal').style.display = 'flex';
+});
+
+$('importClose').addEventListener('click', ()=>{ $('importModal').style.display='none'; });
+$('importModal').addEventListener('click', e=>{ if(e.target===$('importModal')) $('importModal').style.display='none'; });
+$('importCancel').addEventListener('click', ()=>{ $('importModal').style.display='none'; });
+
+$('geminiKeyInput').addEventListener('focus', ()=>{
+  if($('geminiKeyInput').value === '(保存済み)'){
+    $('geminiKeyInput').value = localStorage.getItem(LS_GEMINI_KEY) || '';
+    $('geminiKeyInput').type = 'text';
+  }
+});
+
+$('geminiKeySave').addEventListener('click', ()=>{
+  const key = $('geminiKeyInput').value.trim();
+  if(!key || key === '(保存済み)'){
+    $('geminiKeyStatus').textContent = 'キーを入力してください';
+    return;
+  }
+  localStorage.setItem(LS_GEMINI_KEY, key);
+  $('geminiKeyInput').value = '(保存済み)';
+  $('geminiKeyInput').type = 'password';
+  $('geminiKeyStatus').textContent = '✓ 保存しました';
+});
+
+$('importImages').addEventListener('change', ()=>{
+  const n = $('importImages').files.length;
+  $('importFileCount').textContent = n > 0 ? `選択中: ${n}枚` : '';
+  $('importAnalyze').disabled = n === 0;
+});
+
+$('importChkAll').addEventListener('change', ()=>{
+  const checked = $('importChkAll').checked;
+  document.querySelectorAll('#importPreviewBody .import-row-chk').forEach(cb=>{ cb.checked = checked; });
+});
+
+$('importAnalyze').addEventListener('click', runGeminiAnalysis);
+$('importSaveAll').addEventListener('click', saveImportedRows);
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function runGeminiAnalysis(){
+  const apiKey = localStorage.getItem(LS_GEMINI_KEY);
+  if(!apiKey){
+    showImportError('Gemini APIキーが設定されていません。上のキー設定欄から保存してください。');
+    return;
+  }
+  const files = $('importImages').files;
+  if(!files.length){ showImportError('画像を選択してください。'); return; }
+
+  for(const f of files){
+    if(f.size > 20 * 1024 * 1024){
+      showImportError(`「${f.name}」が大きすぎます（20MB上限）。`);
+      return;
+    }
+  }
+
+  $('importLoading').style.display = '';
+  $('importError').style.display = 'none';
+  $('importPreview').style.display = 'none';
+  $('importAnalyze').disabled = true;
+
+  try{
+    const b64s = await Promise.all([...files].map(f=>fileToBase64(f)));
+    const PROMPT = `【SBI証券スマホアプリ「口座管理」画面 → CSV変換ルール】
+
+画像はSBI証券スマホアプリの口座管理 → 保有証券画面。
+個別株(米国株および日本株)の情報を抽出し、Markdown表のみを出力してください(他の説明文は不要)。
+
+【スコープ】
+- 対象: 画面に表示されている全ての個別株
+- 対象外: 投資信託、預り金、暗号資産、年金など
+- 画像が複数アップロードされた場合: 重複する銘柄+口座区分は1行にまとめる(値は最後の画像を優先)
+
+【出力列】
+Date, Name, Amount, AssetClass, Currency, StockType, Account, Quantity, CostBasis, AmountOriginal, FxRate
+
+【共通ルール】
+- Date: 画像の「参考為替レート 米ドル/円 = 158.86 (2026/05/25 10:01)」のような表記から日付を取り出し、YYYY/M/D 形式
+- AssetClass: stock
+- StockType: Equity
+- Account: 銘柄名の下に表示されている「特定」または「NISA」
+- 数値はカンマ区切り
+- FxRate: 画面上部の参考為替レート(例: 158.86)
+
+【米国株の場合】
+- Name: ティッカーシンボル(例: AMZN, ASTS, RKLB)
+- Currency: USD
+- Quantity: 「保有数量」欄の数値
+- CostBasis: 「取得単価(¥)」欄の数値(円、画面の値そのまま)
+- AmountOriginal: 「現在値」(USD) × Quantity を計算(小数2桁)
+- Amount: 「評価額(¥)」欄の数値(円、画面の値そのまま)
+- FxRate: 参考為替レート
+
+【日本株の場合】
+- Name: 銘柄コード(4桁数字)もしくは略称
+- Currency: JPY
+- Quantity, CostBasis, Amount: 画面の値そのまま
+- AmountOriginal: 空欄
+- FxRate: 空欄
+
+【整合性チェック】
+- 出力したUSD銘柄の Amount 合計が、画面上部の「株式総評価額」と一致すること
+- ズレがあれば出力末尾に【警告: 集計が一致しません ◯◯円差】と明記
+
+【注意】
+- 同じ銘柄が「特定」と「NISA」両方にある場合は、別の行として出力
+- 含み損益は出力しない
+- 出力は Markdown 表のみ。前後に説明文を含めない`;
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{
+            parts:[
+              {text: PROMPT},
+              ...[...files].map((f,i)=>({ inline_data:{ mime_type: f.type || 'image/jpeg', data: b64s[i] }}))
+            ]
+          }]
+        })
+      }
+    );
+
+    if(!resp.ok){
+      const err = await resp.json().catch(()=>null);
+      if(resp.status===401||resp.status===403) throw new Error('キーが無効です。再設定してください。');
+      if(resp.status===429) throw new Error('しばらく待ってから再試行してください（レート制限）。');
+      throw new Error(`APIエラー ${resp.status}: ${err?.error?.message||'不明なエラー'}`);
+    }
+
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    parseGeminiResponse(text);
+
+  }catch(e){
+    showImportError(e.message || '不明なエラーが発生しました');
+  }finally{
+    $('importLoading').style.display = 'none';
+    $('importAnalyze').disabled = false;
+  }
+}
+
+function parseMdTable(text){
+  const lines = text.split('\n').filter(l=>l.trim().startsWith('|'));
+  if(lines.length < 2) return { headers:[], rows:[] };
+  const headers = lines[0].replace(/^\||\|$/g,'').split('|').map(h=>h.trim());
+  const dataLines = lines.slice(1).filter(l=>!/^[\|\s\-:]+$/.test(l));
+  const rows = dataLines.map(line=>{
+    const parts = line.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+    if(parts.length !== headers.length) return null;
+    const obj = {};
+    headers.forEach((h,i)=>{ obj[h] = parts[i]; });
+    return obj;
+  }).filter(Boolean);
+  return { headers, rows };
+}
+
+function parseGeminiResponse(text){
+  const warnMatch = text.match(/【警告[：:][^】]*】/);
+  const warning = warnMatch ? warnMatch[0] : '';
+
+  const { rows } = parseMdTable(text);
+  if(!rows.length){
+    showImportError('Gemini からの応答を解析できませんでした。\n\n' + text);
+    return;
+  }
+
+  const numCols = ['Amount','Quantity','CostBasis','AmountOriginal','FxRate'];
+  const parsed = rows.map(r=>{
+    for(const col of numCols){
+      if(r[col] !== undefined && r[col] !== ''){
+        r[col] = Number(String(r[col]).replace(/,/g,'')) || 0;
+      }
+    }
+    if(r.Date) r.Date = normalizeDate(r.Date);
+    return r;
+  }).filter(r=>r.Date && r.Name);
+
+  if(!parsed.length){
+    showImportError('有効な行が0件でした。\n\n' + text);
+    return;
+  }
+
+  _importedRows = parsed;
+  renderImportPreview(parsed, warning);
+}
+
+function importDupKey(r){ return `${r.Date}_${r.Name}_${r.Account}_${r.StockType}`; }
+
+function renderImportPreview(rows, warning){
+  const existingKeys = new Set(RAW.map(r=>importDupKey(r)));
+  const $body = $('importPreviewBody');
+  $body.innerHTML = rows.map((r,i)=>{
+    const isDup = existingKeys.has(importDupKey(r));
+    const existingRow = isDup ? RAW.find(e=>importDupKey(e)===importDupKey(r)) : null;
+    const usdStr = r.AmountOriginal ? `$${Number(r.AmountOriginal).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—';
+    const jpyStr = r.Amount ? yen(r.Amount) : '—';
+    const rowStyle = isDup ? 'background:rgba(251,191,36,0.07)' : '';
+    return `<tr data-idx="${i}" style="${rowStyle}">
+      <td style="text-align:center"><input type="checkbox" class="import-row-chk" data-idx="${i}" data-dup="${isDup}" ${isDup?'':'checked'} style="accent-color:var(--accent)"></td>
+      <td style="text-align:left">${escapeHtml(r.Name||'')}</td>
+      <td style="text-align:right">${r.Quantity||'—'}</td>
+      <td style="text-align:right">${usdStr}</td>
+      <td style="text-align:right">${jpyStr}</td>
+      <td style="text-align:left">${escapeHtml(r.Account||'')}</td>
+      <td style="text-align:center;color:#fbbf24">${isDup?'⚠':''}</td>
+    </tr>`;
+  }).join('');
+
+  const dups = rows.filter(r=>existingKeys.has(importDupKey(r)));
+  const $dupWarn = $('importDupWarnings');
+  if(dups.length){
+    $dupWarn.innerHTML = '<div style="color:#fbbf24">⚠ 重複警告:</div>' +
+      dups.map(r=>{
+        const ex = RAW.find(e=>importDupKey(e)===importDupKey(r));
+        return `<div style="color:#fde68a;margin-left:8px">「${r.Date} の ${r.Name}（${r.Account||''}）は既に存在」${ex?' '+yen(ex.Amount)+' → '+yen(r.Amount):''}</div>`;
+      }).join('');
+    $dupWarn.style.display = '';
+  } else {
+    $dupWarn.style.display = 'none';
+    $dupWarn.innerHTML = '';
+  }
+
+  const $warn = $('importWarning');
+  if(warning){ $warn.textContent = warning; $warn.style.display = ''; }
+  else $warn.style.display = 'none';
+
+  $('importChkAll').checked = rows.length > 0 && rows.every(r=>!existingKeys.has(importDupKey(r)));
+  $('importPreview').style.display = '';
+  $('importError').style.display = 'none';
+}
+
+function saveImportedRows(){
+  document.querySelectorAll('#importPreviewBody .import-row-chk').forEach(cb=>{
+    if(!cb.checked) return;
+    const row = _importedRows[Number(cb.dataset.idx)];
+    if(cb.dataset.dup === 'true'){
+      const key = importDupKey(row);
+      const existIdx = RAW.findIndex(e=>importDupKey(e)===key);
+      if(existIdx >= 0) RAW.splice(existIdx, 1);
+    }
+    RAW.push({
+      Date:           row.Date || '',
+      Name:           row.Name || '',
+      Amount:         Number(row.Amount) || 0,
+      AssetClass:     row.AssetClass || 'stock',
+      Currency:       row.Currency || '',
+      StockType:      row.StockType || 'Equity',
+      Account:        row.Account || '',
+      Quantity:       Number(row.Quantity) || 0,
+      CostBasis:      Number(row.CostBasis) || 0,
+      AmountOriginal: (row.AmountOriginal !== undefined && row.AmountOriginal !== '') ? Number(row.AmountOriginal) : '',
+      FxRate:         (row.FxRate         !== undefined && row.FxRate         !== '') ? Number(row.FxRate)         : ''
+    });
+  });
+  buildIndexes();
+  saveToStorage();
+  onDataReady();
+  $('importModal').style.display = 'none';
+}
+
+function showImportError(msg){
+  $('importError').textContent = msg;
+  $('importError').style.display = '';
+  $('importPreview').style.display = 'none';
+}
 </script>
 </body>
 </html>
