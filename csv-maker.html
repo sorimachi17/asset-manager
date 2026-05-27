@@ -800,11 +800,19 @@ function sendToIndex() {
     if (r.FxRate         != null && r.FxRate         !== '') obj.FxRate         = r.FxRate;
     return obj;
   }).filter(r => r.Date);
+  // 書き込み前に最大限スペースを確保（csv_maker のローカルデータを解放）
+  localStorage.removeItem('asset_mgr_v1');
+  localStorage.removeItem(SK.rows);
+  localStorage.removeItem(SK.draft);
+  localStorage.removeItem(SK.names);
   try {
-    localStorage.removeItem('asset_mgr_v1');
     localStorage.setItem('asset_mgr_v1', JSON.stringify(converted));
   } catch(e) {
-    alert('保存に失敗しました。ストレージ容量が不足しているか、プライベートブラウズモードでは保存できません。\n(' + e.message + ')');
+    // 失敗したらメモリから csv_maker データを復元
+    try { persist(SK.rows,   rows);       } catch(_) {}
+    try { persist(SK.draft,  draft);      } catch(_) {}
+    try { persist(SK.names,  [...names]); } catch(_) {}
+    alert('保存に失敗しました。データが大きすぎます。\n(' + e.message + ')');
     return;
   }
   if (confirm('✓ ' + converted.length + ' 行を反映しました。\n資産管理ページを開きますか？')) {
