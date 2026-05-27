@@ -171,6 +171,7 @@
     <div class="top-bar">
       <input type="date" id="draftDate" />
       <button class="btn-ghost" onclick="copyFromPrevious()">前回からコピー</button>
+      <button class="btn-ghost" style="color:#ef4444;border-color:#7f1d1d" onclick="clearDraft()">クリア</button>
       <span class="draft-status" id="draftStatus"></span>
     </div>
 
@@ -207,7 +208,6 @@
 
     <div class="commit-bar" id="commitBar" style="display:none">
       <button class="btn-success" onclick="commitDraft()">↓ CSVデータに追加</button>
-      <button class="btn-ghost" style="color:#ef4444;border-color:#7f1d1d" onclick="clearDraft()">クリア</button>
       <span class="commit-count" id="commitCount"></span>
     </div>
   </div>
