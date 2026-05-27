@@ -123,6 +123,22 @@
     .s-card-meta { font-size: 11px; color: var(--muted); }
     .s-card-del  { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
 
+    /* スピナー非表示 */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { display: none; -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+    /* 日付グループ行 */
+    .grp-row { cursor: pointer; }
+    .grp-row:hover td { background: rgba(255,255,255,.06) !important; }
+    .grp-row td { padding: 8px 8px; border-bottom: 1px solid var(--line); }
+    .grp-date { font-size: 13px; font-weight: 600; }
+    .grp-meta { font-size: 11px; color: var(--muted); margin-left: 8px; }
+    .grp-total { font-size: 13px; color: var(--accent); text-align: right; }
+    .grp-arrow { font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+    .data-row td { font-size: 12px; background: rgba(0,0,0,.15); }
+    .data-row:last-of-type td { border-bottom: 2px solid var(--line); }
+
     /* ── Responsive ── */
     @media (max-width: 600px) {
       h1 { font-size: 14px; }
@@ -246,6 +262,7 @@ let rows    = load(SK.rows,    []);
 let presets = load(SK.presets, []);
 let names   = new Set(load(SK.names, []));
 let draft   = load(SK.draft,   { date:'', items:[] });
+let expandedDates = new Set(); // 展開中の日付グループ
 
 // 既存データの日付・数値を正規化（過去に取り込んだ不正形式を修正）
 (function sanitizeRows() {
@@ -529,37 +546,99 @@ function renderAll() {
   renderDataCards();
 }
 
+function toggleDateGroup(date) {
+  if (expandedDates.has(date)) expandedDates.delete(date);
+  else expandedDates.add(date);
+  renderTable();
+}
+
 function renderTable() {
   const tb = document.getElementById('tableBody');
   if (!rows.length) { tb.innerHTML = `<tr><td colspan="12" class="empty-msg">データがありません</td></tr>`; return; }
-  tb.innerHTML = rows.map((r,i) => `
-    <tr>
-      <td><button class="del-btn" onclick="deleteRow(${i})">×</button></td>
-      <td>${e(r.Date)}</td><td>${e(r.Name)}</td>
-      <td style="text-align:right">${e(r.Amount)}</td>
-      <td>${e(r.AssetClass)}</td><td>${e(r.Currency)}</td>
-      <td>${e(r.StockType)}</td><td>${e(r.Account)}</td>
-      <td style="text-align:right">${e(r.Quantity)}</td>
-      <td style="text-align:right">${e(r.CostBasis)}</td>
-      <td style="text-align:right">${e(r.AmountOriginal)}</td>
-      <td style="text-align:right">${e(r.FxRate)}</td>
-    </tr>`).join('');
+
+  // 日付でグループ化（新しい順）
+  const dateMap = new Map();
+  rows.forEach((r, i) => {
+    if (!dateMap.has(r.Date)) dateMap.set(r.Date, []);
+    dateMap.get(r.Date).push({ r, i });
+  });
+  const sortedDates = [...dateMap.keys()].sort().reverse();
+
+  let html = '';
+  for (const date of sortedDates) {
+    const items = dateMap.get(date);
+    const total = items.reduce((s, { r }) => s + (Number(r.Amount) || 0), 0);
+    const isOpen = expandedDates.has(date);
+    const totalStr = total > 0 ? total.toLocaleString('ja-JP') + ' 円' : '—';
+
+    html += `<tr class="grp-row" onclick="toggleDateGroup('${esc(date)}')">
+      <td></td>
+      <td colspan="2"><span class="grp-date">${esc(date)}</span><span class="grp-meta">${items.length} 銘柄</span></td>
+      <td class="grp-total">${totalStr}</td>
+      <td colspan="7"></td>
+      <td class="grp-arrow">${isOpen ? '▲ 閉じる' : '▼ 展開'}</td>
+    </tr>`;
+
+    if (isOpen) {
+      html += items.map(({ r, i }) => `
+        <tr class="data-row">
+          <td><button class="del-btn" onclick="event.stopPropagation();deleteRow(${i})">×</button></td>
+          <td>${e(r.Date)}</td><td>${e(r.Name)}</td>
+          <td style="text-align:right">${e(r.Amount)}</td>
+          <td>${e(r.AssetClass)}</td><td>${e(r.Currency)}</td>
+          <td>${e(r.StockType)}</td><td>${e(r.Account)}</td>
+          <td style="text-align:right">${e(r.Quantity)}</td>
+          <td style="text-align:right">${e(r.CostBasis)}</td>
+          <td style="text-align:right">${e(r.AmountOriginal)}</td>
+          <td style="text-align:right">${e(r.FxRate)}</td>
+        </tr>`).join('');
+    }
+  }
+  tb.innerHTML = html;
 }
 
 function renderDataCards() {
   const el = document.getElementById('dataCardList');
   if (!rows.length) { el.innerHTML = `<p class="empty-msg">データがありません</p>`; return; }
-  el.innerHTML = rows.map((r,i) => {
-    const meta = [r.AssetClass, r.Currency, r.StockType, r.Account].filter(Boolean).join(' · ');
-    const amt  = r.Amount !== '' ? Number(r.Amount).toLocaleString('ja-JP') + ' 円' : '—';
-    return `
-      <div class="s-card">
+
+  const dateMap = new Map();
+  rows.forEach((r, i) => {
+    if (!dateMap.has(r.Date)) dateMap.set(r.Date, []);
+    dateMap.get(r.Date).push({ r, i });
+  });
+  const sortedDates = [...dateMap.keys()].sort().reverse();
+
+  el.innerHTML = sortedDates.map(date => {
+    const items = dateMap.get(date);
+    const total = items.reduce((s, { r }) => s + (Number(r.Amount) || 0), 0);
+    const isOpen = expandedDates.has(date);
+    const totalStr = total > 0 ? total.toLocaleString('ja-JP') + ' 円' : '—';
+    const detail = isOpen ? items.map(({ r, i }) => {
+      const meta = [r.AssetClass, r.Currency, r.StockType, r.Account].filter(Boolean).join(' · ');
+      const amt  = r.Amount !== '' ? Number(r.Amount).toLocaleString('ja-JP') + ' 円' : '—';
+      return `<div class="s-card">
         <div>
           <div class="s-card-name">${esc(r.Name||'—')}</div>
           <div class="s-card-amt">${amt}</div>
-          <div class="s-card-meta">${esc(r.Date)}${meta ? ' · '+esc(meta) : ''}</div>
+          <div class="s-card-meta">${meta}</div>
         </div>
         <button class="s-card-del" onclick="deleteRow(${i})">削除</button>
+      </div>`;
+    }).join('') : '';
+    return `
+      <div style="border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden">
+        <div onclick="toggleDateGroup('${esc(date)}')"
+             style="display:flex;justify-content:space-between;align-items:center;padding:10px 13px;cursor:pointer;background:#1a1a1a">
+          <div>
+            <span style="font-weight:600;font-size:14px">${esc(date)}</span>
+            <span style="color:var(--muted);font-size:11px;margin-left:8px">${items.length}銘柄</span>
+          </div>
+          <div style="text-align:right">
+            <div style="color:var(--accent);font-size:14px;font-weight:700">${totalStr}</div>
+            <div style="color:var(--muted);font-size:11px">${isOpen ? '▲ 閉じる' : '▼ 展開'}</div>
+          </div>
+        </div>
+        ${isOpen ? `<div style="padding:8px">${detail}</div>` : ''}
       </div>`;
   }).join('');
 }
