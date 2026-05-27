@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CSV作成ツール</title>
   <style>
-    :root { --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;--accent:#3b82f6;--row-h:34px; }
+    :root { --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;--accent:#3b82f6;--row-h:30px; }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; }
 
@@ -38,12 +38,12 @@
     input[type="date"]:focus { outline: none; border-color: var(--accent); }
     .draft-status { font-size: 12px; color: var(--muted); margin-left: 4px; }
 
-    /* ── PC: Excel grid ── */
-    .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 8px; }
-    .grid-tbl { width: 100%; border-collapse: collapse; min-width: 980px; }
+    /* ── Excel grid ── */
+    .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+    .grid-tbl { width: 100%; border-collapse: collapse; min-width: 800px; }
     .grid-tbl th {
       background: #0d1017; color: var(--muted); font-size: 11px; font-weight: 600;
-      padding: 6px 8px; text-align: left; border-right: 1px solid var(--line);
+      padding: 5px 7px; text-align: left; border-right: 1px solid var(--line);
       border-bottom: 2px solid var(--line); white-space: nowrap; user-select: none;
     }
     .grid-tbl th:first-child { width: 28px; text-align: center; padding: 0; }
@@ -53,10 +53,17 @@
     .grid-tbl tr:hover td { background: rgba(255,255,255,.025); }
     .grid-tbl tr.add-row td { border-top: 1px solid var(--line); border-bottom: none; }
 
+    /* 銘柄・×列をスクロール時に固定 */
+    .grid-tbl th:first-child, .grid-tbl td:first-child { position: sticky; left: 0; z-index: 2; }
+    .grid-tbl th:nth-child(2), .grid-tbl td:nth-child(2) { position: sticky; left: 28px; z-index: 2; }
+    .grid-tbl th:first-child, .grid-tbl th:nth-child(2) { background: #0d1017; }
+    .grid-tbl td:first-child, .grid-tbl td:nth-child(2) { background: #111; }
+    .grid-tbl tr:hover td:first-child, .grid-tbl tr:hover td:nth-child(2) { background: #1c2030; }
+
     .c-in, .c-sel {
       display: block; width: 100%; height: var(--row-h);
       background: transparent; border: none; color: var(--fg);
-      font-size: 13px; padding: 0 8px; border-radius: 0;
+      font-size: 12px; padding: 0 7px; border-radius: 0;
       -webkit-appearance: none; appearance: none;
     }
     .c-in:focus, .c-sel:focus {
@@ -151,7 +158,8 @@
     @media (max-width: 600px) {
       h1 { font-size: 14px; }
       .wrap { padding: 10px; gap: 10px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
-      .card { padding: 10px; overflow: hidden; } /* グリッドをカード内に閉じ込める */
+      .card { padding: 10px; }
+      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 14px; height: 38px; }
       .top-bar { flex-wrap: wrap; gap: 6px; }
       /* モバイルでもグリッド表示（横スクロール） */
       .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; height: 40px; }
@@ -200,8 +208,6 @@
             <th style="min-width:130px">Account</th>
             <th class="r" style="min-width:80px">Quantity</th>
             <th class="r" style="min-width:90px">CostBasis</th>
-            <th class="r" style="min-width:110px">AmountOriginal</th>
-            <th class="r" style="min-width:70px">FxRate</th>
           </tr>
         </thead>
         <tbody id="gridBody"></tbody>
@@ -239,7 +245,7 @@
           <tr>
             <th></th><th>Date</th><th>Name</th><th>Amount</th><th>AssetClass</th>
             <th>Currency</th><th>StockType</th><th>Account</th>
-            <th>Quantity</th><th>CostBasis</th><th>AmountOriginal</th><th>FxRate</th>
+            <th>Quantity</th><th>CostBasis</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -260,7 +266,7 @@
 </datalist>
 
 <script>
-const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
+const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis'];
 const AC_DEFAULT  = ['stock','cash','bond','reit','fund','crypto','other'];
 const CURRENCIES  = ['JPY','USD','EUR','GBP','AUD','HKD','CNY','SGD'];
 const SK = { rows:'csv_maker_rows', draft:'csv_maker_draft', presets:'csv_maker_presets', names:'csv_maker_names' };
@@ -276,7 +282,7 @@ let expandedDates = new Set(); // 展開中の日付グループ
 
 // 既存データの日付・数値を正規化（過去に取り込んだ不正形式を修正）
 (function sanitizeRows() {
-  const NUM_FS = ['Amount','Quantity','CostBasis','AmountOriginal','FxRate'];
+  const NUM_FS = ['Amount','Quantity','CostBasis'];
   let dirty = false;
   rows.forEach(r => {
     // 日付: スラッシュ → ハイフン
@@ -351,7 +357,7 @@ function copyFromPrevious() {
     draft.items = rows.filter(r => r.Date === latestDate).map(r => ({ ...r, _prev: r.Amount }));
     setStatus('✓ ' + latestDate + ' からコピー（' + draft.items.length + '銘柄）');
   } else if (presets.length) {
-    draft.items = presets.map(p => ({ Name:p.Name, Amount:'', _prev:'', AssetClass:p.AssetClass||'', Currency:p.Currency||'JPY', StockType:p.StockType||'', Account:p.Account||'', Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:'' }));
+    draft.items = presets.map(p => ({ Name:p.Name, Amount:'', _prev:'', AssetClass:p.AssetClass||'', Currency:p.Currency||'JPY', StockType:p.StockType||'', Account:p.Account||'', Quantity:'', CostBasis:'' }));
     setStatus('プリセットから読み込み（' + draft.items.length + '銘柄）');
   } else {
     alert('コピー元データがありません。\nまず「＋ 行を追加」でデータを入力・追加してください。');
@@ -363,7 +369,7 @@ function copyFromPrevious() {
 
 // ── 行追加 / 削除 ─────────────────────────────────────────
 function addRow() {
-  draft.items.push({ Name:'', Amount:'', _prev:'', AssetClass:'', Currency:'JPY', StockType:'', Account:'', Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:'' });
+  draft.items.push({ Name:'', Amount:'', _prev:'', AssetClass:'', Currency:'JPY', StockType:'', Account:'', Quantity:'', CostBasis:'' });
   persist(SK.draft, draft);
   renderDraft();
   setTimeout(() => {
@@ -411,7 +417,7 @@ function setStatus(msg) { document.getElementById('draftStatus').textContent = m
 
 // ── Enter で行追加 ────────────────────────────────────────
 function onGridKey(e, i, df) {
-  if (e.key === 'Enter' && df === 'FxRate') { e.preventDefault(); addRow(); }
+  if (e.key === 'Enter' && df === 'CostBasis') { e.preventDefault(); addRow(); }
 }
 
 // ── 描画 ──────────────────────────────────────────────────
@@ -458,8 +464,6 @@ function cc(it, field) {
     case 'Amount':         return 'c-active';
     case 'Quantity':
     case 'CostBasis':      return isCash ? 'c-na' : 'c-active';
-    case 'AmountOriginal':
-    case 'FxRate':         return isForeign ? 'c-active' : 'c-na';
     case 'StockType':
     case 'Account':        return isCash ? 'c-na' : '';
     default:               return '';
@@ -498,19 +502,11 @@ function renderGrid() {
       <td class="${cc(it,'CostBasis')}">
         <input class="c-in" type="number" value="${esc(it.CostBasis)}" placeholder="0" step="any"
            inputmode="decimal" data-di="${i}" data-df="CostBasis"
-           oninput="onCell(${i},'CostBasis',this.value)" /></td>
-      <td class="${cc(it,'AmountOriginal')}">
-        <input class="c-in" type="number" value="${esc(it.AmountOriginal)}" placeholder="0" step="any"
-           inputmode="decimal" data-di="${i}" data-df="AmountOriginal"
-           oninput="onCell(${i},'AmountOriginal',this.value)" /></td>
-      <td class="${cc(it,'FxRate')}">
-        <input class="c-in" type="number" value="${esc(it.FxRate)}" placeholder="0" step="any"
-           inputmode="decimal" data-di="${i}" data-df="FxRate"
-           oninput="onCell(${i},'FxRate',this.value)"
-           onkeydown="onGridKey(event,${i},'FxRate')" /></td>
+           oninput="onCell(${i},'CostBasis',this.value)"
+           onkeydown="onGridKey(event,${i},'CostBasis')" /></td>
     </tr>`).join('');
   document.getElementById('gridBody').innerHTML = rows2 +
-    `<tr class="add-row"><td colspan="12"><button class="add-row-btn" onclick="addRow()">＋ 行を追加</button></td></tr>`;
+    `<tr class="add-row"><td colspan="10"><button class="add-row-btn" onclick="addRow()">＋ 行を追加</button></td></tr>`;
 }
 
 function renderMobile() {
@@ -552,7 +548,7 @@ function renderMobile() {
                  list="accountList" oninput="onCell(${i},'Account',this.value)" />
         </div>
       </div>
-      <div class="m-grid3">
+      <div class="m-grid2">
         <div>
           <label class="m-label">Quantity</label>
           <input class="m-in" type="number" value="${esc(it.Quantity)}" placeholder="0" step="any"
@@ -563,16 +559,6 @@ function renderMobile() {
           <input class="m-in" type="number" value="${esc(it.CostBasis)}" placeholder="0" step="any"
                  inputmode="decimal" oninput="onCell(${i},'CostBasis',this.value)" />
         </div>
-        <div>
-          <label class="m-label">AmountOriginal</label>
-          <input class="m-in" type="number" value="${esc(it.AmountOriginal)}" placeholder="0" step="any"
-                 inputmode="decimal" oninput="onCell(${i},'AmountOriginal',this.value)" />
-        </div>
-      </div>
-      <div>
-        <label class="m-label">FxRate</label>
-        <input class="m-in" type="number" value="${esc(it.FxRate)}" placeholder="0" step="any"
-               inputmode="decimal" oninput="onCell(${i},'FxRate',this.value)" />
       </div>
     </div>`;
   }).join('');
@@ -593,7 +579,7 @@ function toggleDateGroup(date) {
 
 function renderTable() {
   const tb = document.getElementById('tableBody');
-  if (!rows.length) { tb.innerHTML = `<tr><td colspan="12" class="empty-msg">データがありません</td></tr>`; return; }
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="10" class="empty-msg">データがありません</td></tr>`; return; }
 
   // 日付でグループ化（新しい順）
   const dateMap = new Map();
@@ -614,7 +600,7 @@ function renderTable() {
       <td></td>
       <td colspan="2"><span class="grp-date">${esc(date)}</span><span class="grp-meta">${items.length} 銘柄</span></td>
       <td class="grp-total">${totalStr}</td>
-      <td colspan="7"></td>
+      <td colspan="5"></td>
       <td class="grp-arrow">${isOpen ? '▲ 閉じる' : '▼ 展開'}</td>
     </tr>`;
 
@@ -707,7 +693,7 @@ function importCsv(input) {
     const missing = FIELDS.filter(f => f !== 'Date' && colIdx[f] === undefined && ['Amount','Name'].includes(f));
     if (missing.length) { alert('必須列が見つかりません: ' + missing.join(', ')); return; }
 
-    const NUM_FIELDS = new Set(['Amount','Quantity','CostBasis','AmountOriginal','FxRate']);
+    const NUM_FIELDS = new Set(['Amount','Quantity','CostBasis']);
 
     // "2026/5/9" → "2026-05-09"
     function normDate(s) {
