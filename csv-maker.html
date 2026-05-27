@@ -139,29 +139,13 @@
     .data-row td { font-size: 12px; background: rgba(0,0,0,.15); }
     .data-row:last-of-type td { border-bottom: 2px solid var(--line); }
 
-    /* 銘柄列をスクロール時に固定 */
-    .grid-tbl th:nth-child(2),
-    .grid-tbl td:nth-child(2) {
-      position: sticky; left: 28px; z-index: 3;
-      background: #0d1017;
-    }
-    .grid-tbl td:nth-child(2) { background: #111; }
-    .grid-tbl tr:hover td:nth-child(2) { background: #1a1f2b; }
-    .grid-tbl th:first-child,
-    .grid-tbl td:first-child {
-      position: sticky; left: 0; z-index: 3;
-      background: #0d1017;
-    }
-    .grid-tbl td:first-child { background: #111; }
-    .grid-tbl tr:hover td:first-child { background: #1a1f2b; }
-
     /* ── Responsive ── */
     @media (max-width: 600px) {
       h1 { font-size: 14px; }
       .wrap { padding: 10px; gap: 10px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
-      .card { padding: 10px; }
+      .card { padding: 10px; overflow: hidden; } /* グリッドをカード内に閉じ込める */
       .top-bar { flex-wrap: wrap; gap: 6px; }
-      /* モバイルでもグリッド表示 */
+      /* モバイルでもグリッド表示（横スクロール） */
       .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; height: 40px; }
       .m-wrap { display: none !important; }
       .commit-bar { flex-direction: column; }
@@ -169,6 +153,7 @@
       .sec-title { flex-direction: column; align-items: flex-start; }
       .toolbar { width: 100%; }
       .toolbar button { flex: 1; }
+      /* CSVデータはカード表示 */
       .table-wrap { display: none; }
       .data-card-list { display: block; }
     }
