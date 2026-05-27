@@ -23,7 +23,7 @@
       padding-bottom: max(32px, env(safe-area-inset-bottom));
       display: grid; gap: 12px;
     }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
 
     button { border: none; color: #fff; padding: 8px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; white-space: nowrap; }
     .btn-ghost   { background: #1e2638; border: 1px solid var(--line); }
@@ -174,9 +174,10 @@
       .toolbar button { flex: 1; }
 
       /* 入力グリッド：縦横スクロール＋ヘッダ・左列固定 */
+      :root { --row-h: 44px; }
       .grid-wrap { max-height: 62vh; overflow-y: auto; }
-      .grid-tbl th { font-size: 12px; padding: 6px 7px; }
-      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; height: 44px; }
+      .grid-tbl th { font-size: 12px; padding: 7px 8px; }
+      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; }
       /* スマホ向け列幅（全体幅を抑える） */
       .grid-tbl th:nth-child(2)  { min-width: 130px !important; }
       .grid-tbl th:nth-child(3)  { min-width: 72px  !important; }
