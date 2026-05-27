@@ -39,19 +39,20 @@
     .draft-status { font-size: 12px; color: var(--muted); margin-left: 4px; }
 
     /* ── Excel grid ── */
-    .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
-    .grid-tbl { width: 100%; border-collapse: collapse; min-width: 800px; }
+    .grid-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+    .grid-tbl { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
     .grid-tbl th {
       background: #0d1017; color: var(--muted); font-size: 11px; font-weight: 600;
-      padding: 5px 7px; text-align: left; border-right: 1px solid var(--line);
-      border-bottom: 2px solid var(--line); white-space: nowrap; user-select: none;
+      padding: 5px 7px; text-align: left;
+      border-top: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 2px solid var(--line);
+      white-space: nowrap; user-select: none;
     }
-    .grid-tbl th:first-child { width: 28px; text-align: center; padding: 0; }
+    .grid-tbl th:first-child { width: 28px; text-align: center; padding: 0; border-left: 1px solid var(--line); }
     .grid-tbl th.r { text-align: right; }
     .grid-tbl td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
-    .grid-tbl td:first-child { width: 28px; text-align: center; }
+    .grid-tbl td:first-child { width: 28px; text-align: center; border-left: 1px solid var(--line); }
     .grid-tbl tr:hover td { background: rgba(255,255,255,.025); }
-    .grid-tbl tr.add-row td { border-top: 1px solid var(--line); border-bottom: none; }
+    .grid-tbl tr.add-row td { border-bottom: none; }
 
     /* 銘柄・×列をスクロール時に固定 */
     .grid-tbl th:first-child, .grid-tbl td:first-child { position: sticky; left: 0; z-index: 2; }
