@@ -52,7 +52,7 @@
     .grid-tbl td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
     .grid-tbl td:first-child { width: 28px; text-align: center; border-left: 1px solid var(--line); }
     .grid-tbl tr:hover td { background: rgba(255,255,255,.025); }
-    .grid-tbl tr.add-row td { border-bottom: none; }
+    .grid-tbl tr.add-row td { border-bottom: none; position: static; }
 
     /* 銘柄・×列をスクロール時に固定（横方向） */
     .grid-tbl th:first-child, .grid-tbl td:first-child { position: sticky; left: 0; z-index: 2; }
@@ -784,23 +784,27 @@ function sendToIndex() {
     ? `資産管理アプリに既存データが ${existing.length} 行あります。上書きしてよいですか？`
     : `${rows.length} 行を資産管理アプリに反映します。よろしいですか？`;
   if (!confirm(existMsg)) return;
-  const converted = rows.map(r => ({
-    Date:       r.Date || '',
-    Name:       r.Name || '',
-    Amount:     Number(String(r.Amount  || 0).replace(/,/g,'')) || 0,
-    AssetClass: r.AssetClass || '',
-    Currency:   r.Currency   || '',
-    StockType:  r.StockType  || '',
-    Account:    r.Account    || '',
-    Quantity:   Number(String(r.Quantity  || 0).replace(/,/g,'')) || 0,
-    CostBasis:  Number(String(r.CostBasis || 0).replace(/,/g,'')) || 0,
-    AmountOriginal: '',
-    FxRate: ''
-  })).filter(r => r.Date);
+  const converted = rows.map(r => {
+    const obj = {
+      Date:       r.Date || '',
+      Name:       r.Name || '',
+      Amount:     Number(String(r.Amount  || 0).replace(/,/g,'')) || 0,
+      AssetClass: r.AssetClass || '',
+      Currency:   r.Currency   || '',
+      StockType:  r.StockType  || '',
+      Account:    r.Account    || '',
+      Quantity:   Number(String(r.Quantity  || 0).replace(/,/g,'')) || 0,
+      CostBasis:  Number(String(r.CostBasis || 0).replace(/,/g,'')) || 0,
+    };
+    if (r.AmountOriginal != null && r.AmountOriginal !== '') obj.AmountOriginal = r.AmountOriginal;
+    if (r.FxRate         != null && r.FxRate         !== '') obj.FxRate         = r.FxRate;
+    return obj;
+  }).filter(r => r.Date);
   try {
+    localStorage.removeItem('asset_mgr_v1');
     localStorage.setItem('asset_mgr_v1', JSON.stringify(converted));
   } catch(e) {
-    alert('保存に失敗しました: ' + e.message);
+    alert('保存に失敗しました。ストレージ容量が不足しているか、プライベートブラウズモードでは保存できません。\n(' + e.message + ')');
     return;
   }
   if (confirm('✓ ' + converted.length + ' 行を反映しました。\n資産管理ページを開きますか？')) {
