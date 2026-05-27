@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CSV作成ツール</title>
+  <style>
+    :root {
+      --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;
+      --panel:#151618;--accent:#3b82f6;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; }
+    header { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(17,17,17,.9); backdrop-filter: blur(6px); z-index: 10; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+    h1 { margin: 0; font-size: 18px; }
+    .wrap { max-width: 1300px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    h2 { margin: 0 0 12px; font-size: 15px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; color: var(--muted); }
+    .field label.req::after { content: ' *'; color: #ef4444; }
+    input, select { background: #0e121a; border: 1px solid var(--line); color: var(--fg); padding: 8px 10px; border-radius: 8px; font-size: 14px; width: 100%; }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .form-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    button { border: none; color: #fff; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .btn-primary { background: var(--accent); }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost { background: #1e2638; border: 1px solid var(--line); }
+    .btn-ghost:hover { background: #252d3d; }
+    .btn-danger { background: #7f1d1d; }
+    .btn-danger:hover { background: #991b1b; }
+    .btn-success { background: #15803d; }
+    .btn-success:hover { background: #166534; }
+    .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .count { color: var(--muted); font-size: 12px; margin-left: 6px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 2px 8px; font-size: 16px; line-height: 1; }
+    .del-btn:hover { color: #f87171; }
+    .empty-row td { text-align: center; color: var(--muted); padding: 28px; }
+    .nav-link { color: var(--muted); font-size: 13px; text-decoration: none; }
+    .nav-link:hover { color: var(--fg); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CSV作成ツール</h1>
+  <a class="nav-link" href="index.html">← 資産管理アプリへ</a>
+</header>
+
+<div class="wrap">
+
+  <!-- 入力フォーム -->
+  <div class="card">
+    <h2>行を追加</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label class="req">Date</label>
+        <input type="date" id="fDate" />
+      </div>
+      <div class="field">
+        <label class="req">Name（銘柄名）</label>
+        <input type="text" id="fName" placeholder="例: トヨタ自動車" />
+      </div>
+      <div class="field">
+        <label class="req">Amount（評価額 JPY）</label>
+        <input type="number" id="fAmount" placeholder="0" />
+      </div>
+      <div class="field">
+        <label class="req">AssetClass</label>
+        <select id="fAssetClass">
+          <option value="">選択してください</option>
+          <option value="stock">stock（株式）</option>
+          <option value="cash">cash（現金）</option>
+          <option value="bond">bond（債券）</option>
+          <option value="reit">reit（不動産）</option>
+          <option value="fund">fund（投資信託）</option>
+          <option value="crypto">crypto（暗号資産）</option>
+          <option value="other">other（その他）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="req">Currency</label>
+        <select id="fCurrency">
+          <option value="JPY">JPY</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="AUD">AUD</option>
+          <option value="HKD">HKD</option>
+          <option value="CNY">CNY</option>
+          <option value="SGD">SGD</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>StockType（区分）</label>
+        <input type="text" id="fStockType" placeholder="国内株, ETF, 投信 など" list="stockTypeList" />
+        <datalist id="stockTypeList">
+          <option value="国内株">
+          <option value="外国株">
+          <option value="投資信託">
+          <option value="ETF">
+          <option value="REIT">
+          <option value="個人向け国債">
+          <option value="外国債券">
+          <option value="現金">
+          <option value="MMF">
+        </datalist>
+      </div>
+      <div class="field">
+        <label>Account（口座）</label>
+        <input type="text" id="fAccount" placeholder="例: SBI特定口座" />
+      </div>
+      <div class="field">
+        <label>Quantity（口数・株数）</label>
+        <input type="number" id="fQuantity" placeholder="0" step="any" />
+      </div>
+      <div class="field">
+        <label>CostBasis（取得単価）</label>
+        <input type="number" id="fCostBasis" placeholder="0" step="any" />
+      </div>
+      <div class="field">
+        <label>AmountOriginal（原通貨額）</label>
+        <input type="number" id="fAmountOriginal" placeholder="0" step="any" />
+      </div>
+      <div class="field">
+        <label>FxRate（為替レート）</label>
+        <input type="number" id="fFxRate" placeholder="0" step="any" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addRow()">＋ 行を追加</button>
+      <button class="btn-ghost" onclick="clearForm()">フォームをクリア</button>
+    </div>
+    <p class="hint">* は必須。Enterキーでも追加できます。追加後、銘柄名・金額などはクリアされます（日付・分類・口座は維持）。</p>
+  </div>
+
+  <!-- データテーブル -->
+  <div class="card">
+    <div class="section-title">
+      <h2 style="margin:0">入力済みデータ<span class="count" id="rowCount">0行</span></h2>
+      <div class="toolbar">
+        <button class="btn-success" onclick="downloadCsv()">CSVをダウンロード</button>
+        <button class="btn-danger" onclick="clearAll()">すべて削除</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Date</th>
+            <th>Name</th>
+            <th>Amount</th>
+            <th>AssetClass</th>
+            <th>Currency</th>
+            <th>StockType</th>
+            <th>Account</th>
+            <th>Quantity</th>
+            <th>CostBasis</th>
+            <th>AmountOriginal</th>
+            <th>FxRate</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
+const STORAGE_KEY = 'csv_maker_rows';
+let rows = [];
+try { rows = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(_) { rows = []; }
+
+document.getElementById('fDate').value = new Date().toISOString().slice(0, 10);
+renderTable();
+
+function addRow() {
+  const v = {
+    Date:           document.getElementById('fDate').value,
+    Name:           document.getElementById('fName').value.trim(),
+    Amount:         document.getElementById('fAmount').value,
+    AssetClass:     document.getElementById('fAssetClass').value,
+    Currency:       document.getElementById('fCurrency').value,
+    StockType:      document.getElementById('fStockType').value.trim(),
+    Account:        document.getElementById('fAccount').value.trim(),
+    Quantity:       document.getElementById('fQuantity').value,
+    CostBasis:      document.getElementById('fCostBasis').value,
+    AmountOriginal: document.getElementById('fAmountOriginal').value,
+    FxRate:         document.getElementById('fFxRate').value,
+  };
+
+  if (!v.Date)         { alert('Date を入力してください');       document.getElementById('fDate').focus();       return; }
+  if (!v.Name)         { alert('Name を入力してください');       document.getElementById('fName').focus();       return; }
+  if (v.Amount === '') { alert('Amount を入力してください');     document.getElementById('fAmount').focus();     return; }
+  if (!v.AssetClass)   { alert('AssetClass を選択してください'); document.getElementById('fAssetClass').focus(); return; }
+
+  rows.push(v);
+  save();
+  renderTable();
+
+  // 銘柄固有フィールドをクリア、日付・分類・通貨・区分・口座は維持
+  ['fName','fAmount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('fName').focus();
+}
+
+function deleteRow(i) {
+  rows.splice(i, 1);
+  save();
+  renderTable();
+}
+
+function clearForm() {
+  ['fName','fAmount','fStockType','fAccount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
+    .forEach(id => { document.getElementById(id).value = ''; });
+}
+
+function clearAll() {
+  if (!rows.length) return;
+  if (!confirm(rows.length + '行すべて削除しますか？')) return;
+  rows = [];
+  save();
+  renderTable();
+}
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); } catch(_) {}
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  document.getElementById('rowCount').textContent = rows.length + '行';
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="12">データがありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><button class="del-btn" onclick="deleteRow(${i})" title="削除">×</button></td>
+      <td>${e(r.Date)}</td>
+      <td>${e(r.Name)}</td>
+      <td style="text-align:right">${e(r.Amount)}</td>
+      <td>${e(r.AssetClass)}</td>
+      <td>${e(r.Currency)}</td>
+      <td>${e(r.StockType)}</td>
+      <td>${e(r.Account)}</td>
+      <td style="text-align:right">${e(r.Quantity)}</td>
+      <td style="text-align:right">${e(r.CostBasis)}</td>
+      <td style="text-align:right">${e(r.AmountOriginal)}</td>
+      <td style="text-align:right">${e(r.FxRate)}</td>
+    </tr>
+  `).join('');
+}
+
+function e(v) {
+  if (v === null || v === undefined || v === '') return '<span style="color:var(--muted)">—</span>';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function downloadCsv() {
+  if (!rows.length) { alert('データがありません'); return; }
+  const lines = [FIELDS.join(',')];
+  for (const r of rows) {
+    lines.push(FIELDS.map(f => {
+      const v = String(r[f] ?? '');
+      return (v.includes(',') || v.includes('"') || v.includes('\n'))
+        ? '"' + v.replace(/"/g, '""') + '"'
+        : v;
+    }).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'assets_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+}
+
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') addRow();
+});
+</script>
+
+</body>
+</html>
