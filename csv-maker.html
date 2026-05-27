@@ -247,6 +247,26 @@ let presets = load(SK.presets, []);
 let names   = new Set(load(SK.names, []));
 let draft   = load(SK.draft,   { date:'', items:[] });
 
+// 既存データの日付・数値を正規化（過去に取り込んだ不正形式を修正）
+(function sanitizeRows() {
+  const NUM_FS = ['Amount','Quantity','CostBasis','AmountOriginal','FxRate'];
+  let dirty = false;
+  rows.forEach(r => {
+    // 日付: スラッシュ → ハイフン
+    if (r.Date && /\//.test(r.Date)) {
+      const m = r.Date.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+      if (m) { r.Date = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`; dirty = true; }
+    }
+    // 数値: カンマ除去・NaN → 空文字
+    NUM_FS.forEach(f => {
+      const v = String(r[f] ?? '').replace(/,/g, '').trim();
+      const cleaned = (v === '' || isNaN(Number(v))) ? '' : v;
+      if (cleaned !== String(r[f] ?? '')) { r[f] = cleaned; dirty = true; }
+    });
+  });
+  if (dirty) persist(SK.rows, rows);
+})();
+
 const dateEl = document.getElementById('draftDate');
 dateEl.value = draft.date || new Date().toISOString().slice(0,10);
 if (!draft.date) { draft.date = dateEl.value; persist(SK.draft, draft); }
@@ -386,7 +406,17 @@ function ccMSel(cur, i) {
   const opts = CURRENCIES.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
   return `<select class="m-sel" oninput="onCell(${i},'Currency',this.value)">${opts}</select>`;
 }
-function fmtPrev(v) { return (v!==''&&v!=null) ? Number(v).toLocaleString('ja-JP') : '—'; }
+function fmtPrev(v) {
+  if (v === '' || v == null) return '—';
+  const n = Number(String(v).replace(/,/g, ''));
+  return isNaN(n) ? '—' : n.toLocaleString('ja-JP');
+}
+// 数値フィールドの value 属性用（NaN・カンマ除去）
+function numVal(v) {
+  if (v === '' || v == null) return '';
+  const n = Number(String(v).replace(/,/g, ''));
+  return isNaN(n) ? '' : String(n);
+}
 
 function renderGrid() {
   const rows2 = draft.items.map((it, i) => `
@@ -396,7 +426,7 @@ function renderGrid() {
            list="nameList" data-di="${i}" data-df="Name"
            oninput="onCell(${i},'Name',this.value)" onchange="onNameChange(${i})" /></td>
       <td><div class="c-prev">${fmtPrev(it._prev)}</div></td>
-      <td><input class="c-in" type="number" value="${esc(it.Amount)}" placeholder="0"
+      <td><input class="c-in" type="number" value="${numVal(it.Amount)}" placeholder="0"
            inputmode="decimal" data-di="${i}" data-df="Amount"
            oninput="onCell(${i},'Amount',this.value)" /></td>
       <td><input class="c-in" type="text" value="${esc(it.AssetClass)}" placeholder="stock…"
@@ -440,7 +470,7 @@ function renderMobile() {
         <button class="m-del" onclick="removeRow(${i})">×</button>
       </div>
       <div class="m-prev">${prev}</div>
-      <input class="m-amt" type="number" value="${esc(it.Amount)}" placeholder="今回の評価額（円）"
+      <input class="m-amt" type="number" value="${numVal(it.Amount)}" placeholder="今回の評価額（円）"
              inputmode="decimal" oninput="onCell(${i},'Amount',this.value)" />
       <div class="m-grid2">
         <div>
@@ -559,13 +589,30 @@ function importCsv(input) {
     const missing = FIELDS.filter(f => f !== 'Date' && colIdx[f] === undefined && ['Amount','Name'].includes(f));
     if (missing.length) { alert('必須列が見つかりません: ' + missing.join(', ')); return; }
 
+    const NUM_FIELDS = new Set(['Amount','Quantity','CostBasis','AmountOriginal','FxRate']);
+
+    // "2026/5/9" → "2026-05-09"
+    function normDate(s) {
+      const m = s && s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : (s||'');
+    }
+    // "1,234,567" → "1234567"
+    function normNum(s) {
+      const cleaned = String(s||'').replace(/,/g,'').trim();
+      if (cleaned === '' || isNaN(Number(cleaned))) return '';
+      return cleaned;
+    }
+
     // データ行解析
     const imported = [];
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCsvLine(lines[i]);
       if (cols.every(c => !c.trim())) continue;
       const row = {};
-      FIELDS.forEach(f => { row[f] = colIdx[f] !== undefined ? (cols[colIdx[f]] ?? '') : ''; });
+      FIELDS.forEach(f => {
+        const raw = colIdx[f] !== undefined ? (cols[colIdx[f]] ?? '') : '';
+        row[f] = f === 'Date' ? normDate(raw) : NUM_FIELDS.has(f) ? normNum(raw) : raw;
+      });
       imported.push(row);
     }
     if (!imported.length) { alert('取り込めるデータがありませんでした'); return; }
