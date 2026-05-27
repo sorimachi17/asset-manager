@@ -14,115 +14,145 @@
     header {
       border-bottom: 1px solid var(--line); position: sticky; top: 0;
       background: rgba(17,17,17,.95); backdrop-filter: blur(8px); z-index: 10;
-      padding: 12px 16px;
-      padding-top: max(12px, env(safe-area-inset-top));
+      padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
     h1 { margin: 0; font-size: 18px; white-space: nowrap; }
     .wrap {
-      max-width: 1300px; margin: 0 auto; padding: 16px; display: grid; gap: 14px;
+      max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 14px;
       padding-left: max(16px, env(safe-area-inset-left));
       padding-right: max(16px, env(safe-area-inset-right));
-      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      padding-bottom: max(32px, env(safe-area-inset-bottom));
     }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
     h2 { margin: 0 0 12px; font-size: 15px; }
 
-    /* Form */
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 12px; color: var(--muted); }
-    .field label.req::after { content: ' *'; color: #ef4444; }
-    input, select {
+    /* ── Buttons ────────────────── */
+    button { border: none; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; min-height: 44px; white-space: nowrap; }
+    .btn-primary { background: var(--accent); }
+    .btn-ghost   { background: #1e2638; border: 1px solid var(--line); }
+    .btn-danger  { background: #7f1d1d; }
+    .btn-success { background: #15803d; }
+    .btn-sm { padding: 7px 12px; font-size: 13px; min-height: 36px; }
+
+    /* ── Draft bar ──────────────── */
+    .draft-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    input[type="date"] {
       background: #0e121a; border: 1px solid var(--line); color: var(--fg);
-      padding: 10px 12px; border-radius: 8px; font-size: 16px; width: 100%;
+      padding: 10px 12px; border-radius: 8px; font-size: 16px;
+      -webkit-appearance: none; appearance: none; min-height: 44px;
+    }
+    input[type="date"]:focus { outline: none; border-color: var(--accent); }
+    .draft-status { font-size: 12px; color: var(--muted); }
+
+    /* ── Draft empty ────────────── */
+    .draft-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 0; }
+
+    /* ── Draft table (PC) ───────── */
+    #draftTableWrap { display: none; overflow-x: auto; }
+    .draft-tbl { width: 100%; border-collapse: collapse; }
+    .draft-tbl th {
+      background: #0e121a; color: var(--muted); font-size: 12px; font-weight: 500;
+      padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap;
+    }
+    .draft-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .d-name {
+      background: transparent; border: none; border-bottom: 1px solid var(--line);
+      color: var(--fg); font-size: 14px; width: 170px; padding: 4px;
+    }
+    .d-name:focus { outline: none; border-bottom-color: var(--accent); }
+    .d-amt {
+      background: #0e121a; border: 1px solid var(--line); color: var(--fg);
+      font-size: 15px; padding: 6px 10px; border-radius: 6px; text-align: right;
+      width: 145px; -webkit-appearance: none; appearance: none;
+    }
+    .d-amt:focus { outline: none; border-color: var(--accent); }
+    .d-prev { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; }
+    .d-badge { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 8px; font-size: 18px; line-height: 1; min-height: unset; }
+
+    /* ── Draft cards (mobile) ───── */
+    #draftCardList { display: none; }
+    .d-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+    .d-card:last-child { margin-bottom: 0; }
+    .d-card-top { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .d-card-name {
+      flex: 1; background: #0e121a; border: 1px solid var(--line); color: var(--fg);
+      padding: 10px 12px; border-radius: 8px; font-size: 16px;
+    }
+    .d-card-name:focus { outline: none; border-color: var(--accent); }
+    .d-card-del {
+      flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444;
+      padding: 6px 10px; border-radius: 6px; font-size: 15px; cursor: pointer; min-height: 36px;
+    }
+    .d-card-meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .d-card-prev { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .d-card-amt {
+      width: 100%; background: #0e121a; border: 1px solid var(--line); color: var(--fg);
+      padding: 12px 14px; border-radius: 8px; font-size: 20px; text-align: right;
       -webkit-appearance: none; appearance: none;
     }
-    select {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa4b2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
-    }
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
-    .form-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .d-card-amt:focus { outline: none; border-color: var(--accent); }
+    .d-card-amt::placeholder { font-size: 15px; }
 
-    /* Buttons */
-    button { border: none; color: #fff; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; min-height: 44px; }
-    .btn-primary { background: var(--accent); }
-    .btn-ghost { background: #1e2638; border: 1px solid var(--line); }
-    .btn-danger { background: #7f1d1d; }
-    .btn-success { background: #15803d; }
-
-    /* Presets */
-    .preset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
-    .preset-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .preset-chip {
-      background: #1a2030; border: 1px solid var(--line); color: var(--fg);
-      padding: 7px 12px; border-radius: 20px; cursor: pointer; font-size: 13px;
-      display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
-      -webkit-tap-highlight-color: transparent;
+    /* ── Draft actions ──────────── */
+    .draft-actions {
+      display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+      padding-top: 12px; border-top: 1px solid var(--line);
     }
-    .preset-chip:active { border-color: var(--accent); background: #1e2a42; }
-    .preset-chip-name { font-weight: 500; }
-    .preset-chip-sub { color: var(--muted); font-size: 11px; }
-    .preset-chip-del {
-      background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: 15px; padding: 0 2px; min-height: unset; line-height: 1;
-    }
-    .preset-chip-del:active { color: #ef4444; }
-    .preset-empty { color: var(--muted); font-size: 13px; margin: 0; }
-    .btn-sm { padding: 7px 12px; font-size: 12px; min-height: 36px; }
 
-    /* Section title */
-    .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    /* ── Section title ──────────── */
+    .sec-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
     .count { color: var(--muted); font-size: 12px; margin-left: 6px; }
 
-    /* Desktop table */
+    /* ── Saved data table (PC) ──── */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-    td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
-    tr:hover td { background: rgba(255,255,255,.03); }
-    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 10px; font-size: 18px; line-height: 1; min-height: unset; }
-    .empty-msg { text-align: center; color: var(--muted); padding: 28px; }
+    .data-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-tbl th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .data-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+    .data-tbl tr:hover td { background: rgba(255,255,255,.03); }
+    .data-tbl .del-btn { padding: 2px 8px; font-size: 16px; }
 
-    /* Mobile card list */
-    .card-list { display: none; }
-    .row-card {
+    /* ── Saved data cards (mobile) ─ */
+    .data-card-list { display: none; }
+    .s-card {
       border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
       margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     }
-    .row-card:last-child { margin-bottom: 0; }
-    .row-card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-    .row-card-amount { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
-    .row-card-meta { font-size: 12px; color: var(--muted); line-height: 1.6; }
-    .row-card-del {
-      flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444;
-      padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
-      min-height: 36px; white-space: nowrap;
-    }
-    .row-card-del:active { background: #7f1d1d; }
+    .s-card:last-child { margin-bottom: 0; }
+    .s-card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+    .s-card-amt  { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .s-card-meta { font-size: 12px; color: var(--muted); }
+    .s-card-del  { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; min-height: 36px; }
+    .s-card-del:active { background: #7f1d1d; }
 
+    .empty-msg { text-align: center; color: var(--muted); padding: 28px; }
     .nav-link { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }
-    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; margin-bottom: 0; }
 
+    /* ── Mobile overrides ───────── */
     @media (max-width: 600px) {
       h1 { font-size: 15px; }
-      .wrap { padding: 10px; gap: 10px; }
+      .wrap { padding: 10px; gap: 10px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
       .card { padding: 12px; border-radius: 12px; }
-      .form-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-      .form-actions { gap: 8px; }
-      .form-actions button { flex: 1; }
-      .section-title { flex-direction: column; align-items: flex-start; }
+      .draft-bar { gap: 8px; }
+      .draft-bar .btn-group { display: flex; gap: 8px; flex: 1; }
+      .draft-bar .btn-group button { flex: 1; }
+      /* draft: table hidden → cards visible */
+      #draftTableWrap.show { display: none !important; }
+      #draftCardList.show  { display: block !important; }
+      .draft-actions button { flex: 1; }
+      .sec-title { flex-direction: column; align-items: flex-start; }
       .toolbar { width: 100%; }
       .toolbar button { flex: 1; }
-      .hint { display: none; }
+      /* saved: table hidden → cards visible */
       .table-wrap { display: none; }
-      .card-list { display: block; }
+      .data-card-list { display: block; }
     }
-
-    @media (max-width: 390px) {
-      .form-grid { grid-template-columns: 1fr; }
+    @media (min-width: 601px) {
+      /* draft: table visible → cards hidden */
+      #draftTableWrap.show { display: block !important; }
+      #draftCardList.show  { display: none !important; }
     }
   </style>
 </head>
@@ -135,110 +165,58 @@
 
 <div class="wrap">
 
-  <!-- プリセット -->
+  <!-- ── 日次入力 ─────────────────────────── -->
   <div class="card">
-    <div class="preset-header">
-      <h2 style="margin:0">プリセット</h2>
-      <button class="btn-ghost btn-sm" onclick="savePreset()">＋ 現在の銘柄を登録</button>
+    <h2>日次入力</h2>
+    <div class="draft-bar">
+      <input type="date" id="draftDate" />
+      <div class="btn-group">
+        <button class="btn-ghost" onclick="copyFromPrevious()">前回からコピー</button>
+        <button class="btn-ghost btn-sm" onclick="addDraftRow()">＋ 銘柄を追加</button>
+      </div>
+      <span class="draft-status" id="draftStatus"></span>
     </div>
-    <div class="preset-chips" id="presetChips"></div>
-    <p class="preset-empty" id="presetEmpty">登録なし。銘柄名・AssetClassを入力して「＋ 現在の銘柄を登録」で追加できます。</p>
+
+    <div class="draft-empty" id="draftEmpty">
+      日付を選んで「前回からコピー」するか、「＋ 銘柄を追加」してください。
+    </div>
+
+    <!-- PC -->
+    <div id="draftTableWrap">
+      <table class="draft-tbl">
+        <thead>
+          <tr>
+            <th></th>
+            <th>銘柄</th>
+            <th style="text-align:right">前回</th>
+            <th style="text-align:right">今回（評価額 JPY）</th>
+            <th>分類</th>
+          </tr>
+        </thead>
+        <tbody id="draftTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Mobile -->
+    <div id="draftCardList"></div>
+
+    <div class="draft-actions" id="draftActions" style="display:none">
+      <button class="btn-success" style="flex:2" onclick="commitDraft()">↓ CSVデータに追加</button>
+      <button class="btn-danger btn-sm" onclick="clearDraft()">クリア</button>
+    </div>
   </div>
 
-  <!-- 入力フォーム -->
+  <!-- ── 保存済みデータ ─────────────────────── -->
   <div class="card">
-    <h2>行を追加</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label class="req">Date</label>
-        <input type="date" id="fDate" />
-      </div>
-      <div class="field">
-        <label class="req">Name（銘柄名）</label>
-        <input type="text" id="fName" placeholder="例: トヨタ自動車" list="nameList" autocomplete="off" />
-        <datalist id="nameList"></datalist>
-      </div>
-      <div class="field">
-        <label class="req">Amount（評価額 JPY）</label>
-        <input type="number" id="fAmount" placeholder="0" inputmode="decimal" />
-      </div>
-      <div class="field">
-        <label class="req">AssetClass</label>
-        <select id="fAssetClass">
-          <option value="">選択してください</option>
-          <option value="stock">stock（株式）</option>
-          <option value="cash">cash（現金）</option>
-          <option value="bond">bond（債券）</option>
-          <option value="reit">reit（不動産）</option>
-          <option value="fund">fund（投資信託）</option>
-          <option value="crypto">crypto（暗号資産）</option>
-          <option value="other">other（その他）</option>
-        </select>
-      </div>
-      <div class="field">
-        <label class="req">Currency</label>
-        <select id="fCurrency">
-          <option value="JPY">JPY</option>
-          <option value="USD">USD</option>
-          <option value="EUR">EUR</option>
-          <option value="GBP">GBP</option>
-          <option value="AUD">AUD</option>
-          <option value="HKD">HKD</option>
-          <option value="CNY">CNY</option>
-          <option value="SGD">SGD</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>StockType（区分）</label>
-        <input type="text" id="fStockType" placeholder="国内株, ETF, 投信…" list="stockTypeList" autocomplete="off" />
-        <datalist id="stockTypeList">
-          <option value="国内株"><option value="外国株"><option value="投資信託">
-          <option value="ETF"><option value="REIT"><option value="個人向け国債">
-          <option value="外国債券"><option value="現金"><option value="MMF">
-        </datalist>
-      </div>
-      <div class="field">
-        <label>Account（口座）</label>
-        <input type="text" id="fAccount" placeholder="例: SBI特定口座" list="accountList" autocomplete="off" />
-        <datalist id="accountList"></datalist>
-      </div>
-      <div class="field">
-        <label>Quantity（口数・株数）</label>
-        <input type="number" id="fQuantity" placeholder="0" step="any" inputmode="decimal" />
-      </div>
-      <div class="field">
-        <label>CostBasis（取得単価）</label>
-        <input type="number" id="fCostBasis" placeholder="0" step="any" inputmode="decimal" />
-      </div>
-      <div class="field">
-        <label>AmountOriginal（原通貨額）</label>
-        <input type="number" id="fAmountOriginal" placeholder="0" step="any" inputmode="decimal" />
-      </div>
-      <div class="field">
-        <label>FxRate（為替レート）</label>
-        <input type="number" id="fFxRate" placeholder="0" step="any" inputmode="decimal" />
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-primary" onclick="addRow()">＋ 行を追加</button>
-      <button class="btn-ghost" onclick="clearForm()">クリア</button>
-    </div>
-    <p class="hint">* は必須。Enterキーでも追加。追加後は銘柄名・金額をクリア、日付・分類・口座は維持。</p>
-  </div>
-
-  <!-- データ -->
-  <div class="card">
-    <div class="section-title">
-      <h2 style="margin:0">入力済みデータ<span class="count" id="rowCount">0行</span></h2>
+    <div class="sec-title">
+      <h2 style="margin:0">CSVデータ<span class="count" id="rowCount">0行</span></h2>
       <div class="toolbar">
         <button class="btn-success" onclick="downloadCsv()">CSVダウンロード</button>
-        <button class="btn-danger" onclick="clearAll()">すべて削除</button>
+        <button class="btn-danger btn-sm" onclick="clearAll()">すべて削除</button>
       </div>
     </div>
-
-    <!-- Desktop: table -->
     <div class="table-wrap">
-      <table>
+      <table class="data-tbl">
         <thead>
           <tr>
             <th></th>
@@ -250,163 +228,235 @@
         <tbody id="tableBody"></tbody>
       </table>
     </div>
-
-    <!-- Mobile: card list -->
-    <div class="card-list" id="cardList"></div>
+    <div class="data-card-list" id="dataCardList"></div>
   </div>
 
 </div>
 
+<datalist id="nameList"></datalist>
+
 <script>
 const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
-const SK = { rows:'csv_maker_rows', last:'csv_maker_last', presets:'csv_maker_presets', names:'csv_maker_names', accs:'csv_maker_accounts' };
+const SK = {
+  rows:'csv_maker_rows', draft:'csv_maker_draft',
+  presets:'csv_maker_presets', names:'csv_maker_names', accs:'csv_maker_accounts'
+};
 
 function load(key, def) { try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? def; } catch(_) { return def; } }
 function persist(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(_) {} }
 
-let rows    = load(SK.rows, []);
+let rows    = load(SK.rows,    []);
 let presets = load(SK.presets, []);
 let names   = new Set(load(SK.names, []));
-let accs    = new Set(load(SK.accs,  []));
-const last  = load(SK.last, {});
+let draft   = load(SK.draft,   { date: '', items: [] });
 
-// 前回値を復元
-document.getElementById('fDate').value        = new Date().toISOString().slice(0, 10);
-document.getElementById('fAssetClass').value  = last.AssetClass || '';
-document.getElementById('fCurrency').value    = last.Currency   || 'JPY';
-document.getElementById('fStockType').value   = last.StockType  || '';
-document.getElementById('fAccount').value     = last.Account    || '';
+// 初期化
+const dateEl = document.getElementById('draftDate');
+dateEl.value = draft.date || new Date().toISOString().slice(0, 10);
+if (!draft.date) { draft.date = dateEl.value; persist(SK.draft, draft); }
+
+dateEl.addEventListener('change', function () {
+  draft.date = this.value;
+  persist(SK.draft, draft);
+});
 
 updateNameList();
-updateAccountList();
-renderPresets();
+renderDraft();
 renderAll();
 
-// ── 行追加 ──────────────────────────────
-function addRow() {
-  const v = getForm();
-  if (!v.Date)         { alert('Date を入力してください');       document.getElementById('fDate').focus();       return; }
-  if (!v.Name)         { alert('Name を入力してください');       document.getElementById('fName').focus();       return; }
-  if (v.Amount === '') { alert('Amount を入力してください');     document.getElementById('fAmount').focus();     return; }
-  if (!v.AssetClass)   { alert('AssetClass を選択してください'); document.getElementById('fAssetClass').focus(); return; }
+// ── 前回からコピー ───────────────────────────
+function copyFromPrevious() {
+  syncDraftFromDOM();
+  const date = dateEl.value;
+  if (!date) { alert('日付を選択してください'); return; }
+  if (draft.items.length > 0 && !confirm('現在の下書きを上書きしますか？')) return;
 
-  rows.push(v);
-  names.add(v.Name);
-  if (v.Account) accs.add(v.Account);
+  const allDates = [...new Set(rows.map(r => r.Date))].sort();
+  const prevDate = allDates.filter(d => d < date).pop();
+
+  if (prevDate) {
+    draft.items = rows
+      .filter(r => r.Date === prevDate)
+      .map(r => ({ ...r, _prev: r.Amount }));
+    setStatus(prevDate + ' からコピーしました（' + draft.items.length + '銘柄）');
+  } else if (presets.length) {
+    draft.items = presets.map(p => ({
+      Name: p.Name, Amount: '', _prev: '',
+      AssetClass: p.AssetClass || '', Currency: p.Currency || 'JPY',
+      StockType: p.StockType || '', Account: p.Account || '',
+      Quantity: '', CostBasis: '', AmountOriginal: '', FxRate: ''
+    }));
+    setStatus('プリセットから読み込みました（' + draft.items.length + '銘柄）');
+  } else {
+    alert('コピー元のデータがありません。\n先に「＋ 銘柄を追加」でデータを入力してください。');
+    return;
+  }
+
+  draft.date = date;
+  persist(SK.draft, draft);
+  renderDraft();
+}
+
+// ── 銘柄を追加 ────────────────────────────
+function addDraftRow() {
+  syncDraftFromDOM();
+  draft.date = dateEl.value || new Date().toISOString().slice(0, 10);
+  draft.items.push({
+    Name: '', Amount: '', _prev: '',
+    AssetClass: '', Currency: 'JPY', StockType: '', Account: '',
+    Quantity: '', CostBasis: '', AmountOriginal: '', FxRate: ''
+  });
+  persist(SK.draft, draft);
+  renderDraft();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.d-name, .d-card-name');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeDraftRow(i) {
+  syncDraftFromDOM();
+  draft.items.splice(i, 1);
+  persist(SK.draft, draft);
+  renderDraft();
+}
+
+// ── 銘柄名変更 → 自動補完 ─────────────────
+function onNameChange(i) {
+  const inp = document.querySelector(`[data-di="${i}"][data-df="Name"]`);
+  if (!inp) return;
+  const val = inp.value.trim();
+  draft.items[i].Name = val;
+
+  const preset = presets.find(p => p.Name === val);
+  const hist   = [...rows].reverse().find(r => r.Name === val);
+  const src    = preset || hist;
+  if (src) {
+    draft.items[i].AssetClass = src.AssetClass || '';
+    draft.items[i].Currency   = src.Currency   || 'JPY';
+    draft.items[i].StockType  = src.StockType  || '';
+    draft.items[i].Account    = src.Account    || '';
+    const badge = document.getElementById('db' + i);
+    if (badge) badge.textContent = [src.AssetClass, src.Currency].filter(Boolean).join(' · ');
+  }
+  persist(SK.draft, draft);
+}
+
+// ── DOM → draft 同期 ──────────────────────
+function syncDraftFromDOM() {
+  document.querySelectorAll('[data-di]').forEach(el => {
+    const i = Number(el.dataset.di);
+    const f = el.dataset.df;
+    if (draft.items[i] !== undefined) draft.items[i][f] = el.value;
+  });
+}
+
+// ── CSVデータに追加 ───────────────────────
+function commitDraft() {
+  syncDraftFromDOM();
+  const date = dateEl.value;
+  if (!date) { alert('日付を選択してください'); return; }
+
+  const valid = draft.items.filter(item => item.Name && item.Amount !== '');
+  if (!valid.length) { alert('銘柄名と評価額を入力してください'); return; }
+
+  const newRows = valid.map(({ _prev, ...item }) => ({ ...item, Date: date }));
+  rows.push(...newRows);
+  newRows.forEach(r => { if (r.Name) names.add(r.Name); });
 
   persist(SK.rows,  rows);
   persist(SK.names, [...names]);
-  persist(SK.accs,  [...accs]);
-  persist(SK.last,  { AssetClass: v.AssetClass, Currency: v.Currency, StockType: v.StockType, Account: v.Account });
 
+  draft.items = [];
+  persist(SK.draft, draft);
+  setStatus(newRows.length + '行を追加しました');
   updateNameList();
-  updateAccountList();
-  renderAll();
-
-  ['fName','fAmount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
-    .forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('fName').focus();
-}
-
-function getForm() {
-  return {
-    Date:           document.getElementById('fDate').value,
-    Name:           document.getElementById('fName').value.trim(),
-    Amount:         document.getElementById('fAmount').value,
-    AssetClass:     document.getElementById('fAssetClass').value,
-    Currency:       document.getElementById('fCurrency').value,
-    StockType:      document.getElementById('fStockType').value.trim(),
-    Account:        document.getElementById('fAccount').value.trim(),
-    Quantity:       document.getElementById('fQuantity').value,
-    CostBasis:      document.getElementById('fCostBasis').value,
-    AmountOriginal: document.getElementById('fAmountOriginal').value,
-    FxRate:         document.getElementById('fFxRate').value,
-  };
-}
-
-function deleteRow(i) {
-  rows.splice(i, 1);
-  persist(SK.rows, rows);
+  renderDraft();
   renderAll();
 }
 
-function clearForm() {
-  ['fName','fAmount','fStockType','fAccount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
-    .forEach(id => { document.getElementById(id).value = ''; });
+function clearDraft() {
+  if (draft.items.length && !confirm('下書きをクリアしますか？')) return;
+  draft.items = [];
+  persist(SK.draft, draft);
+  setStatus('');
+  renderDraft();
 }
 
-function clearAll() {
-  if (!rows.length) return;
-  if (!confirm(rows.length + '行すべて削除しますか？')) return;
-  rows = [];
-  persist(SK.rows, rows);
-  renderAll();
+function setStatus(msg) {
+  document.getElementById('draftStatus').textContent = msg;
 }
 
-// ── プリセット ───────────────────────────
-function savePreset() {
-  const v = getForm();
-  if (!v.Name)       { alert('Name を入力してください'); document.getElementById('fName').focus(); return; }
-  if (!v.AssetClass) { alert('AssetClass を選択してください'); return; }
-  const existing = presets.findIndex(p => p.Name === v.Name);
-  if (existing >= 0) {
-    if (!confirm('「' + v.Name + '」のプリセットを上書きしますか？')) return;
-    presets.splice(existing, 1);
-  }
-  presets.push({ Name: v.Name, AssetClass: v.AssetClass, Currency: v.Currency, StockType: v.StockType, Account: v.Account });
-  persist(SK.presets, presets);
-  renderPresets();
+// ── Draft 描画 ────────────────────────────
+function renderDraft() {
+  const empty   = document.getElementById('draftEmpty');
+  const tWrap   = document.getElementById('draftTableWrap');
+  const cList   = document.getElementById('draftCardList');
+  const actions = document.getElementById('draftActions');
+  const has = draft.items.length > 0;
+
+  empty.style.display   = has ? 'none' : '';
+  actions.style.display = has ? '' : 'none';
+  tWrap.classList.toggle('show', has);
+  cList.classList.toggle('show', has);
+
+  if (!has) return;
+  renderDraftTable();
+  renderDraftCards();
 }
 
-function applyPreset(i) {
-  const p = presets[i];
-  document.getElementById('fName').value       = p.Name;
-  document.getElementById('fAssetClass').value = p.AssetClass;
-  document.getElementById('fCurrency').value   = p.Currency   || 'JPY';
-  document.getElementById('fStockType').value  = p.StockType  || '';
-  document.getElementById('fAccount').value    = p.Account    || '';
-  document.getElementById('fAmount').focus();
+function fmt(v) {
+  if (v === '' || v === undefined || v === null) return '—';
+  return Number(v).toLocaleString('ja-JP') + ' 円';
 }
 
-function deletePreset(i) {
-  presets.splice(i, 1);
-  persist(SK.presets, presets);
-  renderPresets();
+function renderDraftTable() {
+  document.getElementById('draftTbody').innerHTML = draft.items.map((item, i) => {
+    const badge = [item.AssetClass, item.Currency].filter(Boolean).join(' · ');
+    return `
+      <tr>
+        <td><button class="del-btn" onclick="removeDraftRow(${i})">×</button></td>
+        <td>
+          <input class="d-name" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
+                 list="nameList" data-di="${i}" data-df="Name" onchange="onNameChange(${i})" />
+          <div class="d-badge" id="db${i}">${esc(badge)}</div>
+        </td>
+        <td class="d-prev">${fmt(item._prev)}</td>
+        <td>
+          <input class="d-amt" type="number" value="${esc(item.Amount)}" placeholder="0"
+                 inputmode="decimal" data-di="${i}" data-df="Amount" />
+        </td>
+        <td class="d-badge">${esc(item.AssetClass)}</td>
+      </tr>`;
+  }).join('');
 }
 
-function renderPresets() {
-  const chips = document.getElementById('presetChips');
-  const empty = document.getElementById('presetEmpty');
-  if (!presets.length) {
-    chips.innerHTML = '';
-    empty.style.display = '';
-    return;
-  }
-  empty.style.display = 'none';
-  chips.innerHTML = presets.map((p, i) => `
-    <div class="preset-chip" onclick="applyPreset(${i})">
-      <span class="preset-chip-name">${esc(p.Name)}</span>
-      <span class="preset-chip-sub">${esc(p.AssetClass)}</span>
-      <button class="preset-chip-del" onclick="event.stopPropagation();deletePreset(${i})" title="削除">×</button>
-    </div>
-  `).join('');
+function renderDraftCards() {
+  document.getElementById('draftCardList').innerHTML = draft.items.map((item, i) => {
+    const meta = [item.AssetClass, item.Currency, item.StockType].filter(Boolean).join(' · ');
+    const prev = (item._prev !== '' && item._prev !== undefined)
+      ? '前回: ' + fmt(item._prev) : '新規';
+    return `
+      <div class="d-card">
+        <div class="d-card-top">
+          <input class="d-card-name" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
+                 list="nameList" data-di="${i}" data-df="Name" onchange="onNameChange(${i})" />
+          <button class="d-card-del" onclick="removeDraftRow(${i})">×</button>
+        </div>
+        <div class="d-card-meta" id="db${i}">${esc(meta) || '分類未設定'}</div>
+        <div class="d-card-prev">${prev}</div>
+        <input class="d-card-amt" type="number" value="${esc(item.Amount)}"
+               placeholder="今回の評価額（円）" inputmode="decimal"
+               data-di="${i}" data-df="Amount" />
+      </div>`;
+  }).join('');
 }
 
-// ── オートコンプリートリスト ─────────────
-function updateNameList() {
-  document.getElementById('nameList').innerHTML =
-    [...names].map(n => `<option value="${esc(n)}">`).join('');
-}
-function updateAccountList() {
-  document.getElementById('accountList').innerHTML =
-    [...accs].map(a => `<option value="${esc(a)}">`).join('');
-}
-
-// ── 描画 ────────────────────────────────
+// ── 保存済みデータ描画 ─────────────────────
 function renderAll() {
   document.getElementById('rowCount').textContent = rows.length + '行';
   renderTable();
-  renderCards();
+  renderDataCards();
 }
 
 function renderTable() {
@@ -417,7 +467,7 @@ function renderTable() {
   }
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
-      <td><button class="del-btn" onclick="deleteRow(${i})" title="削除">×</button></td>
+      <td><button class="del-btn" onclick="deleteRow(${i})">×</button></td>
       <td>${e(r.Date)}</td><td>${e(r.Name)}</td>
       <td style="text-align:right">${e(r.Amount)}</td>
       <td>${e(r.AssetClass)}</td><td>${e(r.Currency)}</td>
@@ -426,12 +476,11 @@ function renderTable() {
       <td style="text-align:right">${e(r.CostBasis)}</td>
       <td style="text-align:right">${e(r.AmountOriginal)}</td>
       <td style="text-align:right">${e(r.FxRate)}</td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
 
-function renderCards() {
-  const el = document.getElementById('cardList');
+function renderDataCards() {
+  const el = document.getElementById('dataCardList');
   if (!rows.length) {
     el.innerHTML = `<p class="empty-msg">データがありません</p>`;
     return;
@@ -440,16 +489,51 @@ function renderCards() {
     const meta = [r.AssetClass, r.Currency, r.StockType, r.Account].filter(Boolean).join(' · ');
     const amt  = r.Amount !== '' ? Number(r.Amount).toLocaleString('ja-JP') + ' 円' : '—';
     return `
-      <div class="row-card">
+      <div class="s-card">
         <div>
-          <div class="row-card-name">${esc(r.Name || '—')}</div>
-          <div class="row-card-amount">${amt}</div>
-          <div class="row-card-meta">${esc(r.Date)}${meta ? ' · ' + esc(meta) : ''}</div>
+          <div class="s-card-name">${esc(r.Name || '—')}</div>
+          <div class="s-card-amt">${amt}</div>
+          <div class="s-card-meta">${esc(r.Date)}${meta ? ' · ' + esc(meta) : ''}</div>
         </div>
-        <button class="row-card-del" onclick="deleteRow(${i})">削除</button>
-      </div>
-    `;
+        <button class="s-card-del" onclick="deleteRow(${i})">削除</button>
+      </div>`;
   }).join('');
+}
+
+function deleteRow(i) {
+  rows.splice(i, 1);
+  persist(SK.rows, rows);
+  renderAll();
+}
+
+function clearAll() {
+  if (!rows.length) return;
+  if (!confirm(rows.length + '行すべて削除しますか？')) return;
+  rows = [];
+  persist(SK.rows, rows);
+  renderAll();
+}
+
+function updateNameList() {
+  document.getElementById('nameList').innerHTML =
+    [...names].map(n => `<option value="${esc(n)}">`).join('');
+}
+
+function downloadCsv() {
+  if (!rows.length) { alert('データがありません'); return; }
+  const lines = [FIELDS.join(',')];
+  for (const r of rows) {
+    lines.push(FIELDS.map(f => {
+      const v = String(r[f] ?? '');
+      return (v.includes(',') || v.includes('"') || v.includes('\n'))
+        ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'assets_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
 }
 
 function e(v) {
@@ -459,28 +543,6 @@ function e(v) {
 function esc(v) {
   return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// ── CSV ─────────────────────────────────
-function downloadCsv() {
-  if (!rows.length) { alert('データがありません'); return; }
-  const lines = [FIELDS.join(',')];
-  for (const r of rows) {
-    lines.push(FIELDS.map(f => {
-      const v = String(r[f] ?? '');
-      return (v.includes(',') || v.includes('"') || v.includes('\n'))
-        ? '"' + v.replace(/"/g,'""') + '"' : v;
-    }).join(','));
-  }
-  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'assets_' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-}
-
-document.addEventListener('keydown', ev => {
-  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') addRow();
-});
 </script>
 
 </body>
