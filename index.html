@@ -116,13 +116,6 @@
     .stock-link{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
     .stock-link:hover{opacity:.8}
 
-    /* 手入力フォーム */
-    .entry-row{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:8px;font-size:13px}
-    .entry-row input{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:7px 8px;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box}
-    .cal-edit-btn,.cal-del-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1;opacity:.55}
-    .cal-edit-btn:hover{opacity:1;background:rgba(59,130,246,0.25)}
-    .cal-del-btn:hover{opacity:1;background:rgba(239,68,68,0.25)}
-
     /* モーダル */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:16px}
     .modal-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-height:90vh;overflow-y:auto}
@@ -243,8 +236,6 @@
       <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
       <button id="clearData" class="btn-danger" disabled>データをクリア</button>
-      <button id="importScreenshot">📷 スクショ取り込み</button>
-      <button id="entryAdd">✏️ 手入力</button>
       <span id="savedBadge" class="saved-badge">● 保存済み</span>
       <span class="muted" style="color:rgba(255,255,255,0.2)">│</span>
       <input id="tradeFile" type="file" accept=".csv" />
@@ -635,112 +626,6 @@
   </div>
 </div>
 
-<!-- 手入力・編集 モーダル -->
-<div id="entryModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:480px">
-    <div class="modal-header">
-      <h2 class="modal-title" id="entryModalTitle">データ追加</h2>
-      <button id="entryClose" class="modal-close">✕</button>
-    </div>
-    <div style="display:grid;gap:10px;margin-bottom:4px">
-      <div class="entry-row"><span style="color:var(--muted)">日付</span><input type="date" id="entryDate" /></div>
-      <div class="entry-row"><span style="color:var(--muted)">銘柄名</span><input type="text" id="entryName" placeholder="例: AMZN, 7203" autocomplete="off" /></div>
-      <div class="entry-row"><span style="color:var(--muted)">評価額 (円)</span><input type="number" id="entryAmount" placeholder="0" min="0" /></div>
-      <div class="entry-row"><span style="color:var(--muted)">AssetClass</span><input type="text" id="entryAssetClass" list="entryListAsset" autocomplete="off" /><datalist id="entryListAsset"></datalist></div>
-      <div class="entry-row"><span style="color:var(--muted)">Currency</span><input type="text" id="entryCurrency" list="entryListCcy" autocomplete="off" /><datalist id="entryListCcy"></datalist></div>
-      <div class="entry-row"><span style="color:var(--muted)">StockType</span><input type="text" id="entryStockType" list="entryListSType" autocomplete="off" /><datalist id="entryListSType"></datalist></div>
-      <div class="entry-row"><span style="color:var(--muted)">口座</span><input type="text" id="entryAccount" list="entryListAcc" autocomplete="off" /><datalist id="entryListAcc"></datalist></div>
-      <div class="entry-row"><span style="color:var(--muted)">数量</span><input type="number" id="entryQuantity" placeholder="0" min="0" /></div>
-      <div class="entry-row"><span style="color:var(--muted)">取得単価</span><input type="number" id="entryCostBasis" placeholder="0" min="0" /></div>
-    </div>
-    <div id="entryDupWarn" style="display:none;margin-top:10px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px;font-size:12px;color:#fde68a"></div>
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:space-between;align-items:center">
-      <button id="entryDelete" class="btn-danger" style="display:none">削除</button>
-      <div style="display:flex;gap:8px;margin-left:auto">
-        <button id="entryCancel" class="btn-ghost">キャンセル</button>
-        <button id="entrySave">保存</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- スクショ取り込み モーダル -->
-<div id="importModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:560px">
-    <div class="modal-header">
-      <h2 class="modal-title">スクショから取り込み</h2>
-      <button id="importClose" class="modal-close">✕</button>
-    </div>
-
-    <!-- API キー設定 -->
-    <div style="background:#0e121a;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">⚙ Gemini API キー設定</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="geminiKeyInput" type="password" placeholder="AIza..." style="flex:1;background:#1a1a1a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:8px;font-size:13px" />
-        <button id="geminiKeySave" style="padding:8px 14px;font-size:13px">保存</button>
-      </div>
-      <div id="geminiKeyStatus" class="muted" style="font-size:12px;margin-top:6px"></div>
-      <div class="muted" style="font-size:11px;margin-top:4px">
-        ※ キー未取得の場合は <span style="color:var(--accent)">https://aistudio.google.com/apikey</span> で無料取得（LocalStorage保存）
-      </div>
-    </div>
-
-    <!-- 取り込み -->
-    <div style="border-top:1px solid var(--line);padding-top:12px;margin-bottom:12px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:10px">── 取り込み ──</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px">
-          日付:
-          <input type="date" id="importDate" />
-        </label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-          画像（複数選択可）:
-          <input type="file" id="importImages" accept="image/*" multiple style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px" />
-        </label>
-        <div id="importFileCount" class="muted" style="font-size:12px"></div>
-      </div>
-      <div style="margin-top:12px">
-        <button id="importAnalyze" disabled>解析</button>
-      </div>
-    </div>
-
-    <!-- 解析中 -->
-    <div id="importLoading" style="display:none;padding:12px;text-align:center;color:var(--muted);font-size:13px">
-      ⏳ Gemini に問い合わせ中...
-    </div>
-
-    <!-- エラー -->
-    <div id="importError" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:10px;font-size:12px;color:#fca5a5;margin-bottom:12px;white-space:pre-wrap"></div>
-
-    <!-- 解析結果プレビュー -->
-    <div id="importPreview" style="display:none">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">── 解析結果プレビュー ──</div>
-      <div id="importWarning" style="display:none;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px;font-size:12px;color:#fde68a;margin-bottom:10px"></div>
-      <div class="table-wrap" style="max-height:320px;overflow-y:auto">
-        <table id="importPreviewTable" style="font-size:12px;min-width:520px">
-          <thead style="position:sticky;top:0;background:var(--panel);z-index:1">
-            <tr>
-              <th style="width:32px;text-align:center"><input type="checkbox" id="importChkAll" style="accent-color:var(--accent)"></th>
-              <th style="text-align:left">銘柄</th>
-              <th style="text-align:right">数量</th>
-              <th style="text-align:right">USD</th>
-              <th style="text-align:right">円</th>
-              <th style="text-align:left">口座</th>
-              <th style="width:24px;text-align:center"></th>
-            </tr>
-          </thead>
-          <tbody id="importPreviewBody"></tbody>
-        </table>
-      </div>
-      <div id="importDupWarnings" style="display:none;margin-top:10px;font-size:12px"></div>
-      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
-        <button id="importCancel" class="btn-ghost">キャンセル</button>
-        <button id="importSaveAll">すべて保存</button>
-      </div>
-    </div>
-
-  </div>
-</div>
 
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
@@ -1756,19 +1641,17 @@ function renderCalendarDetail(){
   const deltaColor = delta===null ? '' : (delta>=0 ? '#22c55e' : '#ef4444');
   const f = getCalFilters();
 
-  const prevDate = previousRecordedDate(d);
-  const rows = (byDate.get(d) || []).filter(r => r.Amount !== 0).map(r => {
-    let prevAmt = 0;
-    if(prevDate){
-      const prevRecs = (byDate.get(prevDate) || []).filter(pr =>
-        pr.Name===r.Name && pr.Account===r.Account && pr.StockType===r.StockType
-      );
-      prevAmt = prevRecs.reduce((s,pr) => s + pr.Amount, 0);
-    }
-    const diff = r.Amount - prevAmt;
-    const pct  = prevAmt !== 0 ? diff / prevAmt : null;
-    return { ...r, Diff:diff, Pct:pct };
-  }).filter(r => (f.AssetClass? r.AssetClass===f.AssetClass : true))
+  const map = byDateName.get(d) || new Map();
+  const rows = [...map.entries()].map(([name, amt])=>{
+    if(amt===0) return null;
+    const prevDate = previousRecordedDate(d);
+    const prevAmt = prevDate ? amountOfNameAt(name, prevDate) : 0;
+    const diff = amt - prevAmt;
+    const pct  = prevAmt!==0 ? (diff/prevAmt) : null;
+    const meta = attrsOfNameAt(name, d);
+    return {Name:name, Amount:amt, Diff:diff, Pct:pct, ...meta};
+  }).filter(Boolean)
+    .filter(r => (f.AssetClass? r.AssetClass===f.AssetClass : true))
     .filter(r => (f.StockType? r.StockType===f.StockType : true))
     .filter(r => (f.Currency? r.Currency===f.Currency : true))
     .filter(r => (f.Account? r.Account===f.Account : true));
@@ -1796,26 +1679,18 @@ function renderCalendarDetail(){
   const list = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
     <thead><tr>
       ${dth('銘柄','name','left')}
-      ${dth('口座','account','left')}
       ${dth('評価額','amount')}
       ${dth('前回比','diff')}
       ${dth('変化率','pct')}
-      <th style="padding:3px 4px;border-bottom:1px solid var(--line);width:52px"></th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const cls = r.Diff>0 ? 'pos' : (r.Diff<0 ? 'neg' : '');
       const pctStr = r.Pct===null ? '—' : `${r.Pct>=0?'+':''}${(r.Pct*100).toFixed(1)}%`;
-      const rk = escapeHtml(`${r.Date}_${r.Name}_${r.Account}_${r.StockType}`);
       return `<tr>
         <td style="padding:3px 4px"><span class="stock-link" data-name="${escapeHtml(r.Name)}">${escapeHtml(r.Name)}</span></td>
-        <td style="padding:3px 4px;color:var(--muted)">${escapeHtml(r.Account||'')}</td>
         <td style="text-align:right;padding:3px 4px">${yen(r.Amount)}</td>
         <td style="text-align:right;padding:3px 4px" class="${cls}">${(r.Diff>=0?'+':'')+yen(r.Diff)}</td>
         <td style="text-align:right;padding:3px 4px" class="${cls}">${pctStr}</td>
-        <td style="padding:3px 2px;white-space:nowrap">
-          <button class="cal-edit-btn" data-key="${rk}" title="編集">✏️</button>
-          <button class="cal-del-btn" data-key="${rk}" title="削除">🗑</button>
-        </td>
       </tr>`;
     }).join('')}</tbody></table>` : '';
 
@@ -2573,22 +2448,11 @@ $('analTable').addEventListener('change', e=>{
 // calendar detail sort
 $("calDetailBody").addEventListener('click', e=>{
   const th = e.target.closest('.detail-sort-th');
-  if(th){
-    const key = th.dataset.key;
-    if(calDetailSort.key===key) calDetailSort.dir = calDetailSort.dir==='desc'?'asc':'desc';
-    else { calDetailSort.key=key; calDetailSort.dir='desc'; }
-    renderCalendarDetail();
-    return;
-  }
-  const editBtn = e.target.closest('.cal-edit-btn');
-  if(editBtn){ openEntryModal('edit', editBtn.dataset.key); return; }
-  const delBtn = e.target.closest('.cal-del-btn');
-  if(delBtn){
-    if(!confirm('このレコードを削除しますか？')) return;
-    const idx = RAW.findIndex(r => entryRawKey(r) === delBtn.dataset.key);
-    if(idx >= 0){ RAW.splice(idx, 1); buildIndexes(); saveToStorage(); onDataReady(); }
-    return;
-  }
+  if(!th) return;
+  const key = th.dataset.key;
+  if(calDetailSort.key===key) calDetailSort.dir = calDetailSort.dir==='desc'?'asc':'desc';
+  else { calDetailSort.key=key; calDetailSort.dir='desc'; }
+  renderCalendarDetail();
 });
 
 // calendar nav
@@ -2605,422 +2469,7 @@ $("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").v
 tryLoadSaved();
 tryLoadTrades();
 
-// ===================== 手入力・編集・削除 =====================
-let _entryMode = 'add';
-let _entryKey  = null;
 
-function entryRawKey(r){ return `${r.Date}_${r.Name}_${r.Account}_${r.StockType}`; }
-
-function openEntryModal(mode, rawKey){
-  _entryMode = mode;
-  _entryKey  = rawKey || null;
-
-  const fillDl = (id, vals) => {
-    $(id).innerHTML = vals.map(v=>`<option value="${escapeHtml(v)}">`).join('');
-  };
-  fillDl('entryListAsset', collectDistinct(['AssetClass'], DATES));
-  fillDl('entryListCcy',   collectDistinct(['Currency'],   DATES));
-  fillDl('entryListSType', collectDistinct(['StockType'],  DATES));
-  fillDl('entryListAcc',   collectDistinct(['Account'],    DATES));
-
-  if(mode === 'add'){
-    $('entryModalTitle').textContent = 'データ追加';
-    $('entryDelete').style.display   = 'none';
-    $('entryDate').value       = DATES.at(-1) || new Date().toISOString().slice(0,10);
-    $('entryName').value       = '';
-    $('entryAmount').value     = '';
-    $('entryAssetClass').value = '';
-    $('entryCurrency').value   = '';
-    $('entryStockType').value  = '';
-    $('entryAccount').value    = '';
-    $('entryQuantity').value   = '';
-    $('entryCostBasis').value  = '';
-  } else {
-    const rec = RAW.find(r => entryRawKey(r) === rawKey);
-    if(!rec){ alert('レコードが見つかりません'); return; }
-    $('entryModalTitle').textContent = 'データ編集';
-    $('entryDelete').style.display   = '';
-    $('entryDate').value       = rec.Date;
-    $('entryName').value       = rec.Name;
-    $('entryAmount').value     = rec.Amount;
-    $('entryAssetClass').value = rec.AssetClass;
-    $('entryCurrency').value   = rec.Currency;
-    $('entryStockType').value  = rec.StockType;
-    $('entryAccount').value    = rec.Account;
-    $('entryQuantity').value   = rec.Quantity  || '';
-    $('entryCostBasis').value  = rec.CostBasis || '';
-  }
-  $('entryDupWarn').style.display = 'none';
-  $('entryModal').style.display   = 'flex';
-}
-
-function checkEntryDup(){
-  const date      = $('entryDate').value;
-  const name      = $('entryName').value.trim();
-  const account   = $('entryAccount').value.trim();
-  const stockType = $('entryStockType').value.trim();
-  if(!date || !name) return;
-  const key = `${date}_${name}_${account}_${stockType}`;
-  const existing = RAW.find(r => entryRawKey(r) === key);
-  if(existing && (_entryMode === 'add' || key !== _entryKey)){
-    $('entryDupWarn').textContent  = `⚠ ${date} の ${name}（${account}）は既に存在します（${yen(existing.Amount)}）。保存すると上書きします。`;
-    $('entryDupWarn').style.display = '';
-  } else {
-    $('entryDupWarn').style.display = 'none';
-  }
-}
-
-function saveEntry(){
-  const date      = normalizeDate($('entryDate').value);
-  const name      = $('entryName').value.trim();
-  const amount    = Number($('entryAmount').value)    || 0;
-  const assetClass= $('entryAssetClass').value.trim();
-  const currency  = $('entryCurrency').value.trim();
-  const stockType = $('entryStockType').value.trim();
-  const account   = $('entryAccount').value.trim();
-  const quantity  = Number($('entryQuantity').value)  || 0;
-  const costBasis = Number($('entryCostBasis').value) || 0;
-
-  if(!date || !name || !assetClass || !currency || !stockType || !account){
-    alert('日付・銘柄名・AssetClass・Currency・StockType・口座は必須です');
-    return;
-  }
-
-  const newRec = { Date:date, Name:name, Amount:amount, AssetClass:assetClass,
-    Currency:currency, StockType:stockType, Account:account,
-    Quantity:quantity, CostBasis:costBasis, AmountOriginal:'', FxRate:'' };
-  const newKey = entryRawKey(newRec);
-
-  if(_entryMode === 'edit' && _entryKey){
-    const idx = RAW.findIndex(r => entryRawKey(r) === _entryKey);
-    if(idx >= 0) RAW.splice(idx, 1);
-  }
-  const dupIdx = RAW.findIndex(r => entryRawKey(r) === newKey);
-  if(dupIdx >= 0) RAW.splice(dupIdx, 1);
-
-  RAW.push(newRec);
-  buildIndexes(); saveToStorage(); onDataReady();
-  $('entryModal').style.display = 'none';
-}
-
-function deleteEntryByKey(key){
-  if(!confirm('このレコードを削除しますか？')) return;
-  const idx = RAW.findIndex(r => entryRawKey(r) === key);
-  if(idx >= 0){ RAW.splice(idx, 1); buildIndexes(); saveToStorage(); onDataReady(); }
-  $('entryModal').style.display = 'none';
-}
-
-$('entryAdd').addEventListener('click',    ()=> openEntryModal('add'));
-$('entryClose').addEventListener('click',  ()=>{ $('entryModal').style.display='none'; });
-$('entryModal').addEventListener('click',  e=>{ if(e.target===$('entryModal')) $('entryModal').style.display='none'; });
-$('entryCancel').addEventListener('click', ()=>{ $('entryModal').style.display='none'; });
-$('entrySave').addEventListener('click',   saveEntry);
-$('entryDelete').addEventListener('click', ()=> deleteEntryByKey(_entryKey));
-['entryDate','entryName','entryAccount','entryStockType'].forEach(id=>{
-  $(id).addEventListener('input', checkEntryDup);
-});
-
-// ===================== スクショ取り込み =====================
-const LS_GEMINI_KEY = 'gemini_api_key_v1';
-let _importedRows = [];
-
-$('importScreenshot').addEventListener('click', ()=>{
-  const savedKey = localStorage.getItem(LS_GEMINI_KEY) || '';
-  $('geminiKeyInput').value = savedKey ? '(保存済み)' : '';
-  $('geminiKeyInput').type = 'password';
-  $('geminiKeyStatus').textContent = savedKey ? '✓ APIキーが保存されています' : '';
-  $('importDate').value = new Date().toISOString().slice(0,10);
-  $('importPreview').style.display = 'none';
-  $('importError').style.display = 'none';
-  $('importLoading').style.display = 'none';
-  $('importFileCount').textContent = '';
-  $('importImages').value = '';
-  $('importAnalyze').disabled = true;
-  $('importModal').style.display = 'flex';
-});
-
-$('importClose').addEventListener('click', ()=>{ $('importModal').style.display='none'; });
-$('importModal').addEventListener('click', e=>{ if(e.target===$('importModal')) $('importModal').style.display='none'; });
-$('importCancel').addEventListener('click', ()=>{ $('importModal').style.display='none'; });
-
-$('geminiKeyInput').addEventListener('focus', ()=>{
-  if($('geminiKeyInput').value === '(保存済み)'){
-    $('geminiKeyInput').value = localStorage.getItem(LS_GEMINI_KEY) || '';
-    $('geminiKeyInput').type = 'text';
-  }
-});
-
-$('geminiKeySave').addEventListener('click', ()=>{
-  const key = $('geminiKeyInput').value.trim();
-  if(!key || key === '(保存済み)'){
-    $('geminiKeyStatus').textContent = 'キーを入力してください';
-    return;
-  }
-  localStorage.setItem(LS_GEMINI_KEY, key);
-  $('geminiKeyInput').value = '(保存済み)';
-  $('geminiKeyInput').type = 'password';
-  $('geminiKeyStatus').textContent = '✓ 保存しました';
-});
-
-$('importImages').addEventListener('change', ()=>{
-  const n = $('importImages').files.length;
-  $('importFileCount').textContent = n > 0 ? `選択中: ${n}枚` : '';
-  $('importAnalyze').disabled = n === 0;
-});
-
-$('importChkAll').addEventListener('change', ()=>{
-  const checked = $('importChkAll').checked;
-  document.querySelectorAll('#importPreviewBody .import-row-chk').forEach(cb=>{ cb.checked = checked; });
-});
-
-$('importAnalyze').addEventListener('click', runGeminiAnalysis);
-$('importSaveAll').addEventListener('click', saveImportedRows);
-
-function fileToBase64(file){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function runGeminiAnalysis(){
-  const apiKey = localStorage.getItem(LS_GEMINI_KEY);
-  if(!apiKey){
-    showImportError('Gemini APIキーが設定されていません。上のキー設定欄から保存してください。');
-    return;
-  }
-  const files = $('importImages').files;
-  if(!files.length){ showImportError('画像を選択してください。'); return; }
-
-  for(const f of files){
-    if(f.size > 20 * 1024 * 1024){
-      showImportError(`「${f.name}」が大きすぎます（20MB上限）。`);
-      return;
-    }
-  }
-
-  $('importLoading').style.display = '';
-  $('importError').style.display = 'none';
-  $('importPreview').style.display = 'none';
-  $('importAnalyze').disabled = true;
-
-  try{
-    const b64s = await Promise.all([...files].map(f=>fileToBase64(f)));
-    const PROMPT = `【SBI証券スマホアプリ「口座管理」画面 → CSV変換ルール】
-
-画像はSBI証券スマホアプリの口座管理 → 保有証券画面。
-個別株(米国株および日本株)の情報を抽出し、Markdown表のみを出力してください(他の説明文は不要)。
-
-【スコープ】
-- 対象: 画面に表示されている全ての個別株
-- 対象外: 投資信託、預り金、暗号資産、年金など
-- 画像が複数アップロードされた場合: 重複する銘柄+口座区分は1行にまとめる(値は最後の画像を優先)
-
-【出力列】
-Date, Name, Amount, AssetClass, Currency, StockType, Account, Quantity, CostBasis, AmountOriginal, FxRate
-
-【共通ルール】
-- Date: 画像の「参考為替レート 米ドル/円 = 158.86 (2026/05/25 10:01)」のような表記から日付を取り出し、YYYY/M/D 形式
-- AssetClass: stock
-- StockType: Equity
-- Account: 銘柄名の下に表示されている「特定」または「NISA」
-- 数値はカンマ区切り
-- FxRate: 画面上部の参考為替レート(例: 158.86)
-
-【米国株の場合】
-- Name: ティッカーシンボル(例: AMZN, ASTS, RKLB)
-- Currency: USD
-- Quantity: 「保有数量」欄の数値
-- CostBasis: 「取得単価(¥)」欄の数値(円、画面の値そのまま)
-- AmountOriginal: 「現在値」(USD) × Quantity を計算(小数2桁)
-- Amount: 「評価額(¥)」欄の数値(円、画面の値そのまま)
-- FxRate: 参考為替レート
-
-【日本株の場合】
-- Name: 銘柄コード(4桁数字)もしくは略称
-- Currency: JPY
-- Quantity, CostBasis, Amount: 画面の値そのまま
-- AmountOriginal: 空欄
-- FxRate: 空欄
-
-【整合性チェック】
-- 出力したUSD銘柄の Amount 合計が、画面上部の「株式総評価額」と一致すること
-- ズレがあれば出力末尾に【警告: 集計が一致しません ◯◯円差】と明記
-
-【注意】
-- 同じ銘柄が「特定」と「NISA」両方にある場合は、別の行として出力
-- 含み損益は出力しない
-- 出力は Markdown 表のみ。前後に説明文を含めない`;
-
-    const reqBody = JSON.stringify({
-      contents:[{
-        parts:[
-          {text: PROMPT},
-          ...[...files].map((f,i)=>({ inline_data:{ mime_type: f.type || 'image/jpeg', data: b64s[i] }}))
-        ]
-      }]
-    });
-
-    const RETRY_DELAYS = [1000, 2000, 4000];
-    let resp, lastErr;
-    for(let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++){
-      resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        { method:'POST', headers:{'Content-Type':'application/json'}, body: reqBody }
-      );
-      if(resp.status !== 503) break;
-      if(attempt < RETRY_DELAYS.length){
-        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-      } else {
-        throw new Error('Googleサーバーが混雑中です。数分後に再試行してください。');
-      }
-    }
-
-    if(!resp.ok){
-      const err = await resp.json().catch(()=>null);
-      if(resp.status===401||resp.status===403) throw new Error('キーが無効です。再設定してください。');
-      if(resp.status===429) throw new Error('しばらく待ってから再試行してください（レート制限）。');
-      throw new Error(`APIエラー ${resp.status}: ${err?.error?.message||'不明なエラー'}`);
-    }
-
-    const data = await resp.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    parseGeminiResponse(text);
-
-  }catch(e){
-    showImportError(e.message || '不明なエラーが発生しました');
-  }finally{
-    $('importLoading').style.display = 'none';
-    $('importAnalyze').disabled = false;
-  }
-}
-
-function parseMdTable(text){
-  const lines = text.split('\n').filter(l=>l.trim().startsWith('|'));
-  if(lines.length < 2) return { headers:[], rows:[] };
-  const headers = lines[0].replace(/^\||\|$/g,'').split('|').map(h=>h.trim());
-  const dataLines = lines.slice(1).filter(l=>!/^[\|\s\-:]+$/.test(l));
-  const rows = dataLines.map(line=>{
-    const parts = line.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
-    if(parts.length !== headers.length) return null;
-    const obj = {};
-    headers.forEach((h,i)=>{ obj[h] = parts[i]; });
-    return obj;
-  }).filter(Boolean);
-  return { headers, rows };
-}
-
-function parseGeminiResponse(text){
-  const warnMatch = text.match(/【警告[：:][^】]*】/);
-  const warning = warnMatch ? warnMatch[0] : '';
-
-  const { rows } = parseMdTable(text);
-  if(!rows.length){
-    showImportError('Gemini からの応答を解析できませんでした。\n\n' + text);
-    return;
-  }
-
-  const numCols = ['Amount','Quantity','CostBasis','AmountOriginal','FxRate'];
-  const parsed = rows.map(r=>{
-    for(const col of numCols){
-      if(r[col] !== undefined && r[col] !== ''){
-        r[col] = Number(String(r[col]).replace(/,/g,'')) || 0;
-      }
-    }
-    if(r.Date) r.Date = normalizeDate(r.Date);
-    return r;
-  }).filter(r=>r.Date && r.Name);
-
-  if(!parsed.length){
-    showImportError('有効な行が0件でした。\n\n' + text);
-    return;
-  }
-
-  _importedRows = parsed;
-  renderImportPreview(parsed, warning);
-}
-
-function importDupKey(r){ return `${r.Date}_${r.Name}_${r.Account}_${r.StockType}`; }
-
-function renderImportPreview(rows, warning){
-  const existingKeys = new Set(RAW.map(r=>importDupKey(r)));
-  const $body = $('importPreviewBody');
-  $body.innerHTML = rows.map((r,i)=>{
-    const isDup = existingKeys.has(importDupKey(r));
-    const existingRow = isDup ? RAW.find(e=>importDupKey(e)===importDupKey(r)) : null;
-    const usdStr = r.AmountOriginal ? `$${Number(r.AmountOriginal).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—';
-    const jpyStr = r.Amount ? yen(r.Amount) : '—';
-    const rowStyle = isDup ? 'background:rgba(251,191,36,0.07)' : '';
-    return `<tr data-idx="${i}" style="${rowStyle}">
-      <td style="text-align:center"><input type="checkbox" class="import-row-chk" data-idx="${i}" data-dup="${isDup}" ${isDup?'':'checked'} style="accent-color:var(--accent)"></td>
-      <td style="text-align:left">${escapeHtml(r.Name||'')}</td>
-      <td style="text-align:right">${r.Quantity||'—'}</td>
-      <td style="text-align:right">${usdStr}</td>
-      <td style="text-align:right">${jpyStr}</td>
-      <td style="text-align:left">${escapeHtml(r.Account||'')}</td>
-      <td style="text-align:center;color:#fbbf24">${isDup?'⚠':''}</td>
-    </tr>`;
-  }).join('');
-
-  const dups = rows.filter(r=>existingKeys.has(importDupKey(r)));
-  const $dupWarn = $('importDupWarnings');
-  if(dups.length){
-    $dupWarn.innerHTML = '<div style="color:#fbbf24">⚠ 重複警告:</div>' +
-      dups.map(r=>{
-        const ex = RAW.find(e=>importDupKey(e)===importDupKey(r));
-        return `<div style="color:#fde68a;margin-left:8px">「${r.Date} の ${r.Name}（${r.Account||''}）は既に存在」${ex?' '+yen(ex.Amount)+' → '+yen(r.Amount):''}</div>`;
-      }).join('');
-    $dupWarn.style.display = '';
-  } else {
-    $dupWarn.style.display = 'none';
-    $dupWarn.innerHTML = '';
-  }
-
-  const $warn = $('importWarning');
-  if(warning){ $warn.textContent = warning; $warn.style.display = ''; }
-  else $warn.style.display = 'none';
-
-  $('importChkAll').checked = rows.length > 0 && rows.every(r=>!existingKeys.has(importDupKey(r)));
-  $('importPreview').style.display = '';
-  $('importError').style.display = 'none';
-}
-
-function saveImportedRows(){
-  document.querySelectorAll('#importPreviewBody .import-row-chk').forEach(cb=>{
-    if(!cb.checked) return;
-    const row = _importedRows[Number(cb.dataset.idx)];
-    if(cb.dataset.dup === 'true'){
-      const key = importDupKey(row);
-      const existIdx = RAW.findIndex(e=>importDupKey(e)===key);
-      if(existIdx >= 0) RAW.splice(existIdx, 1);
-    }
-    RAW.push({
-      Date:           row.Date || '',
-      Name:           row.Name || '',
-      Amount:         Number(row.Amount) || 0,
-      AssetClass:     row.AssetClass || 'stock',
-      Currency:       row.Currency || '',
-      StockType:      row.StockType || 'Equity',
-      Account:        row.Account || '',
-      Quantity:       Number(row.Quantity) || 0,
-      CostBasis:      Number(row.CostBasis) || 0,
-      AmountOriginal: (row.AmountOriginal !== undefined && row.AmountOriginal !== '') ? Number(row.AmountOriginal) : '',
-      FxRate:         (row.FxRate         !== undefined && row.FxRate         !== '') ? Number(row.FxRate)         : ''
-    });
-  });
-  buildIndexes();
-  saveToStorage();
-  onDataReady();
-  $('importModal').style.display = 'none';
-}
-
-function showImportError(msg){
-  $('importError').textContent = msg;
-  $('importError').style.display = '';
-  $('importPreview').style.display = 'none';
-}
 </script>
 </body>
 </html>
