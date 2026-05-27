@@ -201,8 +201,10 @@
     <div class="sec-title">
       <h2>CSVデータ<span class="count" id="rowCount">0行</span></h2>
       <div class="toolbar">
+        <button class="btn-ghost" onclick="triggerImport()">CSVを取り込む</button>
         <button class="btn-success" onclick="downloadCsv()">CSVダウンロード</button>
         <button style="background:#7f1d1d;font-size:12px;padding:6px 12px" onclick="clearAll()">すべて削除</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="importCsv(this)" />
       </div>
     </div>
     <div class="table-wrap">
@@ -544,6 +546,75 @@ function renderDataCards() {
         <button class="s-card-del" onclick="deleteRow(${i})">削除</button>
       </div>`;
   }).join('');
+}
+
+// ── CSV取り込み ───────────────────────────────────────────
+function triggerImport() {
+  const el = document.getElementById('csvFileInput');
+  el.value = '';
+  el.click();
+}
+
+function importCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    let text = e.target.result;
+    // BOM除去
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { alert('データがありません'); return; }
+
+    // ヘッダー解析
+    const header = parseCsvLine(lines[0]);
+    const colIdx = {};
+    header.forEach((h, i) => { colIdx[h.trim()] = i; });
+    const missing = FIELDS.filter(f => f !== 'Date' && colIdx[f] === undefined && ['Amount','Name'].includes(f));
+    if (missing.length) { alert('必須列が見つかりません: ' + missing.join(', ')); return; }
+
+    // データ行解析
+    const imported = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      if (cols.every(c => !c.trim())) continue;
+      const row = {};
+      FIELDS.forEach(f => { row[f] = colIdx[f] !== undefined ? (cols[colIdx[f]] ?? '') : ''; });
+      imported.push(row);
+    }
+    if (!imported.length) { alert('取り込めるデータがありませんでした'); return; }
+
+    const msg = imported.length + '行を取り込みます。\n既存の ' + rows.length + '行に追加されます。\nよろしいですか？';
+    if (!confirm(msg)) return;
+
+    rows.push(...imported);
+    imported.forEach(r => { if (r.Name) names.add(r.Name); });
+    persist(SK.rows, rows);
+    persist(SK.names, [...names]);
+    updateLists();
+    renderAll();
+    alert('✓ ' + imported.length + '行を取り込みました');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQ = true; }
+      else if (ch === ',') { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+  }
+  result.push(cur);
+  return result;
 }
 
 function deleteRow(i) { rows.splice(i,1); persist(SK.rows,rows); renderAll(); }
