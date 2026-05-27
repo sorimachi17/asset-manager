@@ -235,6 +235,7 @@
       <div class="toolbar">
         <button class="btn-ghost" onclick="triggerImport()">CSVを取り込む</button>
         <button class="btn-success" onclick="downloadCsv()">CSVダウンロード</button>
+        <button class="btn-ghost" style="color:#22c55e;border-color:#166534" onclick="sendToIndex()">資産管理に反映</button>
         <button style="background:#7f1d1d;font-size:12px;padding:6px 12px" onclick="clearAll()">すべて削除</button>
         <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="importCsv(this)" />
       </div>
@@ -752,6 +753,37 @@ function parseCsvLine(line) {
   }
   result.push(cur);
   return result;
+}
+
+function sendToIndex() {
+  if (!rows.length) { alert('データがありません'); return; }
+  const existing = (() => { try { const s = localStorage.getItem('asset_mgr_v1'); return s ? JSON.parse(s) : null; } catch { return null; } })();
+  const existMsg = existing && existing.length
+    ? `資産管理アプリに既存データが ${existing.length} 行あります。上書きしてよいですか？`
+    : `${rows.length} 行を資産管理アプリに反映します。よろしいですか？`;
+  if (!confirm(existMsg)) return;
+  const converted = rows.map(r => ({
+    Date:       r.Date || '',
+    Name:       r.Name || '',
+    Amount:     Number(String(r.Amount  || 0).replace(/,/g,'')) || 0,
+    AssetClass: r.AssetClass || '',
+    Currency:   r.Currency   || '',
+    StockType:  r.StockType  || '',
+    Account:    r.Account    || '',
+    Quantity:   Number(String(r.Quantity  || 0).replace(/,/g,'')) || 0,
+    CostBasis:  Number(String(r.CostBasis || 0).replace(/,/g,'')) || 0,
+    AmountOriginal: '',
+    FxRate: ''
+  })).filter(r => r.Date);
+  try {
+    localStorage.setItem('asset_mgr_v1', JSON.stringify(converted));
+  } catch(e) {
+    alert('保存に失敗しました: ' + e.message);
+    return;
+  }
+  if (confirm('✓ ' + converted.length + ' 行を反映しました。\n資産管理ページを開きますか？')) {
+    location.href = 'index.html';
+  }
 }
 
 function deleteRow(i) { rows.splice(i,1); persist(SK.rows,rows); renderAll(); }
