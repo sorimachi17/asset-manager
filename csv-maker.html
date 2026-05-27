@@ -6,61 +6,122 @@
   <title>CSV作成ツール</title>
   <style>
     :root {
-      --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;
-      --panel:#151618;--accent:#3b82f6;
+      --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;--accent:#3b82f6;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; }
-    header { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(17,17,17,.9); backdrop-filter: blur(6px); z-index: 10; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+    header {
+      border-bottom: 1px solid var(--line); position: sticky; top: 0;
+      background: rgba(17,17,17,.95); backdrop-filter: blur(8px); z-index: 10;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
     h1 { margin: 0; font-size: 18px; white-space: nowrap; }
-    .wrap { max-width: 1300px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+    .wrap {
+      max-width: 1300px; margin: 0 auto; padding: 16px; display: grid; gap: 14px;
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
     h2 { margin: 0 0 12px; font-size: 15px; }
+
+    /* Form */
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 12px; color: var(--muted); }
     .field label.req::after { content: ' *'; color: #ef4444; }
-    input, select { background: #0e121a; border: 1px solid var(--line); color: var(--fg); padding: 8px 10px; border-radius: 8px; font-size: 16px; width: 100%; }
+    input, select {
+      background: #0e121a; border: 1px solid var(--line); color: var(--fg);
+      padding: 10px 12px; border-radius: 8px; font-size: 16px; width: 100%;
+      -webkit-appearance: none; appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa4b2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+    }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     .form-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-    button { border: none; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+
+    /* Buttons */
+    button { border: none; color: #fff; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; min-height: 44px; }
     .btn-primary { background: var(--accent); }
-    .btn-primary:hover { background: #2563eb; }
     .btn-ghost { background: #1e2638; border: 1px solid var(--line); }
-    .btn-ghost:hover { background: #252d3d; }
     .btn-danger { background: #7f1d1d; }
-    .btn-danger:hover { background: #991b1b; }
     .btn-success { background: #15803d; }
-    .btn-success:hover { background: #166534; }
+
+    /* Presets */
+    .preset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+    .preset-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .preset-chip {
+      background: #1a2030; border: 1px solid var(--line); color: var(--fg);
+      padding: 7px 12px; border-radius: 20px; cursor: pointer; font-size: 13px;
+      display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .preset-chip:active { border-color: var(--accent); background: #1e2a42; }
+    .preset-chip-name { font-weight: 500; }
+    .preset-chip-sub { color: var(--muted); font-size: 11px; }
+    .preset-chip-del {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 15px; padding: 0 2px; min-height: unset; line-height: 1;
+    }
+    .preset-chip-del:active { color: #ef4444; }
+    .preset-empty { color: var(--muted); font-size: 13px; margin: 0; }
+    .btn-sm { padding: 7px 12px; font-size: 12px; min-height: 36px; }
+
+    /* Section title */
     .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .count { color: var(--muted); font-size: 12px; margin-left: 6px; }
+
+    /* Desktop table */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
     td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
     tr:hover td { background: rgba(255,255,255,.03); }
-    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 10px; font-size: 18px; line-height: 1; }
-    .del-btn:hover { color: #f87171; }
-    .empty-row td { text-align: center; color: var(--muted); padding: 28px; }
+    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 10px; font-size: 18px; line-height: 1; min-height: unset; }
+    .empty-msg { text-align: center; color: var(--muted); padding: 28px; }
+
+    /* Mobile card list */
+    .card-list { display: none; }
+    .row-card {
+      border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    }
+    .row-card:last-child { margin-bottom: 0; }
+    .row-card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+    .row-card-amount { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .row-card-meta { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .row-card-del {
+      flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444;
+      padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      min-height: 36px; white-space: nowrap;
+    }
+    .row-card-del:active { background: #7f1d1d; }
+
     .nav-link { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }
-    .nav-link:hover { color: var(--fg); }
     .hint { font-size: 12px; color: var(--muted); margin-top: 8px; margin-bottom: 0; }
 
     @media (max-width: 600px) {
       h1 { font-size: 15px; }
       .wrap { padding: 10px; gap: 10px; }
-      .card { padding: 12px; border-radius: 10px; }
+      .card { padding: 12px; border-radius: 12px; }
       .form-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .form-actions { gap: 8px; }
       .form-actions button { flex: 1; }
       .section-title { flex-direction: column; align-items: flex-start; }
       .toolbar { width: 100%; }
       .toolbar button { flex: 1; }
-      button { padding: 11px 12px; font-size: 13px; }
       .hint { display: none; }
+      .table-wrap { display: none; }
+      .card-list { display: block; }
     }
 
-    @media (max-width: 400px) {
+    @media (max-width: 390px) {
       .form-grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -69,10 +130,20 @@
 
 <header>
   <h1>CSV作成ツール</h1>
-  <a class="nav-link" href="index.html">← 資産管理アプリへ</a>
+  <a class="nav-link" href="index.html">← 資産管理</a>
 </header>
 
 <div class="wrap">
+
+  <!-- プリセット -->
+  <div class="card">
+    <div class="preset-header">
+      <h2 style="margin:0">プリセット</h2>
+      <button class="btn-ghost btn-sm" onclick="savePreset()">＋ 現在の銘柄を登録</button>
+    </div>
+    <div class="preset-chips" id="presetChips"></div>
+    <p class="preset-empty" id="presetEmpty">登録なし。銘柄名・AssetClassを入力して「＋ 現在の銘柄を登録」で追加できます。</p>
+  </div>
 
   <!-- 入力フォーム -->
   <div class="card">
@@ -84,11 +155,12 @@
       </div>
       <div class="field">
         <label class="req">Name（銘柄名）</label>
-        <input type="text" id="fName" placeholder="例: トヨタ自動車" />
+        <input type="text" id="fName" placeholder="例: トヨタ自動車" list="nameList" autocomplete="off" />
+        <datalist id="nameList"></datalist>
       </div>
       <div class="field">
         <label class="req">Amount（評価額 JPY）</label>
-        <input type="number" id="fAmount" placeholder="0" />
+        <input type="number" id="fAmount" placeholder="0" inputmode="decimal" />
       </div>
       <div class="field">
         <label class="req">AssetClass</label>
@@ -118,92 +190,126 @@
       </div>
       <div class="field">
         <label>StockType（区分）</label>
-        <input type="text" id="fStockType" placeholder="国内株, ETF, 投信 など" list="stockTypeList" />
+        <input type="text" id="fStockType" placeholder="国内株, ETF, 投信…" list="stockTypeList" autocomplete="off" />
         <datalist id="stockTypeList">
-          <option value="国内株">
-          <option value="外国株">
-          <option value="投資信託">
-          <option value="ETF">
-          <option value="REIT">
-          <option value="個人向け国債">
-          <option value="外国債券">
-          <option value="現金">
-          <option value="MMF">
+          <option value="国内株"><option value="外国株"><option value="投資信託">
+          <option value="ETF"><option value="REIT"><option value="個人向け国債">
+          <option value="外国債券"><option value="現金"><option value="MMF">
         </datalist>
       </div>
       <div class="field">
         <label>Account（口座）</label>
-        <input type="text" id="fAccount" placeholder="例: SBI特定口座" />
+        <input type="text" id="fAccount" placeholder="例: SBI特定口座" list="accountList" autocomplete="off" />
+        <datalist id="accountList"></datalist>
       </div>
       <div class="field">
         <label>Quantity（口数・株数）</label>
-        <input type="number" id="fQuantity" placeholder="0" step="any" />
+        <input type="number" id="fQuantity" placeholder="0" step="any" inputmode="decimal" />
       </div>
       <div class="field">
         <label>CostBasis（取得単価）</label>
-        <input type="number" id="fCostBasis" placeholder="0" step="any" />
+        <input type="number" id="fCostBasis" placeholder="0" step="any" inputmode="decimal" />
       </div>
       <div class="field">
         <label>AmountOriginal（原通貨額）</label>
-        <input type="number" id="fAmountOriginal" placeholder="0" step="any" />
+        <input type="number" id="fAmountOriginal" placeholder="0" step="any" inputmode="decimal" />
       </div>
       <div class="field">
         <label>FxRate（為替レート）</label>
-        <input type="number" id="fFxRate" placeholder="0" step="any" />
+        <input type="number" id="fFxRate" placeholder="0" step="any" inputmode="decimal" />
       </div>
     </div>
     <div class="form-actions">
       <button class="btn-primary" onclick="addRow()">＋ 行を追加</button>
-      <button class="btn-ghost" onclick="clearForm()">フォームをクリア</button>
+      <button class="btn-ghost" onclick="clearForm()">クリア</button>
     </div>
-    <p class="hint">* は必須。Enterキーでも追加できます。追加後、銘柄名・金額などはクリアされます（日付・分類・口座は維持）。</p>
+    <p class="hint">* は必須。Enterキーでも追加。追加後は銘柄名・金額をクリア、日付・分類・口座は維持。</p>
   </div>
 
-  <!-- データテーブル -->
+  <!-- データ -->
   <div class="card">
     <div class="section-title">
       <h2 style="margin:0">入力済みデータ<span class="count" id="rowCount">0行</span></h2>
       <div class="toolbar">
-        <button class="btn-success" onclick="downloadCsv()">CSVをダウンロード</button>
+        <button class="btn-success" onclick="downloadCsv()">CSVダウンロード</button>
         <button class="btn-danger" onclick="clearAll()">すべて削除</button>
       </div>
     </div>
+
+    <!-- Desktop: table -->
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th></th>
-            <th>Date</th>
-            <th>Name</th>
-            <th>Amount</th>
-            <th>AssetClass</th>
-            <th>Currency</th>
-            <th>StockType</th>
-            <th>Account</th>
-            <th>Quantity</th>
-            <th>CostBasis</th>
-            <th>AmountOriginal</th>
-            <th>FxRate</th>
+            <th>Date</th><th>Name</th><th>Amount</th><th>AssetClass</th>
+            <th>Currency</th><th>StockType</th><th>Account</th>
+            <th>Quantity</th><th>CostBasis</th><th>AmountOriginal</th><th>FxRate</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
       </table>
     </div>
+
+    <!-- Mobile: card list -->
+    <div class="card-list" id="cardList"></div>
   </div>
 
 </div>
 
 <script>
 const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
-const STORAGE_KEY = 'csv_maker_rows';
-let rows = [];
-try { rows = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(_) { rows = []; }
+const SK = { rows:'csv_maker_rows', last:'csv_maker_last', presets:'csv_maker_presets', names:'csv_maker_names', accs:'csv_maker_accounts' };
 
-document.getElementById('fDate').value = new Date().toISOString().slice(0, 10);
-renderTable();
+function load(key, def) { try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? def; } catch(_) { return def; } }
+function persist(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(_) {} }
 
+let rows    = load(SK.rows, []);
+let presets = load(SK.presets, []);
+let names   = new Set(load(SK.names, []));
+let accs    = new Set(load(SK.accs,  []));
+const last  = load(SK.last, {});
+
+// 前回値を復元
+document.getElementById('fDate').value        = new Date().toISOString().slice(0, 10);
+document.getElementById('fAssetClass').value  = last.AssetClass || '';
+document.getElementById('fCurrency').value    = last.Currency   || 'JPY';
+document.getElementById('fStockType').value   = last.StockType  || '';
+document.getElementById('fAccount').value     = last.Account    || '';
+
+updateNameList();
+updateAccountList();
+renderPresets();
+renderAll();
+
+// ── 行追加 ──────────────────────────────
 function addRow() {
-  const v = {
+  const v = getForm();
+  if (!v.Date)         { alert('Date を入力してください');       document.getElementById('fDate').focus();       return; }
+  if (!v.Name)         { alert('Name を入力してください');       document.getElementById('fName').focus();       return; }
+  if (v.Amount === '') { alert('Amount を入力してください');     document.getElementById('fAmount').focus();     return; }
+  if (!v.AssetClass)   { alert('AssetClass を選択してください'); document.getElementById('fAssetClass').focus(); return; }
+
+  rows.push(v);
+  names.add(v.Name);
+  if (v.Account) accs.add(v.Account);
+
+  persist(SK.rows,  rows);
+  persist(SK.names, [...names]);
+  persist(SK.accs,  [...accs]);
+  persist(SK.last,  { AssetClass: v.AssetClass, Currency: v.Currency, StockType: v.StockType, Account: v.Account });
+
+  updateNameList();
+  updateAccountList();
+  renderAll();
+
+  ['fName','fAmount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('fName').focus();
+}
+
+function getForm() {
+  return {
     Date:           document.getElementById('fDate').value,
     Name:           document.getElementById('fName').value.trim(),
     Amount:         document.getElementById('fAmount').value,
@@ -216,26 +322,12 @@ function addRow() {
     AmountOriginal: document.getElementById('fAmountOriginal').value,
     FxRate:         document.getElementById('fFxRate').value,
   };
-
-  if (!v.Date)         { alert('Date を入力してください');       document.getElementById('fDate').focus();       return; }
-  if (!v.Name)         { alert('Name を入力してください');       document.getElementById('fName').focus();       return; }
-  if (v.Amount === '') { alert('Amount を入力してください');     document.getElementById('fAmount').focus();     return; }
-  if (!v.AssetClass)   { alert('AssetClass を選択してください'); document.getElementById('fAssetClass').focus(); return; }
-
-  rows.push(v);
-  save();
-  renderTable();
-
-  // 銘柄固有フィールドをクリア、日付・分類・通貨・区分・口座は維持
-  ['fName','fAmount','fQuantity','fCostBasis','fAmountOriginal','fFxRate']
-    .forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('fName').focus();
 }
 
 function deleteRow(i) {
   rows.splice(i, 1);
-  save();
-  renderTable();
+  persist(SK.rows, rows);
+  renderAll();
 }
 
 function clearForm() {
@@ -247,31 +339,89 @@ function clearAll() {
   if (!rows.length) return;
   if (!confirm(rows.length + '行すべて削除しますか？')) return;
   rows = [];
-  save();
-  renderTable();
+  persist(SK.rows, rows);
+  renderAll();
 }
 
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); } catch(_) {}
+// ── プリセット ───────────────────────────
+function savePreset() {
+  const v = getForm();
+  if (!v.Name)       { alert('Name を入力してください'); document.getElementById('fName').focus(); return; }
+  if (!v.AssetClass) { alert('AssetClass を選択してください'); return; }
+  const existing = presets.findIndex(p => p.Name === v.Name);
+  if (existing >= 0) {
+    if (!confirm('「' + v.Name + '」のプリセットを上書きしますか？')) return;
+    presets.splice(existing, 1);
+  }
+  presets.push({ Name: v.Name, AssetClass: v.AssetClass, Currency: v.Currency, StockType: v.StockType, Account: v.Account });
+  persist(SK.presets, presets);
+  renderPresets();
+}
+
+function applyPreset(i) {
+  const p = presets[i];
+  document.getElementById('fName').value       = p.Name;
+  document.getElementById('fAssetClass').value = p.AssetClass;
+  document.getElementById('fCurrency').value   = p.Currency   || 'JPY';
+  document.getElementById('fStockType').value  = p.StockType  || '';
+  document.getElementById('fAccount').value    = p.Account    || '';
+  document.getElementById('fAmount').focus();
+}
+
+function deletePreset(i) {
+  presets.splice(i, 1);
+  persist(SK.presets, presets);
+  renderPresets();
+}
+
+function renderPresets() {
+  const chips = document.getElementById('presetChips');
+  const empty = document.getElementById('presetEmpty');
+  if (!presets.length) {
+    chips.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  chips.innerHTML = presets.map((p, i) => `
+    <div class="preset-chip" onclick="applyPreset(${i})">
+      <span class="preset-chip-name">${esc(p.Name)}</span>
+      <span class="preset-chip-sub">${esc(p.AssetClass)}</span>
+      <button class="preset-chip-del" onclick="event.stopPropagation();deletePreset(${i})" title="削除">×</button>
+    </div>
+  `).join('');
+}
+
+// ── オートコンプリートリスト ─────────────
+function updateNameList() {
+  document.getElementById('nameList').innerHTML =
+    [...names].map(n => `<option value="${esc(n)}">`).join('');
+}
+function updateAccountList() {
+  document.getElementById('accountList').innerHTML =
+    [...accs].map(a => `<option value="${esc(a)}">`).join('');
+}
+
+// ── 描画 ────────────────────────────────
+function renderAll() {
+  document.getElementById('rowCount').textContent = rows.length + '行';
+  renderTable();
+  renderCards();
 }
 
 function renderTable() {
   const tbody = document.getElementById('tableBody');
-  document.getElementById('rowCount').textContent = rows.length + '行';
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="12">データがありません</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="12" class="empty-msg">データがありません</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td><button class="del-btn" onclick="deleteRow(${i})" title="削除">×</button></td>
-      <td>${e(r.Date)}</td>
-      <td>${e(r.Name)}</td>
+      <td>${e(r.Date)}</td><td>${e(r.Name)}</td>
       <td style="text-align:right">${e(r.Amount)}</td>
-      <td>${e(r.AssetClass)}</td>
-      <td>${e(r.Currency)}</td>
-      <td>${e(r.StockType)}</td>
-      <td>${e(r.Account)}</td>
+      <td>${e(r.AssetClass)}</td><td>${e(r.Currency)}</td>
+      <td>${e(r.StockType)}</td><td>${e(r.Account)}</td>
       <td style="text-align:right">${e(r.Quantity)}</td>
       <td style="text-align:right">${e(r.CostBasis)}</td>
       <td style="text-align:right">${e(r.AmountOriginal)}</td>
@@ -280,11 +430,37 @@ function renderTable() {
   `).join('');
 }
 
-function e(v) {
-  if (v === null || v === undefined || v === '') return '<span style="color:var(--muted)">—</span>';
-  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function renderCards() {
+  const el = document.getElementById('cardList');
+  if (!rows.length) {
+    el.innerHTML = `<p class="empty-msg">データがありません</p>`;
+    return;
+  }
+  el.innerHTML = rows.map((r, i) => {
+    const meta = [r.AssetClass, r.Currency, r.StockType, r.Account].filter(Boolean).join(' · ');
+    const amt  = r.Amount !== '' ? Number(r.Amount).toLocaleString('ja-JP') + ' 円' : '—';
+    return `
+      <div class="row-card">
+        <div>
+          <div class="row-card-name">${esc(r.Name || '—')}</div>
+          <div class="row-card-amount">${amt}</div>
+          <div class="row-card-meta">${esc(r.Date)}${meta ? ' · ' + esc(meta) : ''}</div>
+        </div>
+        <button class="row-card-del" onclick="deleteRow(${i})">削除</button>
+      </div>
+    `;
+  }).join('');
 }
 
+function e(v) {
+  if (v === null || v === undefined || v === '') return '<span style="color:var(--muted)">—</span>';
+  return esc(String(v));
+}
+function esc(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── CSV ─────────────────────────────────
 function downloadCsv() {
   if (!rows.length) { alert('データがありません'); return; }
   const lines = [FIELDS.join(',')];
@@ -292,14 +468,13 @@ function downloadCsv() {
     lines.push(FIELDS.map(f => {
       const v = String(r[f] ?? '');
       return (v.includes(',') || v.includes('"') || v.includes('\n'))
-        ? '"' + v.replace(/"/g, '""') + '"'
-        : v;
+        ? '"' + v.replace(/"/g,'""') + '"' : v;
     }).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'assets_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'assets_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
 }
 
