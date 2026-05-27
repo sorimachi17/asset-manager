@@ -293,37 +293,23 @@ function onNameChange(i) {
   persist(SK.draft, draft);
 }
 
-// ── 前回からコピー ────────────────────────────────────────
+// ── 前回からコピー（最新日付のデータをコピー）─────────────
 function copyFromPrevious() {
-  const date = dateEl.value;
-  if (!date) { alert('日付を選択してください'); return; }
   if (draft.items.length > 0 && !confirm('現在の下書きを上書きしますか？')) return;
 
-  // 選択日付より前の日付を探す
-  const allDates = [...new Set(rows.map(r=>r.Date))].sort();
-  const prevDate = allDates.filter(d=>d < date).pop();
+  // rows の中で最新の日付を探す
+  const latestDate = rows.reduce((max, r) => (!max || r.Date > max ? r.Date : max), '');
 
-  if (prevDate) {
-    draft.items = rows.filter(r=>r.Date===prevDate).map(r=>({ ...r, _prev:r.Amount }));
-    setStatus('✓ ' + prevDate + ' からコピー（' + draft.items.length + '銘柄）');
-  } else if (allDates.length > 0) {
-    // 同日付のデータがある場合はそれをコピー候補として提示
-    const sameDate = allDates.filter(d=>d === date).pop();
-    if (sameDate && confirm(date + ' のデータをコピーしますか？')) {
-      draft.items = rows.filter(r=>r.Date===sameDate).map(r=>({ ...r, _prev:r.Amount }));
-      setStatus('✓ ' + sameDate + ' からコピー（' + draft.items.length + '銘柄）');
-    } else {
-      alert('選択した日付より前のデータがありません。\n最古のデータ: ' + allDates[0]);
-      return;
-    }
+  if (latestDate) {
+    draft.items = rows.filter(r => r.Date === latestDate).map(r => ({ ...r, _prev: r.Amount }));
+    setStatus('✓ ' + latestDate + ' からコピー（' + draft.items.length + '銘柄）');
   } else if (presets.length) {
-    draft.items = presets.map(p=>({ Name:p.Name, Amount:'', _prev:'', AssetClass:p.AssetClass||'', Currency:p.Currency||'JPY', StockType:p.StockType||'', Account:p.Account||'', Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:'' }));
+    draft.items = presets.map(p => ({ Name:p.Name, Amount:'', _prev:'', AssetClass:p.AssetClass||'', Currency:p.Currency||'JPY', StockType:p.StockType||'', Account:p.Account||'', Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:'' }));
     setStatus('プリセットから読み込み（' + draft.items.length + '銘柄）');
   } else {
     alert('コピー元データがありません。\nまず「＋ 行を追加」でデータを入力・追加してください。');
     return;
   }
-  draft.date = date;
   persist(SK.draft, draft);
   renderDraft();
 }
