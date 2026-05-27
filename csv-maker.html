@@ -5,150 +5,160 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CSV作成ツール</title>
   <style>
-    :root { --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;--accent:#3b82f6; }
+    :root { --bg:#111;--fg:#e8ecf1;--muted:#9aa4b2;--card:#1a1a1a;--line:#262a34;--accent:#3b82f6;--row-h:34px; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; }
 
     header {
       border-bottom: 1px solid var(--line); position: sticky; top: 0;
-      background: rgba(17,17,17,.95); backdrop-filter: blur(8px); z-index: 10;
-      padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+      background: rgba(17,17,17,.95); backdrop-filter: blur(8px); z-index: 20;
+      padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
-    h1 { margin: 0; font-size: 18px; white-space: nowrap; }
+    h1 { margin: 0; font-size: 16px; white-space: nowrap; }
     .wrap {
-      max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; gap: 14px;
-      padding-left: max(16px, env(safe-area-inset-left));
-      padding-right: max(16px, env(safe-area-inset-right));
+      max-width: 1400px; margin: 0 auto; padding: 12px 14px;
+      padding-left: max(14px, env(safe-area-inset-left));
+      padding-right: max(14px, env(safe-area-inset-right));
       padding-bottom: max(32px, env(safe-area-inset-bottom));
+      display: grid; gap: 12px;
     }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
-    h2 { margin: 0 0 12px; font-size: 15px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
 
-    /* Buttons */
-    button { border: none; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; min-height: 44px; white-space: nowrap; }
+    /* ── Buttons ── */
+    button { border: none; color: #fff; padding: 8px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; white-space: nowrap; }
     .btn-primary { background: var(--accent); }
     .btn-ghost   { background: #1e2638; border: 1px solid var(--line); }
     .btn-danger  { background: #7f1d1d; }
-    .btn-success { background: #15803d; }
-    .btn-sm { padding: 7px 12px; font-size: 13px; min-height: 36px; }
+    .btn-success { background: #15803d; font-size: 14px; padding: 10px 20px; }
 
-    /* Inputs & Selects */
-    input[type="date"], input[type="text"], input[type="number"], select {
+    /* ── Top bar ── */
+    .top-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    input[type="date"] {
       background: #0e121a; border: 1px solid var(--line); color: var(--fg);
-      padding: 10px 12px; border-radius: 8px; font-size: 16px; width: 100%;
+      padding: 7px 10px; border-radius: 7px; font-size: 14px; min-height: 36px;
       -webkit-appearance: none; appearance: none;
     }
-    select {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa4b2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+    input[type="date"]:focus { outline: none; border-color: var(--accent); }
+    .draft-status { font-size: 12px; color: var(--muted); margin-left: 4px; }
+
+    /* ── Excel grid ── */
+    .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 8px; }
+    .grid-tbl { width: 100%; border-collapse: collapse; min-width: 960px; }
+    .grid-tbl th {
+      background: #0d1017; color: var(--muted); font-size: 11px; font-weight: 600;
+      padding: 6px 8px; text-align: left; border-right: 1px solid var(--line);
+      border-bottom: 2px solid var(--line); white-space: nowrap; user-select: none;
+      position: sticky; top: 0; z-index: 5;
     }
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
-    input[type="date"] { min-height: 44px; }
+    .grid-tbl th:first-child { border-left: none; width: 28px; text-align: center; padding: 0; }
+    .grid-tbl th.r { text-align: right; }
+    .grid-tbl td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+    .grid-tbl td:first-child { border-left: none; text-align: center; width: 28px; }
+    .grid-tbl tr:hover td { background: rgba(255,255,255,.025); }
+    .grid-tbl tr:hover td:first-child { background: transparent; }
+    .grid-tbl tr.add-row td { border-top: 1px solid var(--line); }
 
-    /* Draft bar */
-    .draft-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-    .draft-status { font-size: 12px; color: var(--muted); }
-    .draft-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 0; }
-
-    /* ── PC draft table ───────────────────── */
-    #draftTableWrap { display: none; overflow-x: auto; }
-    .draft-tbl { width: 100%; border-collapse: collapse; }
-    .draft-tbl th {
-      background: #0e121a; color: var(--muted); font-size: 12px; font-weight: 500;
-      padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap;
+    /* cell inputs / selects */
+    .c-in, .c-sel {
+      display: block; width: 100%; height: var(--row-h);
+      background: transparent; border: none; color: var(--fg);
+      font-size: 13px; padding: 0 8px; border-radius: 0;
+      -webkit-appearance: none; appearance: none;
     }
-    .draft-tbl td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
-    .draft-tbl tr.detail-row td { padding: 0 6px 8px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); }
-    .d-name {
-      background: transparent; border: none; border-bottom: 1px solid var(--line);
-      color: var(--fg); font-size: 14px; width: 160px; padding: 4px; border-radius: 0;
+    .c-in:focus, .c-sel:focus {
+      outline: none;
+      background: rgba(59,130,246,.12);
+      box-shadow: inset 0 0 0 2px var(--accent);
     }
-    .d-name:focus { outline: none; border-bottom-color: var(--accent); }
-    .d-amt {
-      background: #0e121a; border: 1px solid var(--line); color: var(--fg);
-      font-size: 15px; padding: 6px 10px; border-radius: 6px; text-align: right;
-      width: 140px; -webkit-appearance: none; appearance: none;
+    .c-in[type="number"] { text-align: right; padding-right: 6px; }
+    .c-sel {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239aa4b2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 6px center; padding-right: 20px;
     }
-    .d-amt:focus { outline: none; border-color: var(--accent); }
-    .d-sel { font-size: 13px; padding: 6px 24px 6px 8px; border-radius: 6px; width: 110px; min-height: unset; }
-    .d-sel:focus { outline: none; border-color: var(--accent); }
-    .d-prev { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; padding-right: 10px; }
-    .d-badge { font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .del-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 8px; font-size: 18px; line-height: 1; min-height: unset; }
-    .detail-toggle { background: none; border: 1px solid var(--line); color: var(--muted); padding: 3px 8px; font-size: 11px; border-radius: 4px; cursor: pointer; min-height: unset; white-space: nowrap; }
-    .detail-toggle:hover { color: var(--fg); }
-    .detail-grid { display: grid; grid-template-columns: 130px 90px 1fr 1fr; gap: 6px; padding: 8px 4px 4px; }
-    .detail-grid input, .detail-grid select { font-size: 13px; padding: 6px 8px; }
-    .detail-grid select { padding-right: 24px; }
-    .detail-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .c-sel:focus { background-color: rgba(59,130,246,.12); }
+    .c-prev { height: var(--row-h); display: flex; align-items: center; justify-content: flex-end; padding: 0 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-    /* ── Mobile draft cards ───────────────── */
-    #draftCardList { display: none; }
-    .d-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
-    .d-card:last-child { margin-bottom: 0; }
-    .d-card-top { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .d-card-name { flex: 1; font-size: 16px; padding: 10px 12px; border-radius: 8px; }
-    .d-card-del { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 10px; border-radius: 6px; font-size: 15px; cursor: pointer; min-height: 36px; }
-    .d-card-prev { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-    .d-card-amt { font-size: 20px; padding: 12px 14px; border-radius: 8px; text-align: right; margin-bottom: 8px; }
-    .d-card-amt::placeholder { font-size: 15px; }
-    .d-card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-    .d-card-fields-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }
-    .d-card-fields select, .d-card-fields input,
-    .d-card-fields-sub select, .d-card-fields-sub input { font-size: 15px; }
-    .d-card-detail-toggle { width: 100%; background: none; border: 1px solid var(--line); color: var(--muted); font-size: 12px; padding: 6px; border-radius: 6px; cursor: pointer; min-height: unset; text-align: center; }
-    .field-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: block; }
+    /* del button in grid */
+    .del-btn { background: none; border: none; color: #ef444460; cursor: pointer; padding: 0; width: 28px; height: var(--row-h); font-size: 15px; display: flex; align-items: center; justify-content: center; }
+    .del-btn:hover { color: #ef4444; }
 
-    /* Draft actions */
-    .draft-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+    /* add-row button (last row) */
+    .add-row-btn {
+      background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer;
+      height: var(--row-h); padding: 0 10px; text-align: left; width: 100%; display: block;
+    }
+    .add-row-btn:hover { color: var(--fg); background: rgba(255,255,255,.04); }
+    .add-row td { border-bottom: none; }
 
-    /* Section title */
-    .sec-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    /* empty state */
+    .grid-empty { text-align: center; color: var(--muted); padding: 28px 0; font-size: 13px; }
+
+    /* commit bar */
+    .commit-bar { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
+    .commit-count { color: var(--muted); font-size: 12px; }
+
+    /* ── Saved data table ── */
+    .sec-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+    h2 { margin: 0; font-size: 14px; }
     .count { color: var(--muted); font-size: 12px; margin-left: 6px; }
-
-    /* Saved data table */
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .data-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .data-tbl th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-    .data-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+    .data-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .data-tbl th { background: #0e121a; color: var(--muted); font-weight: 500; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .data-tbl td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.04); white-space: nowrap; }
     .data-tbl tr:hover td { background: rgba(255,255,255,.03); }
-    .data-tbl .del-btn { padding: 2px 8px; font-size: 16px; }
-    .empty-msg { text-align: center; color: var(--muted); padding: 28px; }
-
-    /* Saved data cards */
-    .data-card-list { display: none; }
-    .s-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-    .s-card:last-child { margin-bottom: 0; }
-    .s-card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-    .s-card-amt  { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
-    .s-card-meta { font-size: 12px; color: var(--muted); }
-    .s-card-del  { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; min-height: 36px; }
+    .data-tbl .del-btn { color: #ef444460; font-size: 14px; width: auto; height: auto; padding: 2px 6px; }
+    .data-tbl .del-btn:hover { color: #ef4444; }
+    .empty-msg { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
 
     .nav-link { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }
 
-    /* Media queries */
+    /* ── Mobile cards (≤600px) ── */
     @media (max-width: 600px) {
-      h1 { font-size: 15px; }
-      .wrap { padding: 10px; gap: 10px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
-      .card { padding: 12px; border-radius: 12px; }
-      .draft-bar { gap: 8px; }
-      .draft-bar .btn-grp { display: flex; gap: 8px; flex: 1; }
-      .draft-bar .btn-grp button { flex: 1; }
-      #draftTableWrap.show { display: none !important; }
-      #draftCardList.show  { display: block !important; }
-      .draft-actions button { flex: 1; }
+      h1 { font-size: 14px; }
+      .wrap { padding: 10px; gap: 10px; }
+      .card { padding: 12px; }
+      .grid-wrap { display: none; }
+      .grid-empty { display: none; }
+      #mobileList { display: block; }
+      .commit-bar { flex-direction: column; }
+      .commit-bar button { width: 100%; }
       .sec-title { flex-direction: column; align-items: flex-start; }
       .toolbar { width: 100%; }
       .toolbar button { flex: 1; }
       .table-wrap { display: none; }
-      .data-card-list { display: block; }
+      .data-card-list { display: block !important; }
     }
     @media (min-width: 601px) {
-      #draftTableWrap.show { display: block !important; }
-      #draftCardList.show  { display: none !important; }
+      #mobileList { display: none; }
     }
+
+    /* mobile draft cards */
+    #mobileList { display: none; }
+    .m-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+    .m-card:last-child { margin-bottom: 0; }
+    .m-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .m-name { flex: 1; background: #0e121a; border: 1px solid var(--line); color: var(--fg); padding: 9px 11px; border-radius: 7px; font-size: 16px; }
+    .m-del { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 10px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .m-prev { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .m-amt { width: 100%; background: #0e121a; border: 1px solid var(--line); color: var(--fg); padding: 10px 12px; border-radius: 7px; font-size: 20px; text-align: right; margin-bottom: 8px; -webkit-appearance: none; appearance: none; }
+    .m-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+    .m-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+    .m-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: block; }
+    .m-in, .m-sel { width: 100%; background: #0e121a; border: 1px solid var(--line); color: var(--fg); padding: 7px 9px; border-radius: 7px; font-size: 15px; -webkit-appearance: none; appearance: none; }
+    .m-sel { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239aa4b2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 22px; }
+    .m-in:focus, .m-sel:focus { outline: none; border-color: var(--accent); }
+    .m-section { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+
+    /* saved data cards */
+    .data-card-list { display: none; }
+    .s-card { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .s-card:last-child { margin-bottom: 0; }
+    .s-card-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .s-card-amt  { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+    .s-card-meta { font-size: 11px; color: var(--muted); }
+    .s-card-del  { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -160,54 +170,55 @@
 
 <div class="wrap">
 
-  <!-- 日次入力 -->
+  <!-- 入力グリッド -->
   <div class="card">
-    <h2>日次入力</h2>
-    <div class="draft-bar">
+    <div class="top-bar">
       <input type="date" id="draftDate" />
-      <div class="btn-grp">
-        <button class="btn-ghost" onclick="copyFromPrevious()">前回からコピー</button>
-        <button class="btn-ghost btn-sm" onclick="addDraftRow()">＋ 銘柄を追加</button>
-      </div>
+      <button class="btn-ghost" onclick="copyFromPrevious()">前回からコピー</button>
       <span class="draft-status" id="draftStatus"></span>
     </div>
 
-    <div class="draft-empty" id="draftEmpty">日付を選んで「前回からコピー」するか、「＋ 銘柄を追加」してください。</div>
-
-    <!-- PC: table -->
-    <div id="draftTableWrap">
-      <table class="draft-tbl">
+    <!-- PC: spreadsheet grid -->
+    <div class="grid-wrap" id="gridWrap">
+      <table class="grid-tbl" id="gridTbl">
         <thead>
           <tr>
-            <th style="width:32px"></th>
-            <th>銘柄</th>
-            <th style="text-align:right">前回</th>
-            <th style="text-align:right">今回（評価額 JPY）</th>
-            <th>AssetClass</th>
-            <th>Currency</th>
-            <th style="width:60px"></th>
+            <th></th>
+            <th style="min-width:160px">銘柄</th>
+            <th class="r" style="min-width:90px">前回</th>
+            <th class="r" style="min-width:120px">評価額 (JPY)</th>
+            <th style="min-width:100px">AssetClass</th>
+            <th style="min-width:85px">Currency</th>
+            <th style="min-width:110px">StockType</th>
+            <th style="min-width:120px">Account</th>
+            <th class="r" style="min-width:80px">Quantity</th>
+            <th class="r" style="min-width:90px">CostBasis</th>
+            <th class="r" style="min-width:110px">AmountOriginal</th>
+            <th class="r" style="min-width:70px">FxRate</th>
           </tr>
         </thead>
-        <tbody id="draftTbody"></tbody>
+        <tbody id="gridBody"></tbody>
       </table>
     </div>
+    <div class="grid-empty" id="gridEmpty">日付を選んで「前回からコピー」するか、下の「＋ 行を追加」してください。</div>
 
     <!-- Mobile: cards -->
-    <div id="draftCardList"></div>
+    <div id="mobileList"></div>
 
-    <div class="draft-actions" id="draftActions" style="display:none">
-      <button class="btn-success" style="flex:2" onclick="commitDraft()">↓ CSVデータに追加</button>
-      <button class="btn-danger btn-sm" onclick="clearDraft()">クリア</button>
+    <div class="commit-bar" id="commitBar" style="display:none">
+      <button class="btn-success" onclick="commitDraft()">↓ CSVデータに追加</button>
+      <button class="btn-ghost" style="color:#ef4444;border-color:#7f1d1d" onclick="clearDraft()">クリア</button>
+      <span class="commit-count" id="commitCount"></span>
     </div>
   </div>
 
-  <!-- 保存済みデータ -->
+  <!-- 保存済みCSVデータ -->
   <div class="card">
     <div class="sec-title">
-      <h2 style="margin:0">CSVデータ<span class="count" id="rowCount">0行</span></h2>
+      <h2>CSVデータ<span class="count" id="rowCount">0行</span></h2>
       <div class="toolbar">
         <button class="btn-success" onclick="downloadCsv()">CSVダウンロード</button>
-        <button class="btn-danger btn-sm" onclick="clearAll()">すべて削除</button>
+        <button style="background:#7f1d1d;font-size:12px;padding:6px 12px" onclick="clearAll()">すべて削除</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -229,6 +240,11 @@
 </div>
 
 <datalist id="nameList"></datalist>
+<datalist id="stockTypeList">
+  <option value="国内株"><option value="外国株"><option value="投資信託">
+  <option value="ETF"><option value="REIT"><option value="個人向け国債">
+  <option value="外国債券"><option value="現金"><option value="MMF">
+</datalist>
 
 <script>
 const FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
@@ -243,7 +259,6 @@ let rows    = load(SK.rows,    []);
 let presets = load(SK.presets, []);
 let names   = new Set(load(SK.names, []));
 let draft   = load(SK.draft,   { date: '', items: [] });
-let detailOpen = new Set(); // indices with detail expanded
 
 const dateEl = document.getElementById('draftDate');
 dateEl.value = draft.date || new Date().toISOString().slice(0, 10);
@@ -254,18 +269,21 @@ updateNameList();
 renderDraft();
 renderAll();
 
-// ── helpers ─────────────────────────────
-function acOpts(current) {
-  return ASSET_CLASSES.map(v => `<option value="${v}"${v===current?' selected':''}>${v}</option>`).join('');
+// ── helpers ─────────────────────────────────────────────
+function acOpts(cur) {
+  return '<option value="">—</option>' + ASSET_CLASSES.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
 }
-function ccOpts(current) {
-  return CURRENCIES.map(v => `<option value="${v}"${v===current?' selected':''}>${v}</option>`).join('');
+function ccOpts(cur) {
+  return CURRENCIES.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
 }
 function setStatus(msg) { document.getElementById('draftStatus').textContent = msg; }
+function fmtPrev(v) {
+  return (v!==''&&v!==undefined&&v!==null) ? Number(v).toLocaleString('ja-JP') : '—';
+}
 
-// ── 前回からコピー ───────────────────────
+// ── 前回からコピー ───────────────────────────────────────
 function copyFromPrevious() {
-  syncDraftFromDOM();
+  syncFromDOM();
   const date = dateEl.value;
   if (!date) { alert('日付を選択してください'); return; }
   if (draft.items.length > 0 && !confirm('現在の下書きを上書きしますか？')) return;
@@ -278,91 +296,68 @@ function copyFromPrevious() {
     setStatus(prevDate + ' からコピー（' + draft.items.length + '銘柄）');
   } else if (presets.length) {
     draft.items = presets.map(p => ({
-      Name: p.Name, Amount: '', _prev: '',
-      AssetClass: p.AssetClass||'', Currency: p.Currency||'JPY',
-      StockType: p.StockType||'', Account: p.Account||'',
+      Name:p.Name, Amount:'', _prev:'',
+      AssetClass:p.AssetClass||'', Currency:p.Currency||'JPY',
+      StockType:p.StockType||'', Account:p.Account||'',
       Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:''
     }));
     setStatus('プリセットから読み込み（' + draft.items.length + '銘柄）');
   } else {
-    alert('コピー元のデータがありません。\n「＋ 銘柄を追加」でデータを入力してください。');
+    alert('コピー元のデータがありません。\n「＋ 行を追加」でデータを入力してください。');
     return;
   }
-
-  detailOpen.clear();
   draft.date = date;
   persist(SK.draft, draft);
   renderDraft();
 }
 
-// ── 銘柄を追加 ────────────────────────────
-function addDraftRow() {
-  syncDraftFromDOM();
-  draft.date = dateEl.value || new Date().toISOString().slice(0, 10);
-  const idx = draft.items.length;
+// ── 行追加 / 削除 ─────────────────────────────────────────
+function addRow(focusLast) {
+  syncFromDOM();
   draft.items.push({ Name:'', Amount:'', _prev:'', AssetClass:'', Currency:'JPY', StockType:'', Account:'', Quantity:'', CostBasis:'', AmountOriginal:'', FxRate:'' });
-  detailOpen.add(idx); // 新規行は詳細を開いておく
   persist(SK.draft, draft);
   renderDraft();
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('.d-name, .d-card-name');
-    if (inputs.length) inputs[inputs.length - 1].focus();
-  }, 50);
+  if (focusLast !== false) {
+    setTimeout(() => {
+      const ins = document.querySelectorAll('.c-in[data-df="Name"], .m-name');
+      if (ins.length) ins[ins.length - 1].focus();
+    }, 30);
+  }
 }
 
-function removeDraftRow(i) {
-  syncDraftFromDOM();
+function removeRow(i) {
+  syncFromDOM();
   draft.items.splice(i, 1);
-  detailOpen.delete(i);
-  const newOpen = new Set();
-  detailOpen.forEach(n => { if (n > i) newOpen.add(n - 1); else if (n < i) newOpen.add(n); });
-  detailOpen = newOpen;
   persist(SK.draft, draft);
   renderDraft();
 }
 
-function toggleDetail(i) {
-  syncDraftFromDOM();
-  if (detailOpen.has(i)) detailOpen.delete(i); else detailOpen.add(i);
-  persist(SK.draft, draft);
-  renderDraft();
-}
-
-// ── Name 変更 → 自動補完 ─────────────────
+// ── Name 変更 → 自動補完 ─────────────────────────────────
 function onNameChange(i) {
   const inp = document.querySelector(`[data-di="${i}"][data-df="Name"]`);
   if (!inp) return;
   const val = inp.value.trim();
-  draft.items[i].Name = val;
   const src = presets.find(p => p.Name === val) || [...rows].reverse().find(r => r.Name === val);
   if (src) {
-    draft.items[i].AssetClass = src.AssetClass||'';
-    draft.items[i].Currency   = src.Currency||'JPY';
-    draft.items[i].StockType  = src.StockType||'';
-    draft.items[i].Account    = src.Account||'';
-    // 詳細フィールドのDOMを直接更新（再描画しない）
-    const setVal = (df, v) => { const el = document.querySelector(`[data-di="${i}"][data-df="${df}"]`); if (el) el.value = v; };
-    setVal('AssetClass', src.AssetClass||'');
-    setVal('Currency',   src.Currency||'JPY');
-    setVal('StockType',  src.StockType||'');
-    setVal('Account',    src.Account||'');
-    const badge = document.getElementById('db'+i);
-    if (badge) badge.textContent = [src.AssetClass, src.Currency].filter(Boolean).join(' · ');
+    const set = (df, v) => { const el = document.querySelector(`[data-di="${i}"][data-df="${df}"]`); if (el) el.value = v; };
+    set('AssetClass', src.AssetClass||'');
+    set('Currency',   src.Currency||'JPY');
+    set('StockType',  src.StockType||'');
+    set('Account',    src.Account||'');
   }
-  persist(SK.draft, draft);
 }
 
-// ── DOM → draft 同期 ─────────────────────
-function syncDraftFromDOM() {
-  document.querySelectorAll('[data-di]').forEach(el => {
+// ── DOM → draft 同期 ─────────────────────────────────────
+function syncFromDOM() {
+  document.querySelectorAll('[data-di][data-df]').forEach(el => {
     const i = Number(el.dataset.di), f = el.dataset.df;
     if (draft.items[i] !== undefined) draft.items[i][f] = el.value;
   });
 }
 
-// ── CSVデータに追加 ───────────────────────
+// ── commit ───────────────────────────────────────────────
 function commitDraft() {
-  syncDraftFromDOM();
+  syncFromDOM();
   const date = dateEl.value;
   if (!date) { alert('日付を選択してください'); return; }
   const valid = draft.items.filter(it => it.Name && it.Amount !== '');
@@ -371,11 +366,9 @@ function commitDraft() {
   const newRows = valid.map(({ _prev, ...it }) => ({ ...it, Date: date }));
   rows.push(...newRows);
   newRows.forEach(r => { if (r.Name) names.add(r.Name); });
-
   persist(SK.rows, rows);
   persist(SK.names, [...names]);
   draft.items = [];
-  detailOpen.clear();
   persist(SK.draft, draft);
   setStatus(newRows.length + '行を追加しました');
   updateNameList();
@@ -385,172 +378,118 @@ function commitDraft() {
 
 function clearDraft() {
   if (draft.items.length && !confirm('下書きをクリアしますか？')) return;
-  draft.items = []; detailOpen.clear();
+  draft.items = [];
   persist(SK.draft, draft);
   setStatus('');
   renderDraft();
 }
 
-// ── Draft 描画 ────────────────────────────
+// ── キーボードナビゲーション ─────────────────────────────
+function onGridKey(e, i, df) {
+  if (e.key === 'Enter' && df === 'FxRate') {
+    e.preventDefault();
+    addRow();
+  }
+}
+
+// ── Draft 描画 ───────────────────────────────────────────
 function renderDraft() {
-  const empty   = document.getElementById('draftEmpty');
-  const tWrap   = document.getElementById('draftTableWrap');
-  const cList   = document.getElementById('draftCardList');
-  const actions = document.getElementById('draftActions');
   const has = draft.items.length > 0;
-
-  empty.style.display   = has ? 'none' : '';
-  actions.style.display = has ? '' : 'none';
-  tWrap.classList.toggle('show', has);
-  cList.classList.toggle('show', has);
-  if (!has) return;
-  renderDraftTable();
-  renderDraftCards();
+  document.getElementById('gridEmpty').style.display = has ? 'none' : '';
+  document.getElementById('commitBar').style.display = has ? '' : 'none';
+  if (has) {
+    const count = draft.items.filter(it => it.Name && it.Amount !== '').length;
+    document.getElementById('commitCount').textContent = count + '銘柄が入力済み';
+  }
+  renderGrid();
+  renderMobileCards();
 }
 
-function fmtPrev(v) {
-  return (v !== '' && v !== undefined && v !== null) ? Number(v).toLocaleString('ja-JP') + ' 円' : '—';
-}
-
-function renderDraftTable() {
-  const rows2 = draft.items.map((item, i) => {
-    const badge  = [item.AssetClass, item.Currency].filter(Boolean).join(' · ');
-    const isOpen = detailOpen.has(i);
-    const mainRow = `
-      <tr>
-        <td><button class="del-btn" onclick="removeDraftRow(${i})">×</button></td>
-        <td>
-          <input class="d-name" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
-                 list="nameList" data-di="${i}" data-df="Name" onchange="onNameChange(${i})" />
-          <div class="d-badge" id="db${i}">${esc(badge)}</div>
-        </td>
-        <td class="d-prev">${fmtPrev(item._prev)}</td>
-        <td>
-          <input class="d-amt" type="number" value="${esc(item.Amount)}" placeholder="0"
-                 inputmode="decimal" data-di="${i}" data-df="Amount" />
-        </td>
-        <td>
-          <select class="d-sel" data-di="${i}" data-df="AssetClass">
-            <option value="">—</option>${acOpts(item.AssetClass)}
-          </select>
-        </td>
-        <td>
-          <select class="d-sel" data-di="${i}" data-df="Currency">${ccOpts(item.Currency||'JPY')}</select>
-        </td>
-        <td>
-          <button class="detail-toggle" onclick="toggleDetail(${i})">${isOpen ? '詳細 ▲' : '詳細 ▼'}</button>
-        </td>
-      </tr>`;
-    const detailRow = isOpen ? `
-      <tr class="detail-row">
-        <td colspan="7">
-          <div class="detail-grid">
-            <div>
-              <div class="detail-label">StockType</div>
-              <input type="text" value="${esc(item.StockType)}" placeholder="国内株, ETF…"
-                     list="stockTypeList" data-di="${i}" data-df="StockType" />
-            </div>
-            <div>
-              <div class="detail-label">Account</div>
-              <input type="text" value="${esc(item.Account)}" placeholder="SBI特定口座…"
-                     data-di="${i}" data-df="Account" />
-            </div>
-            <div>
-              <div class="detail-label">Quantity</div>
-              <input type="number" value="${esc(item.Quantity)}" placeholder="0" step="any" inputmode="decimal"
-                     data-di="${i}" data-df="Quantity" />
-            </div>
-            <div>
-              <div class="detail-label">CostBasis</div>
-              <input type="number" value="${esc(item.CostBasis)}" placeholder="0" step="any" inputmode="decimal"
-                     data-di="${i}" data-df="CostBasis" />
-            </div>
-            <div>
-              <div class="detail-label">AmountOriginal</div>
-              <input type="number" value="${esc(item.AmountOriginal)}" placeholder="0" step="any" inputmode="decimal"
-                     data-di="${i}" data-df="AmountOriginal" />
-            </div>
-            <div>
-              <div class="detail-label">FxRate</div>
-              <input type="number" value="${esc(item.FxRate)}" placeholder="0" step="any" inputmode="decimal"
-                     data-di="${i}" data-df="FxRate" />
-            </div>
-          </div>
-        </td>
-      </tr>` : '';
-    return mainRow + detailRow;
+function renderGrid() {
+  const tbody = document.getElementById('gridBody');
+  const dataRows = draft.items.map((item, i) => {
+    return `<tr>
+      <td><button class="del-btn" onclick="removeRow(${i})" tabindex="-1">×</button></td>
+      <td><input class="c-in" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
+                 list="nameList" data-di="${i}" data-df="Name" onchange="onNameChange(${i})" /></td>
+      <td><div class="c-prev">${fmtPrev(item._prev)}</div></td>
+      <td><input class="c-in" type="number" value="${esc(item.Amount)}" placeholder="0"
+                 inputmode="decimal" data-di="${i}" data-df="Amount" /></td>
+      <td><select class="c-sel" data-di="${i}" data-df="AssetClass">${acOpts(item.AssetClass)}</select></td>
+      <td><select class="c-sel" data-di="${i}" data-df="Currency">${ccOpts(item.Currency||'JPY')}</select></td>
+      <td><input class="c-in" type="text" value="${esc(item.StockType)}" placeholder="国内株, ETF…"
+                 list="stockTypeList" data-di="${i}" data-df="StockType" /></td>
+      <td><input class="c-in" type="text" value="${esc(item.Account)}" placeholder="SBI特定口座…"
+                 data-di="${i}" data-df="Account" /></td>
+      <td><input class="c-in" type="number" value="${esc(item.Quantity)}" placeholder="0" step="any"
+                 inputmode="decimal" data-di="${i}" data-df="Quantity" /></td>
+      <td><input class="c-in" type="number" value="${esc(item.CostBasis)}" placeholder="0" step="any"
+                 inputmode="decimal" data-di="${i}" data-df="CostBasis" /></td>
+      <td><input class="c-in" type="number" value="${esc(item.AmountOriginal)}" placeholder="0" step="any"
+                 inputmode="decimal" data-di="${i}" data-df="AmountOriginal" /></td>
+      <td><input class="c-in" type="number" value="${esc(item.FxRate)}" placeholder="0" step="any"
+                 inputmode="decimal" data-di="${i}" data-df="FxRate"
+                 onkeydown="onGridKey(event,${i},'FxRate')" /></td>
+    </tr>`;
   });
-  document.getElementById('draftTbody').innerHTML = rows2.join('');
+  // 末尾に "+ 行を追加" 行
+  const addRowHtml = `<tr class="add-row">
+    <td colspan="12"><button class="add-row-btn" onclick="addRow()">＋ 行を追加</button></td>
+  </tr>`;
+  tbody.innerHTML = dataRows.join('') + addRowHtml;
 }
 
-function renderDraftCards() {
-  document.getElementById('draftCardList').innerHTML = draft.items.map((item, i) => {
-    const meta   = [item.AssetClass, item.Currency, item.StockType].filter(Boolean).join(' · ');
-    const prev   = (item._prev !== '' && item._prev !== undefined) ? '前回: ' + fmtPrev(item._prev) : '新規';
-    const isOpen = detailOpen.has(i);
+function renderMobileCards() {
+  document.getElementById('mobileList').innerHTML = draft.items.map((item, i) => {
+    const prev = (item._prev !== '' && item._prev !== undefined) ? '前回: ' + fmtPrev(item._prev) + ' 円' : '新規';
     return `
-      <div class="d-card">
-        <div class="d-card-top">
-          <input class="d-card-name" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
+      <div class="m-card">
+        <div class="m-row">
+          <input class="m-name" type="text" value="${esc(item.Name)}" placeholder="銘柄名"
                  list="nameList" data-di="${i}" data-df="Name" onchange="onNameChange(${i})" />
-          <button class="d-card-del" onclick="removeDraftRow(${i})">×</button>
+          <button class="m-del" onclick="removeRow(${i})">×</button>
         </div>
-        <div class="d-badge" id="db${i}" style="font-size:12px;color:var(--muted);margin-bottom:4px">${esc(meta)||'分類未設定'}</div>
-        <div class="d-card-prev">${prev}</div>
-        <input class="d-card-amt" type="number" value="${esc(item.Amount)}"
-               placeholder="今回の評価額（円）" inputmode="decimal"
-               data-di="${i}" data-df="Amount" />
-        <div class="d-card-fields">
-          <div>
-            <label class="field-label">AssetClass</label>
-            <select data-di="${i}" data-df="AssetClass">
-              <option value="">—</option>${acOpts(item.AssetClass)}
-            </select>
+        <div class="m-prev">${prev}</div>
+        <input class="m-amt" type="number" value="${esc(item.Amount)}" placeholder="今回の評価額（円）"
+               inputmode="decimal" data-di="${i}" data-df="Amount" />
+        <div class="m-grid">
+          <div><label class="m-label">AssetClass</label>
+            <select class="m-sel" data-di="${i}" data-df="AssetClass">${acOpts(item.AssetClass)}</select></div>
+          <div><label class="m-label">Currency</label>
+            <select class="m-sel" data-di="${i}" data-df="Currency">${ccOpts(item.Currency||'JPY')}</select></div>
+        </div>
+        <div class="m-section">
+          <div class="m-grid">
+            <div><label class="m-label">StockType</label>
+              <input class="m-in" type="text" value="${esc(item.StockType)}" placeholder="国内株, ETF…"
+                     list="stockTypeList" data-di="${i}" data-df="StockType" /></div>
+            <div><label class="m-label">Account</label>
+              <input class="m-in" type="text" value="${esc(item.Account)}" placeholder="口座名"
+                     data-di="${i}" data-df="Account" /></div>
           </div>
-          <div>
-            <label class="field-label">Currency</label>
-            <select data-di="${i}" data-df="Currency">${ccOpts(item.Currency||'JPY')}</select>
+          <div class="m-grid3">
+            <div><label class="m-label">Quantity</label>
+              <input class="m-in" type="number" value="${esc(item.Quantity)}" placeholder="0" step="any"
+                     inputmode="decimal" data-di="${i}" data-df="Quantity" /></div>
+            <div><label class="m-label">CostBasis</label>
+              <input class="m-in" type="number" value="${esc(item.CostBasis)}" placeholder="0" step="any"
+                     inputmode="decimal" data-di="${i}" data-df="CostBasis" /></div>
+            <div><label class="m-label">AmountOriginal</label>
+              <input class="m-in" type="number" value="${esc(item.AmountOriginal)}" placeholder="0" step="any"
+                     inputmode="decimal" data-di="${i}" data-df="AmountOriginal" /></div>
+          </div>
+          <div class="m-grid" style="grid-template-columns:1fr">
+            <div><label class="m-label">FxRate</label>
+              <input class="m-in" type="number" value="${esc(item.FxRate)}" placeholder="0" step="any"
+                     inputmode="decimal" data-di="${i}" data-df="FxRate" /></div>
           </div>
         </div>
-        ${isOpen ? `
-        <div class="d-card-fields-sub">
-          <div>
-            <label class="field-label">StockType</label>
-            <input type="text" value="${esc(item.StockType)}" placeholder="国内株, ETF…"
-                   list="stockTypeList" data-di="${i}" data-df="StockType" />
-          </div>
-          <div>
-            <label class="field-label">Account</label>
-            <input type="text" value="${esc(item.Account)}" placeholder="口座名…"
-                   data-di="${i}" data-df="Account" />
-          </div>
-          <div>
-            <label class="field-label">Quantity</label>
-            <input type="number" value="${esc(item.Quantity)}" placeholder="0" step="any" inputmode="decimal"
-                   data-di="${i}" data-df="Quantity" />
-          </div>
-          <div>
-            <label class="field-label">CostBasis</label>
-            <input type="number" value="${esc(item.CostBasis)}" placeholder="0" step="any" inputmode="decimal"
-                   data-di="${i}" data-df="CostBasis" />
-          </div>
-          <div>
-            <label class="field-label">AmountOriginal</label>
-            <input type="number" value="${esc(item.AmountOriginal)}" placeholder="0" step="any" inputmode="decimal"
-                   data-di="${i}" data-df="AmountOriginal" />
-          </div>
-          <div>
-            <label class="field-label">FxRate</label>
-            <input type="number" value="${esc(item.FxRate)}" placeholder="0" step="any" inputmode="decimal"
-                   data-di="${i}" data-df="FxRate" />
-          </div>
-        </div>` : ''}
-        <button class="d-card-detail-toggle" onclick="toggleDetail(${i})">${isOpen ? '▲ 詳細を閉じる' : '▼ StockType / Account / その他'}</button>
       </div>`;
-  }).join('');
+  }).join('') + (draft.items.length === 0 ? '' : '') +
+  `<button class="btn-ghost" style="width:100%;margin-top:8px" onclick="addRow()">＋ 行を追加</button>`;
 }
 
-// ── 保存済みデータ ────────────────────────
+// ── 保存済みデータ ────────────────────────────────────────
 function renderAll() {
   document.getElementById('rowCount').textContent = rows.length + '行';
   renderTable();
@@ -616,12 +555,5 @@ function downloadCsv() {
 function e(v) { return (v===null||v===undefined||v==='') ? '<span style="color:var(--muted)">—</span>' : esc(String(v)); }
 function esc(v) { return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
-
-<datalist id="stockTypeList">
-  <option value="国内株"><option value="外国株"><option value="投資信託">
-  <option value="ETF"><option value="REIT"><option value="個人向け国債">
-  <option value="外国債券"><option value="現金"><option value="MMF">
-</datalist>
-
 </body>
 </html>
