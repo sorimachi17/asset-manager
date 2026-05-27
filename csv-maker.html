@@ -54,12 +54,17 @@
     .grid-tbl tr:hover td { background: rgba(255,255,255,.025); }
     .grid-tbl tr.add-row td { border-bottom: none; }
 
-    /* 銘柄・×列をスクロール時に固定 */
+    /* 銘柄・×列をスクロール時に固定（横方向） */
     .grid-tbl th:first-child, .grid-tbl td:first-child { position: sticky; left: 0; z-index: 2; }
     .grid-tbl th:nth-child(2), .grid-tbl td:nth-child(2) { position: sticky; left: 28px; z-index: 2; }
     .grid-tbl th:first-child, .grid-tbl th:nth-child(2) { background: #0d1017; }
     .grid-tbl td:first-child, .grid-tbl td:nth-child(2) { background: #111; }
     .grid-tbl tr:hover td:first-child, .grid-tbl tr:hover td:nth-child(2) { background: #1c2030; }
+    /* ヘッダ行を縦スクロール時も固定（縦方向） */
+    .grid-tbl thead th { position: sticky; top: 0; z-index: 3; }
+    /* 左上コーナー：横・縦どちらのスクロールでも固定 */
+    .grid-tbl thead th:first-child { position: sticky; top: 0; left: 0; z-index: 5; }
+    .grid-tbl thead th:nth-child(2) { position: sticky; top: 0; left: 28px; z-index: 5; }
 
     .c-in, .c-sel {
       display: block; width: 100%; height: var(--row-h);
@@ -160,16 +165,29 @@
       h1 { font-size: 14px; }
       .wrap { padding: 10px; gap: 10px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
       .card { padding: 10px; }
-      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 14px; height: 38px; }
       .top-bar { flex-wrap: wrap; gap: 6px; }
-      /* モバイルでもグリッド表示（横スクロール） */
-      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; height: 40px; }
       .m-wrap { display: none !important; }
       .commit-bar { flex-direction: column; }
       .commit-bar button { width: 100%; }
       .sec-title { flex-direction: column; align-items: flex-start; }
       .toolbar { width: 100%; }
       .toolbar button { flex: 1; }
+
+      /* 入力グリッド：縦横スクロール＋ヘッダ・左列固定 */
+      .grid-wrap { max-height: 62vh; overflow-y: auto; }
+      .grid-tbl th { font-size: 12px; padding: 6px 7px; }
+      .grid-tbl .c-in, .grid-tbl .c-sel { font-size: 16px; height: 44px; }
+      /* スマホ向け列幅（全体幅を抑える） */
+      .grid-tbl th:nth-child(2)  { min-width: 130px !important; }
+      .grid-tbl th:nth-child(3)  { min-width: 72px  !important; }
+      .grid-tbl th:nth-child(4)  { min-width: 100px !important; }
+      .grid-tbl th:nth-child(5)  { min-width: 88px  !important; }
+      .grid-tbl th:nth-child(6)  { min-width: 72px  !important; }
+      .grid-tbl th:nth-child(7)  { min-width: 88px  !important; }
+      .grid-tbl th:nth-child(8)  { min-width: 96px  !important; }
+      .grid-tbl th:nth-child(9)  { min-width: 72px  !important; }
+      .grid-tbl th:nth-child(10) { min-width: 76px  !important; }
+
       /* CSVデータはカード表示 */
       .table-wrap { display: none; }
       .data-card-list { display: block; }
