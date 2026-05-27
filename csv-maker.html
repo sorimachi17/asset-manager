@@ -123,6 +123,14 @@
     .s-card-meta { font-size: 11px; color: var(--muted); }
     .s-card-del  { flex-shrink: 0; background: none; border: 1px solid #7f1d1d; color: #ef4444; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
 
+    /* セル色分け */
+    .grid-tbl td.c-active { background: rgba(59,130,246,.08); }
+    .grid-tbl td.c-na     { background: rgba(0,0,0,.25); }
+    .grid-tbl td.c-na .c-in,
+    .grid-tbl td.c-na .c-sel { color: rgba(255,255,255,.2); }
+    .grid-tbl tr:hover td.c-active { background: rgba(59,130,246,.14); }
+    .grid-tbl tr:hover td.c-na     { background: rgba(0,0,0,.18); }
+
     /* スピナー非表示 */
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button { display: none; -webkit-appearance: none; margin: 0; }
@@ -419,7 +427,7 @@ function renderDraft() {
 
 function ccSel(cur, di, df) {
   const opts = CURRENCIES.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
-  return `<select class="c-sel" data-di="${di}" data-df="${df}" oninput="onCell(${di},'${df}',this.value)">${opts}</select>`;
+  return `<select class="c-sel" data-di="${di}" data-df="${df}" oninput="onCell(${di},'${df}',this.value)" onchange="renderGrid()">${opts}</select>`;
 }
 function ccMSel(cur, i) {
   const opts = CURRENCIES.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
@@ -437,6 +445,27 @@ function numVal(v) {
   return isNaN(n) ? '' : String(n);
 }
 
+// セルごとの色クラス
+function cc(it, field) {
+  const ac  = (it.AssetClass || '').toLowerCase();
+  const cur = it.Currency || 'JPY';
+  if (!ac) return field === 'Amount' ? 'c-active' : '';
+
+  const isCash    = ac === 'cash';
+  const isForeign = cur !== 'JPY';
+
+  switch (field) {
+    case 'Amount':         return 'c-active';
+    case 'Quantity':
+    case 'CostBasis':      return isCash ? 'c-na' : 'c-active';
+    case 'AmountOriginal':
+    case 'FxRate':         return isForeign ? 'c-active' : 'c-na';
+    case 'StockType':
+    case 'Account':        return isCash ? 'c-na' : '';
+    default:               return '';
+  }
+}
+
 function renderGrid() {
   const rows2 = draft.items.map((it, i) => `
     <tr>
@@ -445,29 +474,37 @@ function renderGrid() {
            list="nameList" data-di="${i}" data-df="Name"
            oninput="onCell(${i},'Name',this.value)" onchange="onNameChange(${i})" /></td>
       <td><div class="c-prev">${fmtPrev(it._prev)}</div></td>
-      <td><input class="c-in" type="number" value="${numVal(it.Amount)}" placeholder="0"
+      <td class="${cc(it,'Amount')}">
+        <input class="c-in" type="number" value="${numVal(it.Amount)}" placeholder="0"
            inputmode="decimal" data-di="${i}" data-df="Amount"
            oninput="onCell(${i},'Amount',this.value)" /></td>
       <td><input class="c-in" type="text" value="${esc(it.AssetClass)}" placeholder="stock…"
            list="acList" data-di="${i}" data-df="AssetClass"
-           oninput="onCell(${i},'AssetClass',this.value)" /></td>
+           oninput="onCell(${i},'AssetClass',this.value)"
+           onchange="renderGrid()" /></td>
       <td>${ccSel(it.Currency||'JPY', i, 'Currency')}</td>
-      <td><input class="c-in" type="text" value="${esc(it.StockType)}" placeholder="国内株, ETF…"
+      <td class="${cc(it,'StockType')}">
+        <input class="c-in" type="text" value="${esc(it.StockType)}" placeholder="国内株, ETF…"
            list="stockTypeList" data-di="${i}" data-df="StockType"
            oninput="onCell(${i},'StockType',this.value)" /></td>
-      <td><input class="c-in" type="text" value="${esc(it.Account)}" placeholder="SBI特定口座…"
+      <td class="${cc(it,'Account')}">
+        <input class="c-in" type="text" value="${esc(it.Account)}" placeholder="SBI特定口座…"
            list="accountList" data-di="${i}" data-df="Account"
            oninput="onCell(${i},'Account',this.value)" /></td>
-      <td><input class="c-in" type="number" value="${esc(it.Quantity)}" placeholder="0" step="any"
+      <td class="${cc(it,'Quantity')}">
+        <input class="c-in" type="number" value="${esc(it.Quantity)}" placeholder="0" step="any"
            inputmode="decimal" data-di="${i}" data-df="Quantity"
            oninput="onCell(${i},'Quantity',this.value)" /></td>
-      <td><input class="c-in" type="number" value="${esc(it.CostBasis)}" placeholder="0" step="any"
+      <td class="${cc(it,'CostBasis')}">
+        <input class="c-in" type="number" value="${esc(it.CostBasis)}" placeholder="0" step="any"
            inputmode="decimal" data-di="${i}" data-df="CostBasis"
            oninput="onCell(${i},'CostBasis',this.value)" /></td>
-      <td><input class="c-in" type="number" value="${esc(it.AmountOriginal)}" placeholder="0" step="any"
+      <td class="${cc(it,'AmountOriginal')}">
+        <input class="c-in" type="number" value="${esc(it.AmountOriginal)}" placeholder="0" step="any"
            inputmode="decimal" data-di="${i}" data-df="AmountOriginal"
            oninput="onCell(${i},'AmountOriginal',this.value)" /></td>
-      <td><input class="c-in" type="number" value="${esc(it.FxRate)}" placeholder="0" step="any"
+      <td class="${cc(it,'FxRate')}">
+        <input class="c-in" type="number" value="${esc(it.FxRate)}" placeholder="0" step="any"
            inputmode="decimal" data-di="${i}" data-df="FxRate"
            oninput="onCell(${i},'FxRate',this.value)"
            onkeydown="onGridKey(event,${i},'FxRate')" /></td>
