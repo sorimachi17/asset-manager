@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -51,6 +51,14 @@
     .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
     .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
     .chart-wrap canvas{width:100%;}
+
+    /* ===== Tabs ===== */
+    .tabs{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .tab-btn{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13px;white-space:nowrap;flex-shrink:0}
+    .tab-btn.active{background:#1a5fff;border-color:#1a5fff;color:#fff}
+    .tab-pane{display:none}
+    .tab-pane.active{display:contents}
+    .ips-row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
 
     /* ===== Calendar (responsive + grass) ===== */
     .cal-header{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
@@ -240,23 +248,26 @@
   <div class="wrap">
     <h1>資産管理アプリ</h1>
     <div class="toolbar">
-      <input id="file" type="file" accept=".csv" />
-      <span class="muted">「CSVを読み込む」→ 集計・可視化します</span>
+      <input id="file" type="file" accept=".csv" multiple />
+      <span class="muted">資産CSVを読み込み（指数CSV(Date+Close)も同時に読込可）</span>
       <button id="exportCsv" disabled>CSV書き出し</button>
-      <button id="clearData" class="btn-danger" disabled>データをクリア</button>
-      <span id="savedBadge" class="saved-badge">● 保存済み</span>
-      <span class="muted" style="color:rgba(255,255,255,0.2)">│</span>
-      <input id="tradeFile" type="file" accept=".csv" />
-      <span class="muted">約定履歴CSV</span>
-      <button id="clearTrades" class="btn-danger" disabled>約定クリア</button>
-      <span id="tradeBadge" class="saved-badge" style="display:none">● 約定済</span>
+      <span id="importNote" class="muted"></span>
+      <span id="benchBadge" class="saved-badge" style="color:#fbbf24"></span>
       <span class="muted" style="color:rgba(255,255,255,0.2)">│</span>
       <a href="csv-maker.html" style="background:#1e2638;border:1px solid var(--line);color:#e8ecf1;padding:10px 14px;border-radius:10px;text-decoration:none;font-size:14px;white-space:nowrap">CSV作成ツール</a>
     </div>
+    <nav class="tabs" id="tabNav">
+      <button class="tab-btn active" data-tab="tabDash">ダッシュボード</button>
+      <button class="tab-btn" data-tab="tabTrend">推移</button>
+      <button class="tab-btn" data-tab="tabAnal">銘柄分析</button>
+      <button class="tab-btn" data-tab="tabCmp">2日間比較</button>
+      <button class="tab-btn" data-tab="tabCal">カレンダー</button>
+    </nav>
   </div>
 </header>
 
 <main class="wrap">
+<div id="tabDash" class="tab-pane active">
   <!-- KPI（統合） -->
   <section class="kpi" id="kpis">
     <div class="card">
@@ -275,6 +286,21 @@
       <div class="sub" id="pnlPctLine" style="margin-top:4px;">—</div>
       <div class="sub" id="pnlCostLine" style="margin-top:2px;">—</div>
     </div>
+    <div class="card" id="kpiRetCard" style="display:none">
+      <div class="muted">運用リターン・年初来 <span id="retBaseNote"></span></div>
+      <div class="big" id="retYtd">—</div>
+      <div class="sub" id="retMonthLine" style="margin-top:4px;">—</div>
+      <div class="sub" id="retAllLine" style="margin-top:2px;">—</div>
+      <div class="sub" id="retBenchLine" style="margin-top:2px;display:none">—</div>
+      <div class="sub" style="margin-top:4px;font-size:10px">※ 入金調整後（修正ディーツ法・保有数×取得単価の変化から資金流出入を推定）</div>
+    </div>
+  </section>
+
+  <!-- IPS準拠チェック -->
+  <section class="panel">
+    <h2>IPS準拠チェック</h2>
+    <div class="h2-sub">目標配分との乖離を監視（しきい値はコード冒頭の IPS_CONFIG で編集）</div>
+    <div id="ipsBody" class="muted" style="margin-top:8px">CSVを読み込むと表示されます</div>
   </section>
 
   <!-- 資産分類 -->
@@ -296,8 +322,10 @@
     <div class="legend-row" id="pieLegend"></div>
   </section>
 
+</div><!-- /tabDash -->
+<div id="tabTrend" class="tab-pane">
   <!-- 日別推移 -->
-  <section class="panel">
+  <section class="panel wide">
     <h2>日別推移</h2>
     <div class="h2-sub" id="lineRangeNote">—</div>
     <div class="controls">
@@ -316,13 +344,15 @@
     <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)">
-        <input type="checkbox" id="showTradeMarkers" style="accent-color:#fbbf24">
-        <span style="color:#fbbf24">▼</span> 買付マーカーを表示（約定履歴必要）
+        <input type="checkbox" id="showBench" checked style="accent-color:#9ca3af">
+        <span style="color:#9ca3af">- -</span> ベンチマークを重ねる（指数CSV読込時・起点で指数化）
       </label>
     </div>
     <div class="muted" style="margin-top:4px">※ 記録日のみ表示（点マーカーは非表示）／最新日が¥0の系列は非表示</div>
   </section>
 
+</div><!-- /tabTrend -->
+<div id="tabAnal" class="tab-pane">
   <!-- 銘柄別割合・合算 -->
   <section class="panel wide">
     <h2>銘柄別割合・合算</h2>
@@ -412,6 +442,8 @@
     </div>
   </section>
 
+</div><!-- /tabAnal -->
+<div id="tabCmp" class="tab-pane">
   <!-- 2日間比較（表のみ） -->
   <section class="panel wide">
     <h2>2日間比較</h2>
@@ -444,6 +476,8 @@
     </div>
   </section>
 
+</div><!-- /tabCmp -->
+<div id="tabCal" class="tab-pane">
   <!-- 月カレンダー -->
   <section class="panel wide">
     <h2>月カレンダー</h2>
@@ -525,80 +559,7 @@
     </div>
   </section>
 
-  <!-- DCA分析 -->
-  <section class="panel wide">
-    <h2>DCA分析（買付コスト）</h2>
-    <div class="h2-sub">銘柄ごとの取得単価分布と平均取得単価を確認</div>
-    <div id="dcaEmpty" class="muted" style="padding:16px 0">約定履歴CSVを読み込むと表示されます</div>
-    <div id="dcaContent" style="display:none">
-      <div class="controls" style="margin-bottom:8px">
-        <label>銘柄: <select id="dcaStock"></select></label>
-      </div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:12px">
-        <span class="muted">平均取得単価: <strong id="dcaAvg" style="color:#f59e0b">—</strong></span>
-        <span class="muted">保有株数: <strong id="dcaTotal">—</strong></span>
-        <span class="muted">取得総額: <strong id="dcaTotalUSD">—</strong></span>
-        <span class="muted">取引回数: <strong id="dcaCount">—</strong></span>
-      </div>
-      <div style="display:flex;gap:12px;font-size:11px;margin-bottom:4px">
-        <span style="color:rgba(59,130,246,1)">■ 特定口座</span>
-        <span style="color:rgba(34,197,94,1)">■ NISA</span>
-        <span style="color:#f59e0b">— 平均取得単価</span>
-      </div>
-      <div class="chart-wrap"><canvas id="dcaCanvas" height="220"></canvas></div>
-    </div>
-  </section>
-
-  <!-- 取引パターン -->
-  <section class="panel wide">
-    <h2>取引パターン</h2>
-    <div class="h2-sub">約定履歴から取引タイミングの傾向を分析</div>
-    <div id="patEmpty" class="muted" style="padding:16px 0">約定履歴CSVを読み込むと表示されます</div>
-    <div id="patContent" style="display:none">
-
-      <!-- Row 1: day/week charts -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
-        <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">曜日別 取引回数</div>
-          <canvas id="patDayCanvas" height="200"></canvas>
-        </div>
-        <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">月別 投資金額</div>
-          <canvas id="patMonthCanvas" height="200"></canvas>
-        </div>
-      </div>
-
-      <!-- Row 2: ticker / cumulative -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
-        <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">銘柄別 取引回数</div>
-          <canvas id="patTickerCanvas" height="200"></canvas>
-        </div>
-        <div>
-          <div class="muted" style="font-size:12px;margin-bottom:6px">累計投資額推移</div>
-          <canvas id="patCumCanvas" height="200"></canvas>
-        </div>
-      </div>
-
-      <!-- Recent trades table -->
-      <div style="margin-top:4px">
-        <div class="muted" style="font-size:12px;margin-bottom:6px">直近50件 取引履歴</div>
-        <div class="table-wrap" style="max-height:320px;overflow-y:auto">
-          <table id="patTradeTable" style="font-size:12px">
-            <thead style="position:sticky;top:0;background:var(--panel);z-index:1"><tr>
-              <th style="text-align:left">日付</th>
-              <th style="text-align:left">銘柄</th>
-              <th style="text-align:right">単価</th>
-              <th style="text-align:right">数量</th>
-              <th style="text-align:right">約定金額</th>
-              <th style="text-align:left">口座</th>
-            </tr></thead>
-            <tbody id="patTradeBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
+</div><!-- /tabCal -->
 
 </main>
 
@@ -640,9 +601,20 @@
 <script>
 dayjs.extend(dayjs_plugin_customParseFormat);
 
+// ============================================================
+// IPS 設定 —— ここを編集してリバランス基準を変える
+// ============================================================
+const IPS_CONFIG = {
+  maxSingleWeight: 0.35,               // 個別銘柄の上限ウェイト（全資産比）
+  maxTopNWeight:  { n: 3, limit: 0.75 }, // 上位N銘柄合計の上限
+  rebalanceBand:  0.05,                // targetsの許容乖離（±5pp）
+  targets: [                           // 例: { dim:'Account', key:'NISA', target:0.40 }
+    // { dim:'AssetClass', key:'stock', target:1.00 },
+  ]
+};
+
 // --- state ---
 let RAW = []; let DATES = []; const byDate = new Map();
-let TRADES = [];
 const byDateName = new Map();
 const META_BY_DATE_NAME = new Map();
 
@@ -651,8 +623,9 @@ const $ = id => document.getElementById(id);
 const yen = n => '¥' + new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const fmt = n => new Intl.NumberFormat('ja-JP').format(Math.round(n ?? 0));
 const PALETTE_BASE = [
-  '0,255,255','0,180,255','57,255,20','0,120,255','0,255,170',
-  '0,150,255','0,255,200','0,90,255','0,255,120','0,210,255'
+  '59,130,246','34,197,94','249,115,22','168,85,247','236,72,153',
+  '20,184,166','250,204,21','239,68,68','99,102,241','132,204,22',
+  '14,165,233','244,114,182'
 ];
 const COLORS = PALETTE_BASE.map(rgb => `rgba(${rgb},0.8)`);
 
@@ -681,47 +654,12 @@ function compactJPY(n){
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-// ===================== LocalStorage =====================
-const LS_KEY = 'asset_mgr_v1';
-const LS_TRADES_KEY = 'asset_mgr_v1_trades';
-
-function saveToStorage(){
-  try{
-    localStorage.setItem(LS_KEY, JSON.stringify(RAW));
-    const badge = $('savedBadge');
-    badge.style.display = 'inline';
-  }catch(e){ console.warn('LocalStorage save failed:', e); }
-}
-
-function tryLoadSaved(){
-  try{
-    const saved = localStorage.getItem(LS_KEY);
-    if(!saved) return false;
-    const data = JSON.parse(saved);
-    if(!Array.isArray(data) || !data.length) return false;
-    RAW = data;
-    buildIndexes();
-    onDataReady();
-    $('exportCsv').disabled = false;
-    $('clearData').disabled = false;
-    $('savedBadge').style.display = 'inline';
-    return true;
-  }catch(e){ return false; }
-}
-
-function clearStorage(){
-  if(!confirm('保存されたデータを削除してページをリセットしますか？')) return;
-  localStorage.removeItem(LS_KEY);
-  location.reload();
-}
-
 // ===================== CSV列マッピング =====================
 const REQUIRED_FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
 
 let _pendingRawRows = null;
 
-function parseCSV(text){
-  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+function parseCSVParsed(parsed){
   const headers = parsed.meta.fields || [];
   const missing = REQUIRED_FIELDS.filter(f => !headers.includes(f));
   if(missing.length === 0){
@@ -769,11 +707,17 @@ function applyMappingAndProcess(mapping, rawRows){
     CostBasis:      Number(String(r[mapping.CostBasis || 'CostBasis'] || '0').replace(/,/g,'')) || 0,
     AmountOriginal: (r['AmountOriginal'] !== undefined && r['AmountOriginal'] !== '') ? (Number(String(r['AmountOriginal']).replace(/,/g,'')) || '') : '',
     FxRate:         (r['FxRate']         !== undefined && r['FxRate']         !== '') ? (Number(String(r['FxRate']        ).replace(/,/g,'')) || '') : ''
-  })).filter(r => r.Date);
+  }));
+  const before = RAW.length;
+  RAW = RAW.filter(r => r.Date && dayjs(r.Date, 'YYYY-MM-DD', true).isValid());
+  const dropped = before - RAW.length;
+  $('importNote').textContent = RAW.length
+    ? `読込 ${RAW.length}行` + (dropped ? `（日付不正 ${dropped}行を除外）` : '')
+    : '有効な行がありません（日付列を確認してください）';
+  if(dropped) console.warn(`日付が解釈できない行を ${dropped} 行除外しました`);
   buildIndexes();
   onDataReady();
   $('exportCsv').disabled = RAW.length === 0;
-  $('clearData').disabled = RAW.length === 0;
 }
 
 // ===================== indexes =====================
@@ -1044,36 +988,7 @@ function drawPie(){
 }
 
 // ===================== Line =====================
-const tradeMarkerPlugin = {
-  id: 'tradeMarkers',
-  afterDatasetsDraw(chart){
-    if(!TRADES.length || !$('showTradeMarkers').checked) return;
-    const {ctx, chartArea, scales} = chart;
-    const labels = chart.data.labels;
-    const byDateMap = new Map();
-    for(const t of TRADES){
-      if(!byDateMap.has(t.date)) byDateMap.set(t.date, []);
-      byDateMap.get(t.date).push(t);
-    }
-    ctx.save();
-    for(const [date, trades] of byDateMap){
-      const idx = labels.indexOf(date);
-      if(idx < 0) continue;
-      const x = scales.x.getPixelForValue(idx);
-      ctx.strokeStyle = 'rgba(251,191,36,0.35)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3,3]);
-      ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#fbbf24';
-      const ty = chartArea.top + 2;
-      ctx.beginPath(); ctx.moveTo(x, ty+8); ctx.lineTo(x-5, ty); ctx.lineTo(x+5, ty); ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-  }
-};
-
-let lineChart;
+let lineChart = null;
 function drawLine(){
   if(!DATES.length) return;
   const dim = $("lineDimension").value;
@@ -1134,7 +1049,8 @@ function drawLine(){
         pointRadius:0, pointHitRadius:8,
         borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]
       })),
-      {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}
+      {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1},
+      ...benchDatasets(labels, totals)
     ]},
     options:{
       responsive:true,
@@ -1143,8 +1059,7 @@ function drawLine(){
         y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}
       },
       plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
-    },
-    plugins:[tradeMarkerPlugin]
+    }
   });
 }
 
@@ -2125,6 +2040,212 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
+// ===================== ベンチマーク =====================
+let BENCH = [];      // [{date, close}] 昇順
+let BENCH_NAME = '';
+
+function parseBenchmarkCSV(parsed, filename){
+  const fields = (parsed.meta.fields || []).map(f => f.trim());
+  const dateKey  = fields.find(f => /^date$|日付/i.test(f));
+  const closeKey = fields.find(f => /adj.*close/i.test(f)) || fields.find(f => /^close$|終値/i.test(f));
+  if(!dateKey || !closeKey) return;
+  const rows = [];
+  for(const r of parsed.data){
+    const d = normalizeDate(String(r[dateKey] ?? r[Object.keys(r).find(k=>k.trim()===dateKey)] ?? '').trim());
+    const c = Number(String(r[closeKey] ?? r[Object.keys(r).find(k=>k.trim()===closeKey)] ?? '').replace(/,/g,''));
+    if(d && dayjs(d,'YYYY-MM-DD',true).isValid() && isFinite(c) && c > 0) rows.push({date:d, close:c});
+  }
+  if(!rows.length){ alert('指数CSVを解釈できませんでした（Date/Close列を確認してください）'); return; }
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  BENCH = rows;
+  BENCH_NAME = (filename || '指数').replace(/\.csv$/i,'');
+  const badge = $('benchBadge');
+  badge.textContent = `● ベンチマーク: ${BENCH_NAME}（${rows[0].date}〜${rows.at(-1).date}）`;
+  badge.style.display = 'inline';
+  if(DATES.length){ renderReturns(); if(activeTab === 'tabTrend') drawLine(); }
+}
+
+function benchCloseOnOrBefore(target){
+  for(let i = BENCH.length - 1; i >= 0; i--){ if(BENCH[i].date <= target) return BENCH[i].close; }
+  return null;
+}
+function benchReturn(fromDate, toDate){
+  const a = benchCloseOnOrBefore(fromDate), b = benchCloseOnOrBefore(toDate);
+  return (a && b) ? (b / a - 1) : null;
+}
+function benchDatasets(labels, totals){
+  const el = $('showBench');
+  if(!BENCH.length || (el && !el.checked)) return [];
+  const c0 = benchCloseOnOrBefore(labels[0]);
+  if(!c0) return [];
+  const base = totals[0];
+  const data = labels.map(d => { const c = benchCloseOnOrBefore(d); return c ? base * c / c0 : null; });
+  return [{ label:`ベンチマーク（${BENCH_NAME}・指数化）`, data,
+    borderColor:'rgba(200,200,200,0.9)', backgroundColor:'rgba(200,200,200,0.9)',
+    borderDash:[6,4], borderWidth:2, pointRadius:0, pointHitRadius:8, tension:0.2, spanGaps:true, order:-2 }];
+}
+
+// ===================== キャッシュフロー推定 & 修正ディーツ =====================
+// 保有数×取得単価の変化から資金流出入を推定する。
+//  - 数量が増加 → 買付: 取得総額の増分を流入とみなす
+//  - 数量が減少 → 売却: 観測時点の市場単価×減少株数を流出として近似
+//  - 数量情報がない行（現金等）→ 評価額の増減そのものを資金移動とみなす
+// 現金を記録している場合、買付は「現金減 + 取得額増」で相殺され外部フローにならない（=正しい挙動）。
+let FLOWS = []; // [{date, flow}] 昇順
+
+function computeFlows(){
+  FLOWS = [];
+  if(DATES.length < 2) return;
+  const byDateKey = new Map(); // date -> Map('Name|Account' -> {qty, cost, amount})
+  for(const r of RAW){
+    if(!byDateKey.has(r.Date)) byDateKey.set(r.Date, new Map());
+    const m = byDateKey.get(r.Date);
+    const key = r.Name + '|' + (r.Account || '');
+    const cur = m.get(key) || {qty:0, cost:0, amount:0};
+    cur.qty += r.Quantity || 0;
+    cur.cost += (r.Quantity || 0) * (r.CostBasis || 0);
+    cur.amount += r.Amount || 0;
+    m.set(key, cur);
+  }
+  for(let i = 1; i < DATES.length; i++){
+    const m0 = byDateKey.get(DATES[i-1]) || new Map();
+    const m1 = byDateKey.get(DATES[i])   || new Map();
+    let flow = 0;
+    const keys = new Set([...m0.keys(), ...m1.keys()]);
+    for(const k of keys){
+      const a = m0.get(k) || {qty:0, cost:0, amount:0};
+      const b = m1.get(k) || {qty:0, cost:0, amount:0};
+      if(a.qty > 0 || b.qty > 0){
+        if(b.qty > a.qty + 1e-9){
+          flow += (b.cost - a.cost);                       // 買付
+        } else if(b.qty < a.qty - 1e-9){
+          const px = b.qty > 0 ? b.amount / b.qty : (a.qty > 0 ? a.amount / a.qty : 0);
+          flow -= (a.qty - b.qty) * px;                    // 売却（近似）
+        }
+      } else {
+        flow += (b.amount - a.amount);                     // 現金等
+      }
+    }
+    if(Math.abs(flow) > 0.5) FLOWS.push({date: DATES[i], flow});
+  }
+}
+
+function modifiedDietz(fromDate, toDate){
+  if(!fromDate || !toDate || fromDate >= toDate) return null;
+  const V0 = sumAt(fromDate), V1 = sumAt(toDate);
+  const T = dayjs(toDate).diff(fromDate, 'day');
+  if(T <= 0 || V0 <= 0) return null;
+  let F = 0, W = 0;
+  for(const f of FLOWS){
+    if(f.date > fromDate && f.date <= toDate){
+      const w = (T - dayjs(f.date).diff(fromDate, 'day')) / T;
+      F += f.flow; W += f.flow * w;
+    }
+  }
+  const denom = V0 + W;
+  if(denom <= 0) return null;
+  return { ret: (V1 - V0 - F) / denom, flowSum: F };
+}
+
+function renderReturns(){
+  const card = $('kpiRetCard');
+  if(DATES.length < 2){ card.style.display = 'none'; return; }
+  const cur = nearestOnOrBefore($('totalDate').value || DATES.at(-1)) || DATES.at(-1);
+  const monthBase = computeMonthBase(cur);
+  const yearStr = cur.slice(0,4);
+  const prevYearDates = DATES.filter(d => d.slice(0,4) < yearStr);
+  const ytdBase = prevYearDates.length ? prevYearDates.at(-1) : DATES[0];
+  const first = DATES[0];
+  const fmtPct = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+
+  const ytd = modifiedDietz(ytdBase, cur);
+  const mon = monthBase ? modifiedDietz(monthBase, cur) : null;
+  const all = modifiedDietz(first, cur);
+
+  card.style.display = '';
+  $('retBaseNote').textContent = `（基準: ${ytdBase}）`;
+  $('retYtd').textContent = ytd ? fmtPct(ytd.ret) : '—';
+  $('retYtd').className = 'big ' + (ytd && ytd.ret < 0 ? 'neg' : 'pos');
+  $('retMonthLine').textContent = mon ? `月間 ${fmtPct(mon.ret)}（基準: ${monthBase}）` : '月間 —';
+  const days = dayjs(cur).diff(first, 'day');
+  const cagr = (all && days > 365) ? Math.pow(1 + all.ret, 365 / days) - 1 : null;
+  $('retAllLine').textContent = all
+    ? `全期間 ${fmtPct(all.ret)}${cagr !== null ? `（年率換算 ${fmtPct(cagr)}）` : ''}（起点: ${first}）`
+    : '全期間 —';
+
+  const bl = $('retBenchLine');
+  const br = BENCH.length ? benchReturn(ytdBase, cur) : null;
+  if(br !== null && ytd){
+    const diff = (ytd.ret - br) * 100;
+    bl.style.display = '';
+    bl.textContent = `vs ${BENCH_NAME}（年初来 ${fmtPct(br)}）: ${diff >= 0 ? '+' : ''}${diff.toFixed(2)}pp`;
+    bl.className = 'sub ' + (diff >= 0 ? 'pos' : 'neg');
+  } else {
+    bl.style.display = 'none';
+  }
+}
+
+// ===================== IPS準拠チェック =====================
+function renderIPS(){
+  const body = $('ipsBody');
+  if(!DATES.length){ body.textContent = 'CSVを読み込むと表示されます'; return; }
+  const cur = nearestOnOrBefore($('totalDate').value || DATES.at(-1)) || DATES.at(-1);
+  const total = sumAt(cur);
+  if(total <= 0){ body.textContent = '—'; return; }
+
+  const byName = new Map();
+  for(const r of (byDate.get(cur) || [])){ byName.set(r.Name, (byName.get(r.Name) || 0) + r.Amount); }
+  const sorted = [...byName.entries()].sort((a,b) => b[1] - a[1]);
+  const badge = (ok, warn) => ok
+    ? '<span style="color:#22c55e;font-weight:600">OK</span>'
+    : (warn ? '<span style="color:#fbbf24;font-weight:600">要注意</span>'
+            : '<span style="color:#ef4444;font-weight:600">超過</span>');
+  const rows = [];
+
+  const [topName, topAmt] = sorted[0] || ['—', 0];
+  const topW = topAmt / total, lim1 = IPS_CONFIG.maxSingleWeight;
+  rows.push({ label:`最大銘柄: ${escapeHtml(topName)}`,
+    val:`${(topW*100).toFixed(1)}% / 上限${(lim1*100).toFixed(0)}%`,
+    st: badge(topW <= lim1 * 0.9, topW <= lim1) });
+
+  const { n, limit } = IPS_CONFIG.maxTopNWeight;
+  const topNW = sorted.slice(0, n).reduce((s,[,v]) => s + v, 0) / total;
+  rows.push({ label:`上位${n}銘柄 集中度`,
+    val:`${(topNW*100).toFixed(1)}% / 上限${(limit*100).toFixed(0)}%`,
+    st: badge(topNW <= limit * 0.9, topNW <= limit) });
+
+  for(const t of IPS_CONFIG.targets){
+    const amt = (byDate.get(cur) || []).filter(r => (r[t.dim] || '') === t.key).reduce((s,r) => s + r.Amount, 0);
+    const w = amt / total, dev = w - t.target, band = IPS_CONFIG.rebalanceBand;
+    rows.push({ label:`${escapeHtml(String(t.dim))} = ${escapeHtml(String(t.key))}`,
+      val:`${(w*100).toFixed(1)}%（目標${(t.target*100).toFixed(0)}% / 乖離${dev>=0?'+':''}${(dev*100).toFixed(1)}pp）`,
+      st: badge(Math.abs(dev) <= band * 0.6, Math.abs(dev) <= band) });
+  }
+
+  body.innerHTML =
+    `<div class="muted" style="margin-bottom:4px">${cur} 時点</div>` +
+    rows.map(r => `<div class="ips-row"><span>${r.label}</span><span style="text-align:right;white-space:nowrap">${r.val}　${r.st}</span></div>`).join('') +
+    `<div class="muted" style="margin-top:8px;font-size:11px">「超過」= リバランス検討。しきい値・目標配分はコード冒頭の IPS_CONFIG で編集。</div>`;
+}
+
+// ===================== タブ =====================
+let activeTab = 'tabDash';
+const TAB_RENDERERS = {
+  tabDash:  () => { refreshKPIs(); renderReturns(); renderIPS(); drawPie(); },
+  tabTrend: () => { drawLine(); },
+  tabAnal:  () => { drawStockAnal(); },
+  tabCmp:   () => { drawCmp(); },
+  tabCal:   () => { renderCalendar(); }
+};
+function renderActiveTab(){ if(DATES.length && TAB_RENDERERS[activeTab]) TAB_RENDERERS[activeTab](); }
+function switchTab(id){
+  activeTab = id;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === id));
+  renderActiveTab();
+}
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
 // ===================== lifecycle =====================
 function fillCalFilters(){
   const fill = (id, arr)=>{ const el=$(id); el.innerHTML='<option value="">(すべて)</option>'+arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join(''); };
@@ -2140,240 +2261,34 @@ function onDataReady(){
   $("toDate").value    = DATES.at(-1) || '';
   $("cmpDateA").value  = DATES.at(-1) || '';
   $("cmpDateB").value  = DATES.at(-1) || '';
+  $('analDate').value  = DATES.at(-1) || '';
   fillCalFilters();
-  refreshKPIs(); drawPie(); drawLine(); drawCmp();
-  $('analDate').value = DATES.at(-1) || '';
-  initCalendarDefaults(); renderCalendar();
-  drawStockAnal();
+  initCalendarDefaults();
   renderSavedSets();
-  saveToStorage();
-}
-
-// ===================== 約定履歴 =====================
-function parseJpDate(str){
-  const m = str.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  const m2 = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-  if(m2) return `${m2[1]}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
-  return '';
-}
-
-function parseTradeCSV(text){
-  const parsed = Papa.parse(text, {skipEmptyLines:true});
-  const trades = [];
-  for(const row of parsed.data){
-    if(row.length < 7) continue;
-    const date = parseJpDate(String(row[0]||'').trim());
-    if(!date) continue;
-    const name    = String(row[2]||'').trim();
-    const account = String(row[4]||'').trim();
-    const qty     = parseFloat(row[5]) || 0;
-    const price   = parseFloat(row[6]) || 0;
-    const total   = parseFloat(row[8]||'0') || 0;
-    if(!name || !qty || !price) continue;
-    const tickerM    = name.match(/([A-Z]{2,6})\s*\/\s*[A-Z]+\s*$/) || name.match(/\b([A-Z]{2,6})\s*$/);
-    const ticker     = tickerM ? tickerM[1] : name;
-    const shortNameM = name.match(/^([\s\S]+?)\s+[A-Z]{2,5}\s*\/\s*[A-Z]+\s*$/);
-    const shortName  = shortNameM ? shortNameM[1].trim() : name;
-    trades.push({date, name, shortName, ticker, account, quantity:qty, unitPrice:price, totalAmount:total});
-  }
-  return trades;
-}
-
-function saveTrades(){
-  try{ localStorage.setItem(LS_TRADES_KEY, JSON.stringify(TRADES)); }catch(e){}
-}
-
-function tryLoadTrades(){
-  try{
-    const saved = localStorage.getItem(LS_TRADES_KEY);
-    if(!saved) return false;
-    const data = JSON.parse(saved);
-    if(!Array.isArray(data) || !data.length) return false;
-    TRADES = data;
-    onTradesReady(false);
-    return true;
-  }catch(e){ return false; }
-}
-
-function onTradesReady(doSave = true){
-  const tickers = [...new Set(TRADES.map(t=>t.ticker))].sort();
-  const sel = $('dcaStock');
-  const cur = sel.value;
-  sel.innerHTML = tickers.map(t=>`<option value="${t}" ${t===cur?'selected':''}>${t}</option>`).join('');
-  $('dcaEmpty').style.display = 'none';
-  $('dcaContent').style.display = '';
-  $('patEmpty').style.display = 'none';
-  $('patContent').style.display = '';
-  $('tradeBadge').style.display = 'inline';
-  $('clearTrades').disabled = false;
-  drawDCA();
-  drawTradePatterns();
-  if(DATES.length) drawLine();
-  if(doSave) saveTrades();
-}
-
-let dcaChart = null;
-function drawDCA(){
-  const ticker = $('dcaStock').value;
-  if(!ticker) return;
-  const trades = TRADES.filter(t=>t.ticker===ticker).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!trades.length) return;
-
-  const labels  = trades.map(t=>t.date);
-  const prices  = trades.map(t=>t.unitPrice);
-  const bgColors = trades.map(t=> (t.account||'').includes('NISA') ? 'rgba(34,197,94,0.7)' : 'rgba(59,130,246,0.7)');
-  const bdColors = trades.map(t=> (t.account||'').includes('NISA') ? 'rgba(34,197,94,1)'   : 'rgba(59,130,246,1)');
-
-  const totalQty = trades.reduce((s,t)=>s+t.quantity, 0);
-  const avgPrice = totalQty ? trades.reduce((s,t)=>s+t.unitPrice*t.quantity, 0)/totalQty : 0;
-
-  if(dcaChart){ dcaChart.destroy(); dcaChart=null; }
-  dcaChart = new Chart($('dcaCanvas'), {
-    type:'bar',
-    data:{labels, datasets:[
-      { label:'取得単価(USD)', data:prices, backgroundColor:bgColors, borderColor:bdColors, borderWidth:1, order:2 },
-      { label:`平均 $${avgPrice.toFixed(2)}`, data:Array(labels.length).fill(avgPrice), type:'line',
-        borderColor:'#f59e0b', borderWidth:2, borderDash:[5,5], pointRadius:0, fill:false, order:1 }
-    ]},
-    options:{
-      responsive:true,
-      scales:{
-        x:{ticks:{color:'#aaa',maxTicksLimit:12,autoSkip:true}, grid:{color:'rgba(255,255,255,0.05)'}},
-        y:{ticks:{color:'#aaa',callback:v=>'$'+v.toFixed(0)}, grid:{color:'rgba(255,255,255,0.05)'}, beginAtZero:false}
-      },
-      plugins:{
-        legend:{labels:{color:'#ccc',font:{size:11}}},
-        tooltip:{callbacks:{
-          title:ctx=>ctx[0].label,
-          label:ctx=>{
-            if(ctx.datasetIndex===0){
-              const t=trades[ctx.dataIndex];
-              return [`単価: $${t.unitPrice}`, `数量: ${t.quantity}株`, `口座: ${t.account}`];
-            }
-            return ctx.dataset.label;
-          }
-        }}
-      }
-    }
-  });
-
-  $('dcaAvg').textContent     = `$${avgPrice.toFixed(2)}`;
-  $('dcaTotal').textContent   = `${totalQty}株`;
-  $('dcaTotalUSD').textContent= `$${(avgPrice*totalQty).toFixed(2)}`;
-  $('dcaCount').textContent   = `${trades.length}回`;
-}
-
-let patDayChart = null, patMonthChart = null, patTickerChart = null, patCumChart = null;
-function drawTradePatterns(){
-  if(!TRADES.length) return;
-
-  const sorted = [...TRADES].sort((a,b)=>a.date.localeCompare(b.date));
-
-  // --- 1. 曜日別取引回数 ---
-  const dayNames  = ['日','月','火','水','木','金','土'];
-  const dayCounts = Array(7).fill(0);
-  for(const t of sorted){ dayCounts[dayjs(t.date).day()]++; }
-
-  // --- 2. 月別投資金額 ---
-  const monthMap = new Map();
-  for(const t of sorted){
-    const ym = t.date.slice(0,7);
-    monthMap.set(ym, (monthMap.get(ym)||0) + t.totalAmount);
-  }
-  const monthLabels = [...monthMap.keys()].sort();
-  const monthData   = monthLabels.map(k=>monthMap.get(k));
-
-  // --- 3. 銘柄別取引回数 ---
-  const tickerMap = new Map();
-  for(const t of sorted){ tickerMap.set(t.ticker, (tickerMap.get(t.ticker)||0)+1); }
-  const tickerEntries = [...tickerMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15);
-  const tickerLabels = tickerEntries.map(e=>e[0]);
-  const tickerCounts = tickerEntries.map(e=>e[1]);
-
-  // --- 4. 累計投資額推移 ---
-  let cumulative = 0;
-  const cumLabels = [], cumData = [];
-  for(const t of sorted){
-    cumulative += t.totalAmount;
-    cumLabels.push(t.date);
-    cumData.push(cumulative);
-  }
-
-  const mkBar = (id, labels, data, existing, color) => {
-    if(existing) existing.destroy();
-    return new Chart($(id), {
-      type:'bar',
-      data:{labels, datasets:[{label:'',data,backgroundColor:color||'rgba(59,130,246,0.6)',borderColor:color||'rgba(59,130,246,1)',borderWidth:1}]},
-      options:{responsive:true,plugins:{legend:{display:false}},
-        scales:{x:{ticks:{color:'#aaa',autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.05)'}},
-                y:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}}}
-    });
-  };
-
-  patDayChart    = mkBar('patDayCanvas',    dayNames,    dayCounts,    patDayChart);
-  patMonthChart  = mkBar('patMonthCanvas',  monthLabels, monthData,    patMonthChart, 'rgba(251,146,60,0.65)');
-  patTickerChart = mkBar('patTickerCanvas', tickerLabels,tickerCounts, patTickerChart,'rgba(34,197,94,0.65)');
-
-  if(patCumChart) patCumChart.destroy();
-  patCumChart = new Chart($('patCumCanvas'), {
-    type:'line',
-    data:{labels:cumLabels, datasets:[{label:'累計投資額',data:cumData,
-      borderColor:'rgba(139,92,246,1)',backgroundColor:'rgba(139,92,246,0.15)',
-      fill:true,pointRadius:0,tension:0.3}]},
-    options:{responsive:true,plugins:{legend:{display:false}},
-      scales:{x:{ticks:{color:'#aaa',autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.05)'}},
-              y:{ticks:{color:'#aaa',callback:v=>yen(v)},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}}}
-  });
-
-  // --- 5. Recent trades table ---
-  const recent = [...sorted].reverse().slice(0,50);
-  $('patTradeBody').innerHTML = recent.map(t=>`<tr>
-    <td style="white-space:nowrap">${t.date}</td>
-    <td>${escapeHtml(t.ticker)}</td>
-    <td style="text-align:right">$${t.unitPrice.toFixed(2)}</td>
-    <td style="text-align:right">${t.quantity}</td>
-    <td style="text-align:right">${t.totalAmount ? yen(t.totalAmount) : '—'}</td>
-    <td style="color:var(--muted)">${escapeHtml(t.account||'')}</td>
-  </tr>`).join('');
+  computeFlows();
+  renderActiveTab();
 }
 
 // ===================== events =====================
 $("file").addEventListener('change', e=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader(); reader.onload = ()=> parseCSV(reader.result); reader.readAsText(file);
+  const files = [...e.target.files]; if(!files.length) return;
+  for(const file of files){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const parsed = Papa.parse(reader.result, {header:true, skipEmptyLines:true});
+      const fields = (parsed.meta.fields || []).map(f => f.trim());
+      const isBench = fields.some(f => /^close$|adj.*close|終値/i.test(f))
+                   && !fields.includes('Name') && !fields.includes('Amount');
+      if(isBench) parseBenchmarkCSV(parsed, file.name);
+      else parseCSVParsed(parsed);
+    };
+    reader.readAsText(file);
+  }
+  e.target.value = '';
 });
-$("tradeFile").addEventListener('change', e=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    const result = parseTradeCSV(reader.result);
-    if(!result.length){ alert('約定データを読み取れませんでした。Shift-JIS形式のCSVを確認してください。'); return; }
-    TRADES = result;
-    onTradesReady(true);
-  };
-  reader.readAsText(file, 'shift-jis');
-});
-$("clearTrades").addEventListener('click', ()=>{
-  if(!confirm('約定履歴データを削除しますか？')) return;
-  TRADES = [];
-  localStorage.removeItem(LS_TRADES_KEY);
-  $('dcaEmpty').style.display = ''; $('dcaContent').style.display = 'none';
-  $('patEmpty').style.display = ''; $('patContent').style.display = 'none';
-  $('tradeBadge').style.display = 'none';
-  $('clearTrades').disabled = true;
-  if(dcaChart){ dcaChart.destroy(); dcaChart=null; }
-  if(patDayChart){ patDayChart.destroy(); patDayChart=null; }
-  if(patMonthChart){ patMonthChart.destroy(); patMonthChart=null; }
-  if(patTickerChart){ patTickerChart.destroy(); patTickerChart=null; }
-  if(patCumChart){ patCumChart.destroy(); patCumChart=null; }
-  if(DATES.length) drawLine();
-});
-$("dcaStock").addEventListener('change', drawDCA);
-$("showTradeMarkers").addEventListener('change', ()=>{ if(DATES.length) drawLine(); });
 $("exportCsv").addEventListener('click', exportCsv);
-$("clearData").addEventListener('click', clearStorage);
-$("totalDate").addEventListener('change', ()=>{ refreshKPIs(); drawPie(); });
+$("totalDate").addEventListener('change', ()=>{ refreshKPIs(); renderReturns(); renderIPS(); drawPie(); });
+$("showBench").addEventListener('change', ()=>{ if(DATES.length) drawLine(); });
 $("pieDimension").addEventListener('change', drawPie);
 $("lineDimension").addEventListener('change', drawLine);
 $("applyRange").addEventListener('click', drawLine);
@@ -2474,10 +2389,6 @@ $("calView").addEventListener('change', ()=>{ calState.view=$("calView").value; 
 $("yearPrev").addEventListener('click', ()=>{ calState.year -= 1; renderCalendar(); });
 $("yearNext").addEventListener('click', ()=>{ calState.year += 1; renderCalendar(); });
 $("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").value; renderCalendar(); });
-
-// 起動時: 保存データがあれば自動復元
-tryLoadSaved();
-tryLoadTrades();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });

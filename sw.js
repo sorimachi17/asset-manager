@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v1';
+const CACHE_NAME = 'asset-mgr-v2';
 const APP_SHELL = [
   './',
   './index.html',
