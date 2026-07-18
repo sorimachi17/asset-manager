@@ -44,6 +44,7 @@
     h2{margin:0 0 6px 0;font-size:16px}
     .h2-sub{margin-top:-2px;font-size:12px;color:var(--muted)}
     select, input[type="date"], input[type="month"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:8px;border-radius:10px}
+    input[type="number"]{background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:6px;border-radius:8px}
     .legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
     .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
     .legend-item.inactive{opacity:.4;text-decoration:line-through}
@@ -298,8 +299,34 @@
 
   <!-- IPS準拠チェック -->
   <section class="panel">
-    <h2>IPS準拠チェック</h2>
-    <div class="h2-sub">目標配分との乖離を監視（しきい値はコード冒頭の IPS_CONFIG で編集）</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <h2>IPS準拠チェック</h2>
+      <button id="ipsEditBtn" class="btn-ghost" style="font-size:12px;padding:4px 10px;flex-shrink:0">⚙ 設定</button>
+    </div>
+    <div class="h2-sub">目標配分との乖離を監視（しきい値・目標は「⚙ 設定」で編集）</div>
+    <div id="ipsEditor" style="display:none;margin-top:10px;background:#1b1b1b;border:1px solid var(--line);border-radius:10px;padding:12px">
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">単一銘柄の上限
+          <input type="number" id="ipsMaxSingle" min="1" max="100" step="1" style="width:64px"> <span class="muted">%</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">上位
+          <input type="number" id="ipsTopN" min="1" max="20" step="1" style="width:52px"> 銘柄の合計上限
+          <input type="number" id="ipsTopNLimit" min="1" max="100" step="1" style="width:64px"> <span class="muted">%</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">目標配分の許容乖離 ±
+          <input type="number" id="ipsBand" min="0.5" max="50" step="0.5" style="width:64px"> <span class="muted">pp</span>
+        </label>
+        <div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px">目標配分（区分・値・目標%）</div>
+          <div id="ipsTargets"></div>
+          <button id="ipsAddTarget" class="btn-ghost" style="font-size:12px;padding:4px 10px">+ 目標を追加</button>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="ipsReset" class="btn-ghost" style="font-size:12px">初期値に戻す</button>
+          <button id="ipsSave" style="font-size:13px">保存</button>
+        </div>
+      </div>
+    </div>
     <div id="ipsBody" class="muted" style="margin-top:8px">CSVを読み込むと表示されます</div>
   </section>
 
@@ -439,6 +466,26 @@
           </tr>
         </tfoot>
       </table>
+    </div>
+  </section>
+
+  <!-- グループ別分析 -->
+  <section class="panel wide">
+    <h2>グループ別円グラフ</h2>
+    <div class="h2-sub">銘柄を自由にグループ分けして、グループごとの構成比を表示（1銘柄は1グループのみ・同名で作り直すと上書き）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0">
+      <span class="muted" style="font-size:11px;flex-shrink:0">グループ:</span>
+      <span id="grpChips" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+      <button id="grpCreate" class="btn-ghost" style="font-size:12px;padding:4px 10px">+ 選択中の銘柄から作成</button>
+    </div>
+    <div id="grpEmpty" class="muted" style="font-size:12px">上の表で銘柄をチェック →「+ 選択中の銘柄から作成」でグループを作るとここに円グラフが表示されます</div>
+    <div id="grpPieWrap" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label class="legend-item" style="cursor:pointer"><input type="checkbox" id="grpIncludeRest" checked style="accent-color:var(--accent)"> 未分類も表示</label>
+      </div>
+      <div class="chart-wrap" style="max-width:420px;margin:0 auto"><canvas id="grpPieCanvas" height="240"></canvas></div>
+      <div id="grpPieLegend" class="legend-row"></div>
+      <div id="grpTable" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -602,16 +649,36 @@
 dayjs.extend(dayjs_plugin_customParseFormat);
 
 // ============================================================
-// IPS 設定 —— ここを編集してリバランス基準を変える
+// IPS 設定 —— 画面の「⚙ 設定」で編集し localStorage に保存される
 // ============================================================
-const IPS_CONFIG = {
+const IPS_DEFAULTS = {
   maxSingleWeight: 0.35,               // 個別銘柄の上限ウェイト（全資産比）
   maxTopNWeight:  { n: 3, limit: 0.75 }, // 上位N銘柄合計の上限
   rebalanceBand:  0.05,                // targetsの許容乖離（±5pp）
-  targets: [                           // 例: { dim:'Account', key:'NISA', target:0.40 }
-    // { dim:'AssetClass', key:'stock', target:1.00 },
-  ]
+  targets: []                          // 例: { dim:'Account', key:'NISA', target:0.40 }
 };
+const LS_IPS_KEY = 'asset_mgr_v1_ips';
+function loadIPSConfig(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_IPS_KEY));
+    if(s && typeof s === 'object'){
+      return {
+        maxSingleWeight: Number(s.maxSingleWeight) || IPS_DEFAULTS.maxSingleWeight,
+        maxTopNWeight: {
+          n: Number(s.maxTopNWeight?.n) || IPS_DEFAULTS.maxTopNWeight.n,
+          limit: Number(s.maxTopNWeight?.limit) || IPS_DEFAULTS.maxTopNWeight.limit
+        },
+        rebalanceBand: Number(s.rebalanceBand) || IPS_DEFAULTS.rebalanceBand,
+        targets: Array.isArray(s.targets)
+          ? s.targets.filter(t => t && t.dim && t.key && isFinite(Number(t.target)))
+          : []
+      };
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(IPS_DEFAULTS));
+}
+function saveIPSConfig(){ localStorage.setItem(LS_IPS_KEY, JSON.stringify(IPS_CONFIG)); }
+let IPS_CONFIG = loadIPSConfig();
 
 // --- state ---
 let RAW = []; let DATES = []; const byDate = new Map();
@@ -1835,6 +1902,116 @@ function renderSavedSets(){
   });
 }
 
+// ===================== 銘柄グループ =====================
+const LS_GROUPS_KEY = 'asset_mgr_v1_groups';
+function loadGroups(){ try{ const g = JSON.parse(localStorage.getItem(LS_GROUPS_KEY)||'[]'); return Array.isArray(g) ? g : []; }catch(e){ return []; } }
+function saveGroups(g){ localStorage.setItem(LS_GROUPS_KEY, JSON.stringify(g)); }
+
+function renderGroups(){
+  const groups = loadGroups();
+  const wrap = $('grpChips');
+  wrap.innerHTML = groups.map((g,i)=>
+    `<span style="display:inline-flex;align-items:center;gap:1px">` +
+    `<button class="btn-ghost grp-btn" data-idx="${i}" title="クリックでメンバーを選択" style="font-size:12px;padding:4px 10px">${escapeHtml(g.name)} <span class="muted" style="font-size:10px">(${g.names.length})</span></button>` +
+    `<button class="grp-del" data-idx="${i}" title="削除" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 4px;line-height:1">✕</button>` +
+    `</span>`
+  ).join('');
+  wrap.querySelectorAll('.grp-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const g = loadGroups()[Number(btn.dataset.idx)];
+      if(!g) return;
+      analSelected.clear();
+      g.names.forEach(n=>analSelected.add(n));
+      drawStockAnal();
+    });
+  });
+  wrap.querySelectorAll('.grp-del').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const all = loadGroups();
+      if(!confirm(`グループ「${all[Number(btn.dataset.idx)]?.name}」を削除しますか？`)) return;
+      all.splice(Number(btn.dataset.idx), 1);
+      saveGroups(all);
+      renderGroups(); renderGroupPie();
+    });
+  });
+}
+
+let grpPieChart = null;
+function renderGroupPie(){
+  const groups = loadGroups();
+  const wrapEl = $('grpPieWrap'), emptyEl = $('grpEmpty');
+  if(!groups.length || !DATES.length){
+    wrapEl.style.display = 'none'; emptyEl.style.display = '';
+    if(grpPieChart){ grpPieChart.destroy(); grpPieChart = null; }
+    return;
+  }
+  emptyEl.style.display = 'none'; wrapEl.style.display = '';
+  const selDate = nearestOnOrBefore($('analDate').value || DATES.at(-1)) || DATES.at(-1);
+  const totalVal = sumAt(selDate);
+  const m = byDateName.get(selDate) || new Map();
+  const grouped = new Set();
+  const labels = [], data = [], counts = [];
+  for(const g of groups){
+    let sum = 0, cnt = 0;
+    for(const n of g.names){
+      const amt = amountOfNameAt(n, selDate);
+      sum += amt; grouped.add(n);
+      if(amt !== 0) cnt++;
+    }
+    if(sum !== 0){ labels.push(g.name); data.push(sum); counts.push(cnt); }
+  }
+  let rest = 0, restCnt = 0;
+  for(const [n, amt] of m){ if(!grouped.has(n) && amt !== 0){ rest += amt; restCnt++; } }
+  if($('grpIncludeRest').checked && rest > 0){ labels.push('未分類'); data.push(rest); counts.push(restCnt); }
+
+  const palette = getPalette(labels.length);
+  if(labels[labels.length-1] === '未分類') palette[palette.length-1] = 'rgba(80,80,100,0.5)';
+
+  if(grpPieChart){ grpPieChart.destroy(); grpPieChart = null; }
+  grpPieChart = new Chart($('grpPieCanvas'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor: palette, borderWidth: 1 }] },
+    options:{
+      cutout:'30%', layout:{ padding:30 },
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{ label:(ctx)=>{ const t = ctx.dataset.data.reduce((s,v)=>s+v,0); return `${ctx.label}: ${yen(ctx.parsed)} (${(t?ctx.parsed/t*100:0).toFixed(1)}%)`; } }}
+      }
+    },
+    plugins:[pieLabelsPlugin]
+  });
+
+  const pieTotal = data.reduce((s,v)=>s+v,0);
+  $('grpPieLegend').innerHTML = labels.map((k,i)=>
+    `<span class="legend-item"><span class="dot" style="background:${palette[i]}"></span>${escapeHtml(k)} ${(pieTotal?data[i]/pieTotal*100:0).toFixed(1)}%</span>`
+  ).join('');
+
+  $('grpTable').innerHTML = `<div class="table-wrap"><table style="font-size:12px">
+    <thead><tr><th>グループ</th><th style="text-align:right">評価額</th><th style="text-align:right">全体比</th><th style="text-align:right">銘柄数</th></tr></thead>
+    <tbody>${labels.map((k,i)=>
+      `<tr><td>${escapeHtml(k)}</td><td style="text-align:right">${yen(data[i])}</td><td style="text-align:right">${(totalVal?data[i]/totalVal*100:0).toFixed(1)}%</td><td style="text-align:right">${counts[i]}</td></tr>`
+    ).join('')}</tbody>
+  </table></div>`;
+}
+
+$('grpCreate').addEventListener('click', ()=>{
+  if(analSelected.size === 0){ alert('上の表で銘柄をチェックしてからグループを作成してください'); return; }
+  const name = prompt('グループ名を入力してください');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  const members = [...analSelected];
+  let all = loadGroups();
+  // 1銘柄1グループ: 他グループから重複銘柄を除去
+  for(const g of all){ g.names = g.names.filter(n => !members.includes(n)); }
+  const existing = all.findIndex(g => g.name === trimmed);
+  if(existing >= 0) all[existing].names = members;
+  else all.push({ name: trimmed, names: members });
+  all = all.filter(g => g.names.length > 0);
+  saveGroups(all);
+  renderGroups(); renderGroupPie();
+});
+$('grpIncludeRest').addEventListener('change', renderGroupPie);
+
 function drawStockAnal(){
   if(!DATES.length) return;
   const picker = $('analDate').value || DATES.at(-1);
@@ -1925,6 +2102,8 @@ function drawStockAnal(){
 
   renderQuickSel();
   updateSelSummary(totalVal);
+  renderGroups();
+  renderGroupPie();
 }
 
 
@@ -2225,8 +2404,60 @@ function renderIPS(){
   body.innerHTML =
     `<div class="muted" style="margin-bottom:4px">${cur} 時点</div>` +
     rows.map(r => `<div class="ips-row"><span>${r.label}</span><span style="text-align:right;white-space:nowrap">${r.val}　${r.st}</span></div>`).join('') +
-    `<div class="muted" style="margin-top:8px;font-size:11px">「超過」= リバランス検討。しきい値・目標配分はコード冒頭の IPS_CONFIG で編集。</div>`;
+    `<div class="muted" style="margin-top:8px;font-size:11px">「超過」= リバランス検討。しきい値・目標配分は「⚙ 設定」で編集。</div>`;
 }
+
+// ---- IPS設定エディタ ----
+let _ipsDraft = [];
+function renderIPSEditor(){
+  $('ipsMaxSingle').value = Math.round(IPS_CONFIG.maxSingleWeight * 100);
+  $('ipsTopN').value = IPS_CONFIG.maxTopNWeight.n;
+  $('ipsTopNLimit').value = Math.round(IPS_CONFIG.maxTopNWeight.limit * 100);
+  $('ipsBand').value = +(IPS_CONFIG.rebalanceBand * 100).toFixed(1);
+  _ipsDraft = IPS_CONFIG.targets.map(t => ({...t}));
+  renderIPSTargets();
+}
+function renderIPSTargets(){
+  const dims = ['AssetClass','Currency','Name','StockType','Account'];
+  const host = $('ipsTargets');
+  host.innerHTML = _ipsDraft.map((t,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+      <select class="ips-t-dim" data-idx="${i}" style="font-size:12px;padding:4px">${dims.map(d=>`<option${d===t.dim?' selected':''}>${d}</option>`).join('')}</select>
+      <input class="ips-t-key" data-idx="${i}" value="${escapeHtml(t.key||'')}" placeholder="値（例: NISA）" style="flex:1;min-width:90px;background:#0e121a;border:1px solid var(--line);color:var(--fg);padding:5px 8px;border-radius:8px;font-size:12px">
+      <input class="ips-t-target" data-idx="${i}" type="number" min="0" max="100" step="1" value="${Math.round((t.target||0)*100)}" style="width:64px">
+      <span class="muted" style="font-size:11px">%</span>
+      <button class="ips-t-del" data-idx="${i}" title="削除" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+    </div>`).join('') || '<div class="muted" style="font-size:11px;margin-bottom:6px">目標配分は未設定です</div>';
+  host.querySelectorAll('.ips-t-dim').forEach(el=>el.addEventListener('change', ()=>{ _ipsDraft[+el.dataset.idx].dim = el.value; }));
+  host.querySelectorAll('.ips-t-key').forEach(el=>el.addEventListener('input', ()=>{ _ipsDraft[+el.dataset.idx].key = el.value; }));
+  host.querySelectorAll('.ips-t-target').forEach(el=>el.addEventListener('input', ()=>{ _ipsDraft[+el.dataset.idx].target = (Number(el.value)||0)/100; }));
+  host.querySelectorAll('.ips-t-del').forEach(el=>el.addEventListener('click', ()=>{ _ipsDraft.splice(+el.dataset.idx,1); renderIPSTargets(); }));
+}
+$('ipsEditBtn').addEventListener('click', ()=>{
+  const ed = $('ipsEditor');
+  if(ed.style.display === 'none'){ renderIPSEditor(); ed.style.display = ''; }
+  else ed.style.display = 'none';
+});
+$('ipsAddTarget').addEventListener('click', ()=>{ _ipsDraft.push({dim:'AssetClass', key:'', target:0.5}); renderIPSTargets(); });
+$('ipsSave').addEventListener('click', ()=>{
+  const ms = Number($('ipsMaxSingle').value), n = Number($('ipsTopN').value),
+        nl = Number($('ipsTopNLimit').value), band = Number($('ipsBand').value);
+  if(!(ms>0 && ms<=100 && n>=1 && nl>0 && nl<=100 && band>0)){ alert('数値を確認してください'); return; }
+  const targets = _ipsDraft
+    .map(t=>({dim: t.dim||'AssetClass', key: String(t.key||'').trim(), target: Number(t.target)||0}))
+    .filter(t=>t.key && t.target>0);
+  IPS_CONFIG = { maxSingleWeight: ms/100, maxTopNWeight: {n: Math.round(n), limit: nl/100}, rebalanceBand: band/100, targets };
+  saveIPSConfig();
+  $('ipsEditor').style.display = 'none';
+  renderIPS();
+});
+$('ipsReset').addEventListener('click', ()=>{
+  if(!confirm('IPS設定を初期値に戻しますか？')) return;
+  IPS_CONFIG = JSON.parse(JSON.stringify(IPS_DEFAULTS));
+  saveIPSConfig();
+  renderIPSEditor();
+  renderIPS();
+});
 
 // ===================== タブ =====================
 let activeTab = 'tabDash';
