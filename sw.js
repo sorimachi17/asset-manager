@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v4-mobile-dashboard';
+const CACHE_NAME = 'asset-mgr-v5-mobile-dashboard-fixes';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,7 +15,27 @@ const MOBILE_UI_CSS = String.raw`
     padding-bottom:calc(68px + env(safe-area-inset-bottom));
   }
 
-  /* アプリ風の下部固定タブ */
+  /* 上部ヘッダーは固定を解除し、iOS/PWAでもファイル入力が欠けないようにする */
+  header{
+    position:relative;
+    top:auto;
+    overflow:visible;
+  }
+  .toolbar{
+    overflow:visible;
+  }
+  input[type="file"]{
+    display:block;
+    width:100%;
+    min-height:44px;
+    height:auto;
+    padding:8px;
+    line-height:1.4;
+    overflow:visible;
+    box-sizing:border-box;
+  }
+
+  /* アプリ風の下部固定タブ。推移はダッシュボードに統合したので非表示 */
   #tabNav{
     position:fixed;
     left:0;
@@ -23,7 +43,7 @@ const MOBILE_UI_CSS = String.raw`
     bottom:0;
     z-index:180;
     display:grid;
-    grid-template-columns:repeat(5,minmax(0,1fr));
+    grid-template-columns:repeat(4,minmax(0,1fr));
     gap:4px;
     margin:0;
     padding:7px 6px calc(7px + env(safe-area-inset-bottom));
@@ -32,6 +52,9 @@ const MOBILE_UI_CSS = String.raw`
     border-top:1px solid var(--line);
     backdrop-filter:saturate(130%) blur(12px);
     -webkit-backdrop-filter:saturate(130%) blur(12px);
+  }
+  #tabNav .tab-btn[data-tab="tabTrend"]{
+    display:none;
   }
   #tabNav .tab-btn{
     min-width:0;
@@ -63,6 +86,19 @@ const MOBILE_UI_SCRIPT = String.raw`
 (() => {
   const isMobile = () => window.matchMedia('(max-width:600px)').matches;
   try {
+    /* 含み損益の計算ロジックをカード内に明記 */
+    const pnlCard = document.getElementById('kpiPnlCard');
+    if (pnlCard && !document.getElementById('pnlLogicNote')) {
+      const note = document.createElement('div');
+      note.id = 'pnlLogicNote';
+      note.className = 'sub';
+      note.style.marginTop = '8px';
+      note.style.fontSize = '10px';
+      note.style.lineHeight = '1.5';
+      note.textContent = '計算: 各銘柄の「評価額 −（保有数量 × 取得単価）」を合算。損益率 = 総含み損益 ÷ 取得総額。Quantity / CostBasis がある銘柄のみ対象。';
+      pnlCard.appendChild(note);
+    }
+
     if (typeof TAB_RENDERERS !== 'undefined' && TAB_RENDERERS.tabDash) {
       const originalDashRenderer = TAB_RENDERERS.tabDash;
       if (!originalDashRenderer.__mobileDashboardEnhanced) {
