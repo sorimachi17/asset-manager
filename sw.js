@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v11-partial-group-expand';
+const CACHE_NAME = 'asset-mgr-v12-group-detail-overlay';
 const APP_SHELL = [
   './',
   './index.html',
@@ -53,8 +53,10 @@ const MOBILE_UI_SCRIPT = String.raw`
 (() => {
   const isMobile = () => window.matchMedia('(max-width:600px)').matches;
   let expandedGroup = '';
+  let expandedMembers = [];
   let basePie = null;
-  let pieSliceMeta = [];
+  let detailProgress = 0;
+  let detailAnimFrame = 0;
 
   function getSelectedAnalDate(){
     if (typeof DATES === 'undefined' || !DATES.length) return '';
@@ -138,7 +140,7 @@ const MOBILE_UI_SCRIPT = String.raw`
     rows.forEach((row) => {
       const detail = row.nextElementSibling;
       if (!detail || !detail.classList.contains('grp-detail-row')) return;
-      const shouldOpen = row.dataset.groupName === groupName;
+      const shouldOpen = !!groupName && row.dataset.groupName === groupName;
       detail.style.display = shouldOpen ? '' : 'none';
       row.classList.toggle('is-open', shouldOpen);
       row.setAttribute('aria-expanded', String(shouldOpen));
@@ -155,10 +157,7 @@ const MOBILE_UI_SCRIPT = String.raw`
       bar.innerHTML = '<button id="grpDrillBack" class="btn-ghost" type="button">← 詳細化を解除</button><span id="grpDrillTitle"></span>';
       const wrap = canvas.closest('.chart-wrap');
       if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(bar, wrap);
-      document.getElementById('grpDrillBack').addEventListener('click',()=>{
-        expandedGroup = '';
-        if (typeof renderGroupPie === 'function') renderGroupPie();
-      });
+      document.getElementById('grpDrillBack').addEventListener('click',collapseGroupDetail);
     }
     return bar;
   }
@@ -169,23 +168,56 @@ const MOBILE_UI_SCRIPT = String.raw`
     const values = (grpPieChart.data.datasets[0].data || []).map(Number);
     const rawColors = grpPieChart.data.datasets[0].backgroundColor || [];
     const colors = Array.isArray(rawColors) ? rawColors.slice() : labels.map(() => rawColors);
-    basePie = { labels, values, colors };
-    pieSliceMeta = labels.map((label) => ({type:'group', group:label}));
+    const legend = document.getElementById('grpPieLegend');
+    basePie = { labels, values, colors, legendHtml: legend ? legend.innerHTML : '' };
     return true;
   }
 
-  function renderExpandedLegend(labels, values, colors, metas){
+  function renderExpandedLegend(){
     const legend = document.getElementById('grpPieLegend');
-    if (!legend) return;
-    const total = basePie ? basePie.values.reduce((s,v)=>s+v,0) : values.reduce((s,v)=>s+v,0);
-    legend.innerHTML = labels.map((label,i) => {
-      const meta = metas[i] || {};
-      const display = meta.type === 'member' ? (escapeHtml(meta.group) + ' › ' + escapeHtml(meta.name)) : escapeHtml(label);
-      return '<span class="legend-item"><span class="dot" style="background:'+colors[i]+'"></span>'+display+' '+(total?values[i]/total*100:0).toFixed(1)+'%</span>';
-    }).join('');
+    if (!legend || !basePie) return;
+    const total = basePie.values.reduce((s,v)=>s+v,0);
+    const groupIndex = basePie.labels.indexOf(expandedGroup);
+    const groupTotal = groupIndex >= 0 ? basePie.values[groupIndex] : 0;
+    const memberTotal = expandedMembers.reduce((s,m)=>s+m.value,0);
+    const pieces = [];
+
+    basePie.labels.forEach((label,i) => {
+      if (label !== expandedGroup) {
+        pieces.push('<span class="legend-item"><span class="dot" style="background:'+basePie.colors[i]+'"></span>'+escapeHtml(label)+' '+(total?basePie.values[i]/total*100:0).toFixed(1)+'%</span>');
+        return;
+      }
+      pieces.push('<span class="legend-item" style="font-weight:600"><span class="dot" style="background:'+basePie.colors[i]+';outline:2px solid rgba(255,255,255,.9);outline-offset:1px"></span>'+escapeHtml(label)+' '+(total?groupTotal/total*100:0).toFixed(1)+'%（詳細）</span>');
+      expandedMembers.forEach((m) => {
+        pieces.push('<span class="legend-item" style="padding-left:10px"><span class="dot" style="background:'+m.color+'"></span>↳ '+escapeHtml(m.name)+' '+(total?m.value/memberTotal*groupTotal/total*100:0).toFixed(1)+'%</span>');
+      });
+    });
+    legend.innerHTML = pieces.join('');
   }
 
-  function expandGroupSlice(groupName){
+  function animateDetailIn(){
+    if (detailAnimFrame) cancelAnimationFrame(detailAnimFrame);
+    const chart = typeof grpPieChart !== 'undefined' ? grpPieChart : null;
+    if (!chart) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      detailProgress = 1;
+      chart.draw();
+      return;
+    }
+    detailProgress = 0;
+    const started = performance.now();
+    const duration = 360;
+    const tick = (now) => {
+      const t = Math.min(1,(now-started)/duration);
+      detailProgress = 1 - Math.pow(1-t,3);
+      chart.draw();
+      if (t < 1) detailAnimFrame = requestAnimationFrame(tick);
+      else detailAnimFrame = 0;
+    };
+    detailAnimFrame = requestAnimationFrame(tick);
+  }
+
+  function expandGroupSlice(groupName, animate){
     try {
       if (typeof grpPieChart === 'undefined' || !grpPieChart) return;
       if (!basePie && !snapshotBasePie()) return;
@@ -195,76 +227,146 @@ const MOBILE_UI_SCRIPT = String.raw`
       const selectedDate = getSelectedAnalDate();
       const names = groupMembers(groupName, selectedDate);
       if (!names.length || typeof amountOfNameAt !== 'function') return;
-      const rawMemberValues = names.map((name)=>amountOfNameAt(name, selectedDate));
-      const rawMemberTotal = rawMemberValues.reduce((s,v)=>s+v,0);
-      if (!rawMemberTotal) return;
-
-      const groupTotal = basePie.values[groupIndex];
-      const scale = groupTotal / rawMemberTotal;
-      const memberValues = rawMemberValues.map((v)=>v*scale);
-      const memberColors = typeof getPalette === 'function' ? getPalette(names.length) : names.map(()=>basePie.colors[groupIndex]);
-
-      const labels = [];
-      const values = [];
-      const colors = [];
-      const metas = [];
-      basePie.labels.forEach((label,i)=>{
-        if (label !== groupName) {
-          labels.push(label);
-          values.push(basePie.values[i]);
-          colors.push(basePie.colors[i]);
-          metas.push({type:'group', group:label});
-          return;
-        }
-        names.forEach((name,j)=>{
-          labels.push(name);
-          values.push(memberValues[j]);
-          colors.push(memberColors[j]);
-          metas.push({type:'member', group:groupName, name});
-        });
-      });
+      const rawValues = names.map((name)=>amountOfNameAt(name, selectedDate));
+      const rawTotal = rawValues.reduce((s,v)=>s+v,0);
+      if (!rawTotal) return;
+      const palette = typeof getPalette === 'function' ? getPalette(names.length) : names.map(()=>basePie.colors[groupIndex]);
 
       expandedGroup = groupName;
-      pieSliceMeta = metas;
-      grpPieChart.data.labels = labels;
-      grpPieChart.data.datasets[0].data = values;
-      grpPieChart.data.datasets[0].backgroundColor = colors;
-      grpPieChart.update();
-      renderExpandedLegend(labels, values, colors, metas);
+      expandedMembers = names.map((name,i)=>({name,value:rawValues[i],color:palette[i]}));
       openOnlyGroupRow(groupName);
+      renderExpandedLegend();
 
       const bar = ensureDrillBar();
       if (bar) {
         bar.style.display = 'flex';
         const title = document.getElementById('grpDrillTitle');
-        if (title) title.textContent = groupName + ' の部分だけ銘柄別に表示';
+        if (title) title.textContent = groupName + ' の比率を維持したまま内訳表示';
+      }
+
+      if (animate === false) {
+        detailProgress = 1;
+        grpPieChart.draw();
+      } else {
+        animateDetailIn();
       }
     } catch(err){ console.warn('partial group expansion failed',err); }
   }
 
-  function wireGroupPieClick(){
-    try {
-      const canvas = document.getElementById('grpPieCanvas');
-      if (!canvas || canvas.dataset.groupPieClickBound === '1') return;
-      canvas.dataset.groupPieClickBound = '1';
-      canvas.style.cursor = 'pointer';
-      canvas.addEventListener('click',(event)=>{
-        if (typeof grpPieChart === 'undefined' || !grpPieChart) return;
-        const hits = grpPieChart.getElementsAtEventForMode(event,'nearest',{intersect:true},true);
-        if (!hits.length) return;
-        const idx = hits[0].index;
-        const meta = pieSliceMeta[idx];
-        if (!meta) return;
-        if (meta.type === 'member') {
-          if (typeof showStockChart === 'function') showStockChart(meta.name);
-          return;
-        }
-        expandGroupSlice(meta.group);
-      });
-    } catch(err){ console.warn('group pie click wiring failed',err); }
+  function collapseGroupDetail(){
+    if (detailAnimFrame) cancelAnimationFrame(detailAnimFrame);
+    detailAnimFrame = 0;
+    expandedGroup = '';
+    expandedMembers = [];
+    detailProgress = 0;
+    openOnlyGroupRow('');
+    const bar = document.getElementById('grpDrillBar');
+    if (bar) bar.style.display = 'none';
+    const legend = document.getElementById('grpPieLegend');
+    if (legend && basePie) legend.innerHTML = basePie.legendHtml;
+    if (typeof grpPieChart !== 'undefined' && grpPieChart) grpPieChart.draw();
   }
 
+  function relativeChartPoint(event, chart){
+    if (typeof Chart !== 'undefined' && Chart.helpers && typeof Chart.helpers.getRelativePosition === 'function') {
+      try { return Chart.helpers.getRelativePosition(event, chart); } catch (_) {}
+    }
+    const rect = chart.canvas.getBoundingClientRect();
+    return {
+      x:(event.clientX-rect.left)*(chart.width/rect.width),
+      y:(event.clientY-rect.top)*(chart.height/rect.height)
+    };
+  }
+
+  function memberAtEvent(event, chart, groupIndex){
+    if (!expandedMembers.length) return null;
+    const arc = chart.getDatasetMeta(0).data[groupIndex];
+    if (!arc) return null;
+    const p = relativeChartPoint(event, chart);
+    const dx = p.x-arc.x, dy = p.y-arc.y;
+    const radius = Math.sqrt(dx*dx+dy*dy);
+    if (radius < arc.innerRadius || radius > arc.outerRadius) return null;
+    let angle = Math.atan2(dy,dx);
+    const twoPi = Math.PI*2;
+    while (angle < arc.startAngle) angle += twoPi;
+    while (angle > arc.endAngle && angle-twoPi >= arc.startAngle) angle -= twoPi;
+    if (angle < arc.startAngle || angle > arc.endAngle) return null;
+    const ratio = (angle-arc.startAngle)/(arc.endAngle-arc.startAngle || 1);
+    const total = expandedMembers.reduce((s,m)=>s+m.value,0);
+    let acc = 0;
+    for (const m of expandedMembers) {
+      acc += m.value/total;
+      if (ratio <= acc + 1e-9) return m;
+    }
+    return expandedMembers[expandedMembers.length-1] || null;
+  }
+
+  function openStockDetail(name){
+    const links = Array.from(document.querySelectorAll('#tabAnal section:nth-of-type(1) .stock-link[data-name]'));
+    const target = links.find((el)=>el.dataset.name===name);
+    if (target) { target.click(); return; }
+    if (typeof showStockChart === 'function') showStockChart(name);
+  }
+
+  const groupDetailOverlayPlugin = {
+    id:'groupDetailOverlay',
+    afterDatasetsDraw(chart){
+      if (!expandedGroup || !expandedMembers.length || detailProgress <= 0 || !basePie || chart.canvas.id !== 'grpPieCanvas') return;
+      const groupIndex = basePie.labels.indexOf(expandedGroup);
+      if (groupIndex < 0) return;
+      const arc = chart.getDatasetMeta(0).data[groupIndex];
+      if (!arc) return;
+      const x=arc.x, y=arc.y, inner=arc.innerRadius, outer=arc.outerRadius, start=arc.startAngle, end=arc.endAngle;
+      const total = expandedMembers.reduce((s,m)=>s+m.value,0);
+      if (!total) return;
+      const ctx = chart.ctx;
+      let cursor = start;
+
+      ctx.save();
+      expandedMembers.forEach((m,i)=>{
+        const next = i===expandedMembers.length-1 ? end : cursor + (end-start)*(m.value/total);
+        ctx.beginPath();
+        ctx.arc(x,y,outer,cursor,next);
+        ctx.arc(x,y,inner,next,cursor,true);
+        ctx.closePath();
+        ctx.globalAlpha = detailProgress * .94;
+        ctx.fillStyle = m.color;
+        ctx.fill();
+
+        if (i > 0) {
+          const lineOuter = inner + (outer-inner)*detailProgress;
+          ctx.beginPath();
+          ctx.moveTo(x+Math.cos(cursor)*inner,y+Math.sin(cursor)*inner);
+          ctx.lineTo(x+Math.cos(cursor)*lineOuter,y+Math.sin(cursor)*lineOuter);
+          ctx.globalAlpha = detailProgress * .9;
+          ctx.strokeStyle = 'rgba(17,17,17,.95)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        cursor = next;
+      });
+
+      /* Thick outline around the whole selected group, not each member. */
+      ctx.beginPath();
+      ctx.arc(x,y,outer+1.5,start,end);
+      ctx.lineTo(x+Math.cos(end)*(inner-1.5),y+Math.sin(end)*(inner-1.5));
+      ctx.arc(x,y,Math.max(1,inner-1.5),end,start,true);
+      ctx.closePath();
+      ctx.globalAlpha = Math.min(1,.35+detailProgress*.65);
+      ctx.strokeStyle = 'rgba(255,255,255,.96)';
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
   try {
+    if (typeof Chart !== 'undefined' && !Chart.__groupDetailOverlayRegistered) {
+      Chart.register(groupDetailOverlayPlugin);
+      Chart.__groupDetailOverlayRegistered = true;
+    }
+
     const pnlCard = document.getElementById('kpiPnlCard');
     if (pnlCard && !document.getElementById('pnlLogicNote')) {
       const note = document.createElement('div');
@@ -277,7 +379,28 @@ const MOBILE_UI_SCRIPT = String.raw`
       pnlCard.appendChild(note);
     }
 
-    if (typeof renderGroupPie === 'function' && !renderGroupPie.__partialExpandEnhanced) {
+    function wireGroupPieClick(){
+      const canvas = document.getElementById('grpPieCanvas');
+      if (!canvas || canvas.dataset.groupPieClickBound === '1') return;
+      canvas.dataset.groupPieClickBound = '1';
+      canvas.style.cursor = 'pointer';
+      canvas.addEventListener('click',(event)=>{
+        if (typeof grpPieChart === 'undefined' || !grpPieChart || !basePie) return;
+        const hits = grpPieChart.getElementsAtEventForMode(event,'nearest',{intersect:true},true);
+        if (!hits.length) return;
+        const groupIndex = hits[0].index;
+        const groupName = basePie.labels[groupIndex];
+        if (!groupName) return;
+
+        if (expandedGroup === groupName && detailProgress > .65) {
+          const member = memberAtEvent(event,grpPieChart,groupIndex);
+          if (member) { openStockDetail(member.name); return; }
+        }
+        expandGroupSlice(groupName,true);
+      });
+    }
+
+    if (typeof renderGroupPie === 'function' && !renderGroupPie.__overlayEnhanced) {
       const original = renderGroupPie;
       const enhanced = function(){
         const keepExpanded = expandedGroup;
@@ -288,14 +411,16 @@ const MOBILE_UI_SCRIPT = String.raw`
           wireGroupPieClick();
           const bar = ensureDrillBar();
           if (keepExpanded && basePie && basePie.labels.includes(keepExpanded)) {
-            expandGroupSlice(keepExpanded);
+            expandGroupSlice(keepExpanded,false);
           } else {
             expandedGroup = '';
+            expandedMembers = [];
+            detailProgress = 0;
             if (bar) bar.style.display = 'none';
           }
         });
       };
-      enhanced.__partialExpandEnhanced = true;
+      enhanced.__overlayEnhanced = true;
       renderGroupPie = enhanced;
     }
 
