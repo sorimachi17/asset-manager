@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v8-group-accordion';
+const CACHE_NAME = 'asset-mgr-v9-group-pie-click';
 const APP_SHELL = [
   './',
   './index.html',
@@ -28,8 +28,6 @@ const MOBILE_UI_CSS = String.raw`
     padding-bottom:calc(78px + env(safe-area-inset-bottom))!important;
   }
 
-  /* Important for iOS Safari/PWA: backdrop-filter on an ancestor can make
-     position:fixed descendants behave as if fixed inside that ancestor. */
   header{
     position:static!important;
     top:auto!important;
@@ -47,7 +45,6 @@ const MOBILE_UI_CSS = String.raw`
     z-index:1!important;
   }
 
-  /* File picker: keep the native control fully visible on iOS. */
   input[type="file"]{
     display:block!important;
     width:100%!important;
@@ -72,7 +69,6 @@ const MOBILE_UI_CSS = String.raw`
     border-radius:9px!important;
   }
 
-  /* Bottom app navigation. Trend is integrated into Dashboard. */
   #tabNav{
     position:fixed!important;
     left:0!important;
@@ -111,10 +107,8 @@ const MOBILE_UI_CSS = String.raw`
     text-overflow:ellipsis!important;
   }
 
-  /* Dashboard contains Trend too. */
   #tabDash.active ~ #tabTrend{display:contents!important;}
 
-  /* Dashboard order: total -> pie -> trend -> P/L -> return -> IPS. */
   #tabDash.active > .kpi{display:contents!important;}
   #tabDash.active > .kpi > .card:first-child{order:1!important;}
   #tabDash.active > section:nth-of-type(3){order:2!important;}
@@ -138,6 +132,8 @@ const MOBILE_UI_SCRIPT = String.raw`
       if (!host || typeof loadGroups !== 'function' || typeof DATES === 'undefined' || !DATES.length) return;
       const tbody = host.querySelector('tbody');
       if (!tbody) return;
+      if (tbody.dataset.groupAccordionEnhanced === '1') return;
+      tbody.dataset.groupAccordionEnhanced = '1';
 
       const rows = Array.from(tbody.children).filter((r) => r.tagName === 'TR');
       if (!rows.length) return;
@@ -176,6 +172,7 @@ const MOBILE_UI_SCRIPT = String.raw`
           : 0;
 
         row.classList.add('grp-summary-row');
+        row.dataset.groupName = groupName;
         row.setAttribute('role', 'button');
         row.setAttribute('tabindex', '0');
         row.setAttribute('aria-expanded', 'false');
@@ -238,6 +235,39 @@ const MOBILE_UI_SCRIPT = String.raw`
     }
   }
 
+  function wireGroupPieClick(){
+    try {
+      const canvas = document.getElementById('grpPieCanvas');
+      if (!canvas || canvas.dataset.groupPieClickBound === '1') return;
+      canvas.dataset.groupPieClickBound = '1';
+      canvas.style.cursor = 'pointer';
+
+      canvas.addEventListener('click', (event) => {
+        if (typeof grpPieChart === 'undefined' || !grpPieChart) return;
+        const hits = grpPieChart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
+        if (!hits.length) return;
+
+        const idx = hits[0].index;
+        const label = grpPieChart.data && grpPieChart.data.labels
+          ? String(grpPieChart.data.labels[idx])
+          : '';
+        if (!label) return;
+
+        const rows = Array.from(document.querySelectorAll('#grpTable .grp-summary-row'));
+        const row = rows.find((r) => r.dataset.groupName === label);
+        if (!row) return;
+
+        if (row.getAttribute('aria-expanded') !== 'true') row.click();
+        requestAnimationFrame(() => {
+          const detail = row.nextElementSibling;
+          (detail || row).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+    } catch (err) {
+      console.warn('group pie click wiring failed', err);
+    }
+  }
+
   try {
     const pnlCard = document.getElementById('kpiPnlCard');
     if (pnlCard && !document.getElementById('pnlLogicNote')) {
@@ -255,7 +285,10 @@ const MOBILE_UI_SCRIPT = String.raw`
       const originalGroupPieRenderer = renderGroupPie;
       const enhancedGroupPieRenderer = function(){
         originalGroupPieRenderer();
-        requestAnimationFrame(enhanceGroupTable);
+        requestAnimationFrame(() => {
+          enhanceGroupTable();
+          wireGroupPieClick();
+        });
       };
       enhancedGroupPieRenderer.__accordionEnhanced = true;
       renderGroupPie = enhancedGroupPieRenderer;
@@ -285,7 +318,10 @@ const MOBILE_UI_SCRIPT = String.raw`
     }
 
     if (typeof activeTab !== 'undefined' && activeTab === 'tabAnal') {
-      requestAnimationFrame(enhanceGroupTable);
+      requestAnimationFrame(() => {
+        enhanceGroupTable();
+        wireGroupPieClick();
+      });
     }
   } catch (err) {
     console.warn('mobile dashboard enhancement failed', err);
