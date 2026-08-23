@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v12-group-detail-overlay';
+const CACHE_NAME = 'asset-mgr-v13-group-toggle-stable';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,9 +22,10 @@ const MOBILE_UI_CSS = String.raw`
 #grpTable .grp-detail-box{padding:8px 8px 4px;border-left:2px solid var(--line);margin-left:5px;overflow-x:auto;}
 #grpTable .grp-detail-table{width:100%;min-width:470px;font-size:11px;}
 #grpTable .grp-detail-table th,#grpTable .grp-detail-table td{padding:6px 5px;}
-#grpDrillBar{display:none;align-items:center;gap:8px;margin:6px 0 8px;flex-wrap:wrap;}
-#grpDrillBack{padding:6px 10px;font-size:12px;}
-#grpDrillTitle{font-size:12px;color:var(--muted);}
+#grpDrillBar{display:flex;align-items:center;gap:8px;margin:6px 0 8px;min-height:34px;flex-wrap:nowrap;}
+#grpDrillBack{padding:6px 10px;font-size:12px;visibility:hidden;pointer-events:none;flex:0 0 auto;}
+#grpDrillBar.is-expanded #grpDrillBack{visibility:visible;pointer-events:auto;}
+#grpDrillTitle{font-size:12px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 @media (max-width:600px){
   body{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important;}
@@ -147,6 +148,16 @@ const MOBILE_UI_SCRIPT = String.raw`
     });
   }
 
+  function setDrillBarState(isExpanded, groupName){
+    const bar = ensureDrillBar();
+    if (!bar) return;
+    bar.classList.toggle('is-expanded', !!isExpanded);
+    const title = document.getElementById('grpDrillTitle');
+    if (title) title.textContent = isExpanded && groupName
+      ? groupName + ' の比率を維持したまま内訳表示'
+      : 'グループをタップすると内訳表示';
+  }
+
   function ensureDrillBar(){
     const canvas = document.getElementById('grpPieCanvas');
     if (!canvas) return null;
@@ -154,7 +165,7 @@ const MOBILE_UI_SCRIPT = String.raw`
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'grpDrillBar';
-      bar.innerHTML = '<button id="grpDrillBack" class="btn-ghost" type="button">← 詳細化を解除</button><span id="grpDrillTitle"></span>';
+      bar.innerHTML = '<button id="grpDrillBack" class="btn-ghost" type="button">← 詳細化を解除</button><span id="grpDrillTitle">グループをタップすると内訳表示</span>';
       const wrap = canvas.closest('.chart-wrap');
       if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(bar, wrap);
       document.getElementById('grpDrillBack').addEventListener('click',collapseGroupDetail);
@@ -236,13 +247,7 @@ const MOBILE_UI_SCRIPT = String.raw`
       expandedMembers = names.map((name,i)=>({name,value:rawValues[i],color:palette[i]}));
       openOnlyGroupRow(groupName);
       renderExpandedLegend();
-
-      const bar = ensureDrillBar();
-      if (bar) {
-        bar.style.display = 'flex';
-        const title = document.getElementById('grpDrillTitle');
-        if (title) title.textContent = groupName + ' の比率を維持したまま内訳表示';
-      }
+      setDrillBarState(true, groupName);
 
       if (animate === false) {
         detailProgress = 1;
@@ -260,8 +265,7 @@ const MOBILE_UI_SCRIPT = String.raw`
     expandedMembers = [];
     detailProgress = 0;
     openOnlyGroupRow('');
-    const bar = document.getElementById('grpDrillBar');
-    if (bar) bar.style.display = 'none';
+    setDrillBarState(false, '');
     const legend = document.getElementById('grpPieLegend');
     if (legend && basePie) legend.innerHTML = basePie.legendHtml;
     if (typeof grpPieChart !== 'undefined' && grpPieChart) grpPieChart.draw();
@@ -392,9 +396,9 @@ const MOBILE_UI_SCRIPT = String.raw`
         const groupName = basePie.labels[groupIndex];
         if (!groupName) return;
 
-        if (expandedGroup === groupName && detailProgress > .65) {
-          const member = memberAtEvent(event,grpPieChart,groupIndex);
-          if (member) { openStockDetail(member.name); return; }
+        if (expandedGroup === groupName) {
+          collapseGroupDetail();
+          return;
         }
         expandGroupSlice(groupName,true);
       });
@@ -409,14 +413,14 @@ const MOBILE_UI_SCRIPT = String.raw`
           enhanceGroupTable();
           snapshotBasePie();
           wireGroupPieClick();
-          const bar = ensureDrillBar();
+          ensureDrillBar();
           if (keepExpanded && basePie && basePie.labels.includes(keepExpanded)) {
             expandGroupSlice(keepExpanded,false);
           } else {
             expandedGroup = '';
             expandedMembers = [];
             detailProgress = 0;
-            if (bar) bar.style.display = 'none';
+            setDrillBarState(false, '');
           }
         });
       };
@@ -434,7 +438,7 @@ const MOBILE_UI_SCRIPT = String.raw`
     }
 
     if (isMobile() && typeof activeTab !== 'undefined' && activeTab==='tabDash' && typeof DATES!=='undefined' && DATES.length && typeof drawLine==='function') requestAnimationFrame(()=>drawLine());
-    if (typeof activeTab !== 'undefined' && activeTab==='tabAnal') requestAnimationFrame(()=>{enhanceGroupTable();snapshotBasePie();wireGroupPieClick();ensureDrillBar();});
+    if (typeof activeTab !== 'undefined' && activeTab==='tabAnal') requestAnimationFrame(()=>{enhanceGroupTable();snapshotBasePie();wireGroupPieClick();ensureDrillBar();setDrillBarState(false,'');});
   } catch(err){ console.warn('mobile dashboard enhancement failed',err); }
 })();
 `;
