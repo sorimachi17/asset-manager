@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v10-group-pie-drilldown';
+const CACHE_NAME = 'asset-mgr-v11-partial-group-expand';
 const APP_SHELL = [
   './',
   './index.html',
@@ -52,8 +52,9 @@ const MOBILE_UI_CSS = String.raw`
 const MOBILE_UI_SCRIPT = String.raw`
 (() => {
   const isMobile = () => window.matchMedia('(max-width:600px)').matches;
-  let groupPieMode = 'groups';
-  let currentDrillGroup = '';
+  let expandedGroup = '';
+  let basePie = null;
+  let pieSliceMeta = [];
 
   function getSelectedAnalDate(){
     if (typeof DATES === 'undefined' || !DATES.length) return '';
@@ -119,6 +120,7 @@ const MOBILE_UI_SCRIPT = String.raw`
         }).join('');
         detailRow.innerHTML = '<td colspan="'+row.cells.length+'"><div class="grp-detail-box"><div class="muted" style="font-size:10px;margin:0 0 4px">'+selectedDate+' 時点</div><table class="grp-detail-table"><thead><tr><th>銘柄</th><th style="text-align:right">評価額</th><th style="text-align:right">グループ比</th><th style="text-align:right">含み損益</th></tr></thead><tbody>'+(memberRows||'<tr><td colspan="4" class="muted">対象銘柄なし</td></tr>')+'</tbody></table>'+(totalValue?'<div class="muted" style="font-size:10px;margin-top:4px">グループ全体: '+yen(groupTotal)+' / 総資産の '+(groupTotal/totalValue*100).toFixed(1)+'%</div>':'')+'</div></td>';
         row.parentNode.insertBefore(detailRow,row.nextSibling);
+
         const toggle = () => {
           const open = detailRow.style.display !== 'none';
           detailRow.style.display = open ? 'none' : '';
@@ -131,6 +133,18 @@ const MOBILE_UI_SCRIPT = String.raw`
     } catch(err){ console.warn('group table enhancement failed',err); }
   }
 
+  function openOnlyGroupRow(groupName){
+    const rows = Array.from(document.querySelectorAll('#grpTable .grp-summary-row'));
+    rows.forEach((row) => {
+      const detail = row.nextElementSibling;
+      if (!detail || !detail.classList.contains('grp-detail-row')) return;
+      const shouldOpen = row.dataset.groupName === groupName;
+      detail.style.display = shouldOpen ? '' : 'none';
+      row.classList.toggle('is-open', shouldOpen);
+      row.setAttribute('aria-expanded', String(shouldOpen));
+    });
+  }
+
   function ensureDrillBar(){
     const canvas = document.getElementById('grpPieCanvas');
     if (!canvas) return null;
@@ -138,42 +152,94 @@ const MOBILE_UI_SCRIPT = String.raw`
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'grpDrillBar';
-      bar.innerHTML = '<button id="grpDrillBack" class="btn-ghost" type="button">← グループ一覧へ戻る</button><span id="grpDrillTitle"></span>';
+      bar.innerHTML = '<button id="grpDrillBack" class="btn-ghost" type="button">← 詳細化を解除</button><span id="grpDrillTitle"></span>';
       const wrap = canvas.closest('.chart-wrap');
       if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(bar, wrap);
       document.getElementById('grpDrillBack').addEventListener('click',()=>{
-        groupPieMode = 'groups';
-        currentDrillGroup = '';
+        expandedGroup = '';
         if (typeof renderGroupPie === 'function') renderGroupPie();
       });
     }
     return bar;
   }
 
-  function drillIntoGroup(groupName){
+  function snapshotBasePie(){
+    if (typeof grpPieChart === 'undefined' || !grpPieChart || !grpPieChart.data || !grpPieChart.data.datasets.length) return false;
+    const labels = (grpPieChart.data.labels || []).map(String);
+    const values = (grpPieChart.data.datasets[0].data || []).map(Number);
+    const rawColors = grpPieChart.data.datasets[0].backgroundColor || [];
+    const colors = Array.isArray(rawColors) ? rawColors.slice() : labels.map(() => rawColors);
+    basePie = { labels, values, colors };
+    pieSliceMeta = labels.map((label) => ({type:'group', group:label}));
+    return true;
+  }
+
+  function renderExpandedLegend(labels, values, colors, metas){
+    const legend = document.getElementById('grpPieLegend');
+    if (!legend) return;
+    const total = basePie ? basePie.values.reduce((s,v)=>s+v,0) : values.reduce((s,v)=>s+v,0);
+    legend.innerHTML = labels.map((label,i) => {
+      const meta = metas[i] || {};
+      const display = meta.type === 'member' ? (escapeHtml(meta.group) + ' › ' + escapeHtml(meta.name)) : escapeHtml(label);
+      return '<span class="legend-item"><span class="dot" style="background:'+colors[i]+'"></span>'+display+' '+(total?values[i]/total*100:0).toFixed(1)+'%</span>';
+    }).join('');
+  }
+
+  function expandGroupSlice(groupName){
     try {
       if (typeof grpPieChart === 'undefined' || !grpPieChart) return;
+      if (!basePie && !snapshotBasePie()) return;
+      const groupIndex = basePie.labels.indexOf(groupName);
+      if (groupIndex < 0) return;
+
       const selectedDate = getSelectedAnalDate();
       const names = groupMembers(groupName, selectedDate);
-      if (!names.length) return;
-      const values = names.map((n)=>amountOfNameAt(n, selectedDate));
-      const palette = typeof getPalette === 'function' ? getPalette(names.length) : undefined;
-      groupPieMode = 'members';
-      currentDrillGroup = groupName;
-      grpPieChart.data.labels = names;
+      if (!names.length || typeof amountOfNameAt !== 'function') return;
+      const rawMemberValues = names.map((name)=>amountOfNameAt(name, selectedDate));
+      const rawMemberTotal = rawMemberValues.reduce((s,v)=>s+v,0);
+      if (!rawMemberTotal) return;
+
+      const groupTotal = basePie.values[groupIndex];
+      const scale = groupTotal / rawMemberTotal;
+      const memberValues = rawMemberValues.map((v)=>v*scale);
+      const memberColors = typeof getPalette === 'function' ? getPalette(names.length) : names.map(()=>basePie.colors[groupIndex]);
+
+      const labels = [];
+      const values = [];
+      const colors = [];
+      const metas = [];
+      basePie.labels.forEach((label,i)=>{
+        if (label !== groupName) {
+          labels.push(label);
+          values.push(basePie.values[i]);
+          colors.push(basePie.colors[i]);
+          metas.push({type:'group', group:label});
+          return;
+        }
+        names.forEach((name,j)=>{
+          labels.push(name);
+          values.push(memberValues[j]);
+          colors.push(memberColors[j]);
+          metas.push({type:'member', group:groupName, name});
+        });
+      });
+
+      expandedGroup = groupName;
+      pieSliceMeta = metas;
+      grpPieChart.data.labels = labels;
       grpPieChart.data.datasets[0].data = values;
-      if (palette) grpPieChart.data.datasets[0].backgroundColor = palette;
+      grpPieChart.data.datasets[0].backgroundColor = colors;
       grpPieChart.update();
-      const total = values.reduce((s,v)=>s+v,0);
-      const legend = document.getElementById('grpPieLegend');
-      if (legend) legend.innerHTML = names.map((n,i)=>'<span class="legend-item"><span class="dot" style="background:'+(palette?palette[i]:'currentColor')+'"></span>'+escapeHtml(n)+' '+(total?values[i]/total*100:0).toFixed(1)+'%</span>').join('');
+      renderExpandedLegend(labels, values, colors, metas);
+      openOnlyGroupRow(groupName);
+
       const bar = ensureDrillBar();
       if (bar) {
         bar.style.display = 'flex';
         const title = document.getElementById('grpDrillTitle');
-        if (title) title.textContent = groupName + ' › 銘柄別';
+        if (title) title.textContent = groupName + ' の部分だけ銘柄別に表示';
       }
-    } catch(err){ console.warn('group drilldown failed',err); }
+    } catch(err){ console.warn('partial group expansion failed',err); }
   }
 
   function wireGroupPieClick(){
@@ -187,18 +253,13 @@ const MOBILE_UI_SCRIPT = String.raw`
         const hits = grpPieChart.getElementsAtEventForMode(event,'nearest',{intersect:true},true);
         if (!hits.length) return;
         const idx = hits[0].index;
-        const label = grpPieChart.data && grpPieChart.data.labels ? String(grpPieChart.data.labels[idx]) : '';
-        if (!label) return;
-
-        if (groupPieMode === 'members') {
-          if (typeof showStockChart === 'function') showStockChart(label);
+        const meta = pieSliceMeta[idx];
+        if (!meta) return;
+        if (meta.type === 'member') {
+          if (typeof showStockChart === 'function') showStockChart(meta.name);
           return;
         }
-
-        const rows = Array.from(document.querySelectorAll('#grpTable .grp-summary-row'));
-        const row = rows.find((r)=>r.dataset.groupName===label);
-        if (row && row.getAttribute('aria-expanded') !== 'true') row.click();
-        drillIntoGroup(label);
+        expandGroupSlice(meta.group);
       });
     } catch(err){ console.warn('group pie click wiring failed',err); }
   }
@@ -216,17 +277,25 @@ const MOBILE_UI_SCRIPT = String.raw`
       pnlCard.appendChild(note);
     }
 
-    if (typeof renderGroupPie === 'function' && !renderGroupPie.__drillEnhanced) {
+    if (typeof renderGroupPie === 'function' && !renderGroupPie.__partialExpandEnhanced) {
       const original = renderGroupPie;
       const enhanced = function(){
+        const keepExpanded = expandedGroup;
         original();
-        groupPieMode = 'groups';
-        currentDrillGroup = '';
-        const bar = ensureDrillBar();
-        if (bar) bar.style.display = 'none';
-        requestAnimationFrame(()=>{enhanceGroupTable();wireGroupPieClick();});
+        requestAnimationFrame(()=>{
+          enhanceGroupTable();
+          snapshotBasePie();
+          wireGroupPieClick();
+          const bar = ensureDrillBar();
+          if (keepExpanded && basePie && basePie.labels.includes(keepExpanded)) {
+            expandGroupSlice(keepExpanded);
+          } else {
+            expandedGroup = '';
+            if (bar) bar.style.display = 'none';
+          }
+        });
       };
-      enhanced.__drillEnhanced = true;
+      enhanced.__partialExpandEnhanced = true;
       renderGroupPie = enhanced;
     }
 
@@ -240,7 +309,7 @@ const MOBILE_UI_SCRIPT = String.raw`
     }
 
     if (isMobile() && typeof activeTab !== 'undefined' && activeTab==='tabDash' && typeof DATES!=='undefined' && DATES.length && typeof drawLine==='function') requestAnimationFrame(()=>drawLine());
-    if (typeof activeTab !== 'undefined' && activeTab==='tabAnal') requestAnimationFrame(()=>{enhanceGroupTable();wireGroupPieClick();ensureDrillBar();});
+    if (typeof activeTab !== 'undefined' && activeTab==='tabAnal') requestAnimationFrame(()=>{enhanceGroupTable();snapshotBasePie();wireGroupPieClick();ensureDrillBar();});
   } catch(err){ console.warn('mobile dashboard enhancement failed',err); }
 })();
 `;
