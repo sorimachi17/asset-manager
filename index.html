@@ -40,6 +40,18 @@
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
     .big{font-size:22px;font-weight:700;margin-top:6px}
     .sub{font-size:12px;color:var(--muted)}
+    .pnl-breakdown{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+    .pnl-breakdown summary{display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;cursor:pointer;color:#cbd5e1;font-size:12px;user-select:none}
+    .pnl-breakdown summary::-webkit-details-marker{display:none}
+    .pnl-breakdown summary::after{content:'›';font-size:18px;line-height:1;color:var(--muted);transition:transform .15s}
+    .pnl-breakdown[open] summary::after{transform:rotate(90deg)}
+    .pnl-breakdown-count{margin-left:auto;color:var(--muted);font-size:11px}
+    .pnl-breakdown-list{max-height:260px;overflow-y:auto;margin-top:6px}
+    .pnl-breakdown-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px}
+    .pnl-breakdown-row:last-child{border-bottom:0}
+    .pnl-breakdown-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pnl-breakdown-value{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .pnl-breakdown-pct{display:block;color:var(--muted);font-size:10px;line-height:1.2}
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0;overflow:hidden}
     h2{margin:0 0 6px 0;font-size:16px}
     .h2-sub{margin-top:-2px;font-size:12px;color:var(--muted)}
@@ -286,6 +298,10 @@
       <div class="big" id="pnlValue">—</div>
       <div class="sub" id="pnlPctLine" style="margin-top:4px;">—</div>
       <div class="sub" id="pnlCostLine" style="margin-top:2px;">—</div>
+      <details id="pnlBreakdown" class="pnl-breakdown">
+        <summary>銘柄別内訳 <span id="pnlBreakdownCount" class="pnl-breakdown-count"></span></summary>
+        <div id="pnlBreakdownList" class="pnl-breakdown-list"></div>
+      </details>
     </div>
     <div class="card" id="kpiRetCard" style="display:none">
       <div class="muted">運用リターン・年初来 <span id="retBaseNote"></span></div>
@@ -883,10 +899,17 @@ function refreshKPIs(){
   // 含み損益
   const names = [...(byDateName.get(curDate)||new Map()).keys()];
   let totalPnl = 0, totalCost = 0, hasPnl = false;
+  const pnlRows = [];
   for(const name of names){
     const p = pnlOfNameAt(name, curDate);
-    if(p){ totalPnl += p.pnl; totalCost += p.cost; hasPnl = true; }
+    if(p){
+      totalPnl += p.pnl;
+      totalCost += p.cost;
+      hasPnl = true;
+      pnlRows.push({name, ...p});
+    }
   }
+  pnlRows.sort((a,b) => Math.abs(b.pnl) - Math.abs(a.pnl) || a.name.localeCompare(b.name));
   const pnlCard = $('kpiPnlCard');
   if(hasPnl){
     pnlCard.style.display = '';
@@ -897,8 +920,21 @@ function refreshKPIs(){
     $('pnlPctLine').textContent = `損益率 ${sign}${pnlPct.toFixed(2)}%`;
     $('pnlPctLine').className = 'sub ' + (totalPnl >= 0 ? 'pos' : 'neg');
     $('pnlCostLine').textContent = `取得総額 ${yen(totalCost)}`;
+    $('pnlBreakdownCount').textContent = `${pnlRows.length}銘柄`;
+    $('pnlBreakdownList').innerHTML = pnlRows.map(r => {
+      const rowSign = r.pnl >= 0 ? '+' : '';
+      const pct = r.pnlPct == null ? '損益率 —' : `損益率 ${rowSign}${r.pnlPct.toFixed(2)}%`;
+      const cls = r.pnl >= 0 ? 'pos' : 'neg';
+      return `<div class="pnl-breakdown-row">
+        <span class="pnl-breakdown-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+        <span class="pnl-breakdown-value ${cls}">${rowSign}${yen(r.pnl)}<small class="pnl-breakdown-pct">${pct}</small></span>
+      </div>`;
+    }).join('');
+    $('pnlBreakdown').style.display = pnlRows.length ? '' : 'none';
   } else {
     pnlCard.style.display = 'none';
+    $('pnlBreakdownList').innerHTML = '';
+    $('pnlBreakdownCount').textContent = '';
   }
 }
 

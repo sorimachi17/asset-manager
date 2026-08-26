@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v14-direct-profit-loss';
+const CACHE_NAME = 'asset-mgr-v15-pnl-breakdown';
 const APP_SHELL = [
   './',
   './index.html',
