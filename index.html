@@ -50,6 +50,7 @@
     .pnl-breakdown-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px}
     .pnl-breakdown-row:last-child{border-bottom:0}
     .pnl-breakdown-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pnl-breakdown-account{display:block;color:var(--muted);font-size:10px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .pnl-breakdown-value{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     .pnl-breakdown-pct{display:block;color:var(--muted);font-size:10px;line-height:1.2}
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0;overflow:hidden}
@@ -743,6 +744,17 @@ function optionalNumber(v){
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
+function pnlOfRow(r){
+  const directPnl = optionalNumber(r.ProfitLoss);
+  const qty = Number(r.Quantity) || 0;
+  const costBasis = Number(r.CostBasis) || 0;
+  if(directPnl === null && !(qty > 0 && costBasis > 0)) return null;
+  const amount = Number(r.Amount) || 0;
+  const pnl = directPnl !== null ? directPnl : amount - qty * costBasis;
+  const cost = amount - pnl;
+  const pnlPct = cost > 0 ? pnl / cost * 100 : null;
+  return {qty, costBasis, cost, pnl, pnlPct};
+}
 
 // ===================== CSV列マッピング =====================
 const REQUIRED_FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
@@ -827,9 +839,7 @@ function buildIndexes(){
     const _qty = r.Quantity || 0; const _cost = _qty * (r.CostBasis || 0);
     _m.Quantity += _qty; _m._totalCost += _cost;
     _m.CostBasis = _m.Quantity > 0 ? _m._totalCost / _m.Quantity : 0;
-    const _rowPnl = r.ProfitLoss !== null
-      ? r.ProfitLoss
-      : (_qty > 0 && (r.CostBasis || 0) > 0 ? r.Amount - _cost : null);
+    const _rowPnl = pnlOfRow(r)?.pnl ?? null;
     if(_rowPnl !== null){
       _m.ProfitLoss += _rowPnl;
       _m._hasPnl = true;
@@ -897,19 +907,22 @@ function refreshKPIs(){
     : '年初来 —';
 
   // 含み損益
-  const names = [...(byDateName.get(curDate)||new Map()).keys()];
   let totalPnl = 0, totalCost = 0, hasPnl = false;
-  const pnlRows = [];
-  for(const name of names){
-    const p = pnlOfNameAt(name, curDate);
+  const pnlRows = (byDate.get(curDate) || []).map((r, rowIndex) => {
+    const p = pnlOfRow(r);
     if(p){
       totalPnl += p.pnl;
       totalCost += p.cost;
       hasPnl = true;
-      pnlRows.push({name, ...p});
     }
-  }
-  pnlRows.sort((a,b) => Math.abs(b.pnl) - Math.abs(a.pnl) || a.name.localeCompare(b.name));
+    return {name:r.Name, account:r.Account || '', rowIndex, ...(p || {pnl:null, pnlPct:null, cost:null})};
+  });
+  pnlRows.sort((a,b) => {
+    if(a.pnl === null && b.pnl === null) return a.rowIndex - b.rowIndex;
+    if(a.pnl === null) return 1;
+    if(b.pnl === null) return -1;
+    return Math.abs(b.pnl) - Math.abs(a.pnl) || a.rowIndex - b.rowIndex;
+  });
   const pnlCard = $('kpiPnlCard');
   if(hasPnl){
     pnlCard.style.display = '';
@@ -920,13 +933,20 @@ function refreshKPIs(){
     $('pnlPctLine').textContent = `損益率 ${sign}${pnlPct.toFixed(2)}%`;
     $('pnlPctLine').className = 'sub ' + (totalPnl >= 0 ? 'pos' : 'neg');
     $('pnlCostLine').textContent = `取得総額 ${yen(totalCost)}`;
-    $('pnlBreakdownCount').textContent = `${pnlRows.length}銘柄`;
+    $('pnlBreakdownCount').textContent = `${pnlRows.length}件`;
     $('pnlBreakdownList').innerHTML = pnlRows.map(r => {
+      const account = r.account ? `<small class="pnl-breakdown-account">${escapeHtml(r.account)}</small>` : '';
+      if(r.pnl === null){
+        return `<div class="pnl-breakdown-row">
+          <span class="pnl-breakdown-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}${account}</span>
+          <span class="pnl-breakdown-value muted">—<small class="pnl-breakdown-pct">損益データなし</small></span>
+        </div>`;
+      }
       const rowSign = r.pnl >= 0 ? '+' : '';
       const pct = r.pnlPct == null ? '損益率 —' : `損益率 ${rowSign}${r.pnlPct.toFixed(2)}%`;
       const cls = r.pnl >= 0 ? 'pos' : 'neg';
       return `<div class="pnl-breakdown-row">
-        <span class="pnl-breakdown-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+        <span class="pnl-breakdown-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}${account}</span>
         <span class="pnl-breakdown-value ${cls}">${rowSign}${yen(r.pnl)}<small class="pnl-breakdown-pct">${pct}</small></span>
       </div>`;
     }).join('');
@@ -2079,9 +2099,7 @@ function drawStockAnal(){
     const _mq = r.Quantity || 0; const _mc = _mq * (r.CostBasis || 0);
     _mb.Quantity += _mq; _mb._totalCost += _mc;
     _mb.CostBasis = _mb.Quantity > 0 ? _mb._totalCost / _mb.Quantity : 0;
-    const _rowPnl = r.ProfitLoss !== null
-      ? r.ProfitLoss
-      : (_mq > 0 && (r.CostBasis || 0) > 0 ? r.Amount - _mc : null);
+    const _rowPnl = pnlOfRow(r)?.pnl ?? null;
     if(_rowPnl !== null){
       _mb.ProfitLoss += _rowPnl;
       _mb._hasPnl = true;

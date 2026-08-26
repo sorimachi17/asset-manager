@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v15-pnl-breakdown';
+const CACHE_NAME = 'asset-mgr-v16-pnl-all-rows';
 const APP_SHELL = [
   './',
   './index.html',
