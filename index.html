@@ -721,6 +721,13 @@ function compactJPY(n){
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
+function optionalNumber(v){
+  const s = String(v ?? '').replace(/,/g,'').trim();
+  if(s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ===================== CSV列マッピング =====================
 const REQUIRED_FIELDS = ['Date','Name','Amount','AssetClass','Currency','StockType','Account'];
 
@@ -772,6 +779,7 @@ function applyMappingAndProcess(mapping, rawRows){
     Account:        (r[mapping.Account] || '').trim(),
     Quantity:       Number(String(r[mapping.Quantity || 'Quantity'] || '0').replace(/,/g,'')) || 0,
     CostBasis:      Number(String(r[mapping.CostBasis || 'CostBasis'] || '0').replace(/,/g,'')) || 0,
+    ProfitLoss:     optionalNumber(r['ProfitLoss']),
     AmountOriginal: (r['AmountOriginal'] !== undefined && r['AmountOriginal'] !== '') ? (Number(String(r['AmountOriginal']).replace(/,/g,'')) || '') : '',
     FxRate:         (r['FxRate']         !== undefined && r['FxRate']         !== '') ? (Number(String(r['FxRate']        ).replace(/,/g,'')) || '') : ''
   }));
@@ -798,11 +806,18 @@ function buildIndexes(){
     m.set(r.Name, (m.get(r.Name)||0) + r.Amount);
     if(!META_BY_DATE_NAME.has(r.Date)) META_BY_DATE_NAME.set(r.Date, new Map());
     const mm = META_BY_DATE_NAME.get(r.Date);
-    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0, AmountOriginal:0, FxRate:''});
+    if(!mm.has(r.Name)) mm.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, StockType:r.StockType, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0, ProfitLoss:0, _hasPnl:false, AmountOriginal:0, FxRate:''});
     const _m = mm.get(r.Name);
     const _qty = r.Quantity || 0; const _cost = _qty * (r.CostBasis || 0);
     _m.Quantity += _qty; _m._totalCost += _cost;
     _m.CostBasis = _m.Quantity > 0 ? _m._totalCost / _m.Quantity : 0;
+    const _rowPnl = r.ProfitLoss !== null
+      ? r.ProfitLoss
+      : (_qty > 0 && (r.CostBasis || 0) > 0 ? r.Amount - _cost : null);
+    if(_rowPnl !== null){
+      _m.ProfitLoss += _rowPnl;
+      _m._hasPnl = true;
+    }
     if(r.AmountOriginal) _m.AmountOriginal = (_m.AmountOriginal || 0) + Number(r.AmountOriginal);
     if(r.FxRate) _m.FxRate = r.FxRate;
   }
@@ -822,12 +837,12 @@ function attrsOfNameAt(name, date){
 function computeMonthBase(curDate){ const t = dayjs(curDate).subtract(1,'month').format('YYYY-MM-DD'); return nearestOnOrBefore(t); }
 function pnlOfNameAt(name, date){
   const attrs = attrsOfNameAt(name, date);
+  if(!attrs._hasPnl) return null;
   const qty = attrs.Quantity || 0;
   const costBasis = attrs.CostBasis || 0;
-  if(!qty && !costBasis) return null;
   const amount = amountOfNameAt(name, date);
-  const cost = qty * costBasis;
-  const pnl = amount - cost;
+  const pnl = attrs.ProfitLoss;
+  const cost = amount - pnl;
   const pnlPct = cost > 0 ? pnl / cost * 100 : null;
   return { qty, costBasis, cost, pnl, pnlPct };
 }
@@ -2023,11 +2038,18 @@ function drawStockAnal(){
   const metaBucket = new Map();
   for(const r of (byDate.get(selDate)||[])){
     bucket.set(r.Name, (bucket.get(r.Name)||0) + r.Amount);
-    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0});
+    if(!metaBucket.has(r.Name)) metaBucket.set(r.Name, {AssetClass:r.AssetClass, Currency:r.Currency, Account:r.Account, Quantity:0, CostBasis:0, _totalCost:0, ProfitLoss:0, _hasPnl:false});
     const _mb = metaBucket.get(r.Name);
     const _mq = r.Quantity || 0; const _mc = _mq * (r.CostBasis || 0);
     _mb.Quantity += _mq; _mb._totalCost += _mc;
     _mb.CostBasis = _mb.Quantity > 0 ? _mb._totalCost / _mb.Quantity : 0;
+    const _rowPnl = r.ProfitLoss !== null
+      ? r.ProfitLoss
+      : (_mq > 0 && (r.CostBasis || 0) > 0 ? r.Amount - _mc : null);
+    if(_rowPnl !== null){
+      _mb.ProfitLoss += _rowPnl;
+      _mb._hasPnl = true;
+    }
   }
 
   // 不在銘柄の選択を除去
@@ -2037,9 +2059,9 @@ function drawStockAnal(){
     const meta = metaBucket.get(name) || {};
     const qty = meta.Quantity || 0;
     const costBasis = meta.CostBasis || 0;
-    const hasPnlData = qty > 0 || costBasis > 0;
-    const cost = qty * costBasis;
-    const pnl = hasPnlData ? amount - cost : null;
+    const hasPnlData = !!meta._hasPnl;
+    const pnl = hasPnlData ? meta.ProfitLoss : null;
+    const cost = hasPnlData ? amount - pnl : null;
     const pnlPct = (hasPnlData && cost > 0) ? pnl / cost * 100 : null;
     return { name, amount, pct: totalVal > 0 ? amount/totalVal*100 : 0, pnl, pnlPct, cost, ...meta };
   }).filter(r => r.amount !== 0);
@@ -2210,7 +2232,7 @@ function renderSelPie(selTotal, totalVal, selDate){
 // ===================== Export =====================
 function exportCsv(){
   if(RAW.length===0) return;
-  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','AmountOriginal','FxRate'];
+  const header = ['Date','Name','Amount','AssetClass','Currency','StockType','Account','Quantity','CostBasis','ProfitLoss','AmountOriginal','FxRate'];
   const rows = RAW.map(r=>header.map(h=>r[h]??''));
   const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});

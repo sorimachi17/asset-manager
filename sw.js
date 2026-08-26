@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v13-group-toggle-stable';
+const CACHE_NAME = 'asset-mgr-v14-direct-profit-loss';
 const APP_SHELL = [
   './',
   './index.html',
