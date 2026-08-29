@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v18-group-pnl-readable';
+const CACHE_NAME = 'asset-mgr-v19-group-detail-legend';
 const APP_SHELL = [
   './',
   './index.html',
@@ -30,6 +30,57 @@ const MOBILE_FIT_CSS = String.raw`
   #grpTable .grp-detail-table th:nth-child(3),#grpTable .grp-detail-table td:nth-child(3){width:16%!important;}
   #grpTable .grp-detail-table th:nth-child(4),#grpTable .grp-detail-table td:nth-child(4){width:28%!important;}
   #grpTable .grp-detail-table td:nth-child(4){white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:normal!important;word-break:normal!important;font-size:9px!important;line-height:1.25!important;}
+
+  /* Expanded pie legend: make the selected parent and its children visually distinct. */
+  #grpPieLegend:has(.legend-item[style*="font-weight:600"]){
+    gap:5px!important;
+    padding:8px!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:12px!important;
+    background:rgba(255,255,255,.018)!important;
+  }
+  #grpPieLegend:has(.legend-item[style*="font-weight:600"]) > .legend-item{
+    transition:opacity .15s ease,background .15s ease,border-color .15s ease!important;
+  }
+  #grpPieLegend:has(.legend-item[style*="font-weight:600"]) > .legend-item:not([style*="font-weight:600"]):not([style*="padding-left:10px"]){
+    opacity:.38!important;
+  }
+  #grpPieLegend .legend-item[style*="font-weight:600"]{
+    flex-basis:100%!important;
+    width:100%!important;
+    margin:2px 0 1px!important;
+    padding:7px 9px!important;
+    border:1px solid rgba(255,255,255,.22)!important;
+    border-radius:9px!important;
+    background:rgba(255,255,255,.075)!important;
+    color:var(--fg)!important;
+    font-size:12px!important;
+  }
+  #grpPieLegend .legend-item[style*="font-weight:600"]::before{
+    content:'選択中';
+    flex:0 0 auto;
+    margin-right:2px;
+    padding:1px 5px;
+    border-radius:999px;
+    background:rgba(59,130,246,.20);
+    border:1px solid rgba(96,165,250,.38);
+    color:#bfdbfe;
+    font-size:9px;
+    font-weight:600;
+    line-height:1.45;
+  }
+  #grpPieLegend .legend-item[style*="padding-left:10px"]{
+    flex-basis:calc(100% - 14px)!important;
+    width:calc(100% - 14px)!important;
+    margin-left:14px!important;
+    padding:5px 7px!important;
+    border-left:2px solid rgba(147,197,253,.55)!important;
+    border-radius:0 7px 7px 0!important;
+    background:rgba(59,130,246,.055)!important;
+    color:#dbeafe!important;
+    font-size:11px!important;
+    opacity:1!important;
+  }
 }
 `;
 
