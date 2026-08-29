@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v17-group-table-fit';
+const CACHE_NAME = 'asset-mgr-v18-group-pnl-readable';
 const APP_SHELL = [
   './',
   './index.html',
@@ -25,10 +25,11 @@ const MOBILE_FIT_CSS = String.raw`
   #grpTable .grp-detail-box{width:100%!important;max-width:100%!important;min-width:0!important;margin-left:0!important;padding:8px 2px 4px 5px!important;overflow-x:hidden!important;}
   #grpTable .grp-detail-table{width:100%!important;max-width:100%!important;min-width:0!important;table-layout:fixed!important;font-size:10px!important;}
   #grpTable .grp-detail-table th,#grpTable .grp-detail-table td{min-width:0!important;padding:5px 2px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
-  #grpTable .grp-detail-table th:nth-child(1),#grpTable .grp-detail-table td:nth-child(1){width:32%!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;}
-  #grpTable .grp-detail-table th:nth-child(2),#grpTable .grp-detail-table td:nth-child(2){width:27%!important;}
-  #grpTable .grp-detail-table th:nth-child(3),#grpTable .grp-detail-table td:nth-child(3){width:17%!important;}
-  #grpTable .grp-detail-table th:nth-child(4),#grpTable .grp-detail-table td:nth-child(4){width:24%!important;}
+  #grpTable .grp-detail-table th:nth-child(1),#grpTable .grp-detail-table td:nth-child(1){width:31%!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;}
+  #grpTable .grp-detail-table th:nth-child(2),#grpTable .grp-detail-table td:nth-child(2){width:25%!important;}
+  #grpTable .grp-detail-table th:nth-child(3),#grpTable .grp-detail-table td:nth-child(3){width:16%!important;}
+  #grpTable .grp-detail-table th:nth-child(4),#grpTable .grp-detail-table td:nth-child(4){width:28%!important;}
+  #grpTable .grp-detail-table td:nth-child(4){white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:normal!important;word-break:normal!important;font-size:9px!important;line-height:1.25!important;}
 }
 `;
 
