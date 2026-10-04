@@ -180,6 +180,9 @@
       .big{font-size:18px}
       h2{font-size:15px}
 
+      /* タブを押しやすくする */
+      .tab-btn{min-height:42px;padding:10px 16px}
+
       /* ツールバー */
       input[type="file"]{width:100%;box-sizing:border-box}
       .toolbar .muted{display:none}
@@ -397,10 +400,35 @@
 
 </div><!-- /tabTrend -->
 <div id="tabAnal" class="tab-pane">
+  <!-- グループ別分析 -->
+  <section class="panel wide">
+    <h2>グループ別の資産構成</h2>
+    <div class="h2-sub">円グラフのグループをタップすると、銘柄別の評価額と割合を確認できます。</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0">
+      <span class="muted" style="font-size:11px;flex-shrink:0">グループ:</span>
+      <span id="grpChips" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
+      <button id="grpCreate" class="btn-ghost" style="font-size:12px;padding:4px 10px">選択銘柄からグループを作成</button>
+    </div>
+    <div class="muted" style="font-size:11px;margin:0 0 8px">下の銘柄一覧で銘柄を選択し、このボタンからグループを作成できます。1銘柄は1グループに所属します。</div>
+    <div id="grpEmpty" class="muted" style="font-size:12px">銘柄一覧からグループを作成すると、ここに円グラフが表示されます。</div>
+    <div id="grpPieWrap" style="display:none">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
+        <label class="legend-item" style="cursor:pointer"><input type="checkbox" id="grpIncludeRest" checked style="accent-color:var(--accent)"> 未分類も表示</label>
+        <span class="muted">表示日: <span id="grpDateLabel">—</span></span>
+      </div>
+      <div class="chart-wrap" style="max-width:420px;margin:0 auto"><canvas id="grpPieCanvas" height="240"></canvas></div>
+      <div id="grpPieLegend" class="legend-row"></div>
+      <div id="grpDetail" class="cal-detail" style="display:none;margin-top:10px">
+        <p class="detail-title" id="grpDetailTitle">—</p>
+        <div id="grpDetailBody"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- 銘柄別割合・合算 -->
   <section class="panel wide">
-    <h2>銘柄別割合・合算</h2>
-    <div class="h2-sub">銘柄をチェックすると合計額・割合を確認できます <span class="muted">（銘柄名をクリックで推移グラフ）</span></div>
+    <h2>保有銘柄</h2>
+    <div class="h2-sub">グループの編集や銘柄選択はこちらから行います。銘柄名をタップすると推移グラフを表示します。</div>
     <div class="controls" style="margin-top:8px">
       <label>日付: <input type="date" id="analDate"/></label>
       <span class="muted" id="analDateNote">—</span>
@@ -483,26 +511,6 @@
           </tr>
         </tfoot>
       </table>
-    </div>
-  </section>
-
-  <!-- グループ別分析 -->
-  <section class="panel wide">
-    <h2>グループ別円グラフ</h2>
-    <div class="h2-sub">銘柄を自由にグループ分けして、グループごとの構成比を表示（1銘柄は1グループのみ・同名で作り直すと上書き）</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0">
-      <span class="muted" style="font-size:11px;flex-shrink:0">グループ:</span>
-      <span id="grpChips" style="display:inline-flex;flex-wrap:wrap;gap:4px"></span>
-      <button id="grpCreate" class="btn-ghost" style="font-size:12px;padding:4px 10px">+ 選択中の銘柄から作成</button>
-    </div>
-    <div id="grpEmpty" class="muted" style="font-size:12px">上の表で銘柄をチェック →「+ 選択中の銘柄から作成」でグループを作るとここに円グラフが表示されます</div>
-    <div id="grpPieWrap" style="display:none">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <label class="legend-item" style="cursor:pointer"><input type="checkbox" id="grpIncludeRest" checked style="accent-color:var(--accent)"> 未分類も表示</label>
-      </div>
-      <div class="chart-wrap" style="max-width:420px;margin:0 auto"><canvas id="grpPieCanvas" height="240"></canvas></div>
-      <div id="grpPieLegend" class="legend-row"></div>
-      <div id="grpTable" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -614,6 +622,7 @@
       <div class="year-top">
         <span class="muted">※ 月を選択すると月末総額の詳細を表示（選択中の月を再度タップで月表示へ）</span>
       </div>
+      <div id="yearSummary" class="cal-detail" style="margin:0 0 10px"></div>
       <div class="year-grid" id="yearGrid"></div>
       <div class="muted" id="yearNote" style="margin-top:6px">—</div>
       <div class="cal-detail" id="yearDetail" style="display:none">
@@ -1765,6 +1774,21 @@ function renderCalendarDetail(){
 function renderYearView(){
   const y = calState.year;
   $("yearTitle").textContent = `${y}年`;
+  const yearDates = DATES.filter(d => d.startsWith(`${y}-`));
+  const yearEnd = yearDates.at(-1) || null;
+  const prevYearEnd = [...DATES].reverse().find(d => d < `${y}-01-01`) || null;
+  const yearSummary = $("yearSummary");
+  if(yearEnd){
+    const total = sumAt(yearEnd);
+    const previous = prevYearEnd ? sumAt(prevYearEnd) : null;
+    const change = previous==null ? null : total-previous;
+    const pct = previous>0 ? change/previous*100 : null;
+    const changeClass = change==null ? '' : change>0 ? 'pos' : change<0 ? 'neg' : '';
+    const changeText = change==null ? '比較元データなし' : `${change>=0?'+':''}${yen(change)}${pct==null?'':`（${pct>=0?'+':''}${pct.toFixed(1)}%）`}`;
+    yearSummary.innerHTML = `<strong>${y}年の年間損益（記録残高の前年差）</strong><div style="margin-top:4px">${yearEnd}時点の総額：${yen(total)}　／　年間増減：<span class="${changeClass}"><strong>${changeText}</strong></span></div><div class="muted" style="margin-top:3px">比較基準: ${prevYearEnd||'—'} → ${yearEnd}。入出金を除いた投資リターンではありません。</div>`;
+  }else{
+    yearSummary.innerHTML = `<strong>${y}年の年間損益</strong><div class="muted" style="margin-top:4px">この年の記録はありません。</div>`;
+  }
   const mode = calState.yearMode;
   const months = Array.from({length:12},(_,i)=>i+1);
   const grid = $("yearGrid");
@@ -2008,6 +2032,21 @@ function renderGroups(){
 }
 
 let grpPieChart = null;
+let grpPieDetails = new Map();
+
+function renderGroupDetail(name){
+  const detail = $('grpDetail');
+  const rows = grpPieDetails.get(name);
+  if(!rows){ detail.style.display='none'; return; }
+  detail.style.display='';
+  $('grpDetailTitle').textContent = `${name}：銘柄別内訳`;
+  const sorted = rows.items.filter(r=>r.amount!==0).sort((a,b)=>b.amount-a.amount);
+  const totalVal = rows.totalVal;
+  const groupTotal = sorted.reduce((s,r)=>s+r.amount,0);
+  $('grpDetailBody').innerHTML = `<div class="muted" style="margin-bottom:6px">グループ合計: ${yen(groupTotal)}（全体の${totalVal? (groupTotal/totalVal*100).toFixed(1):'0.0'}%）</div>` +
+    (sorted.length ? `<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>銘柄</th><th>評価額</th><th>全体比</th><th>グループ内比</th></tr></thead><tbody>${sorted.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td>${yen(r.amount)}</td><td>${totalVal?(r.amount/totalVal*100).toFixed(1):'0.0'}%</td><td>${groupTotal?(r.amount/groupTotal*100).toFixed(1):'0.0'}%</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">このグループに表示対象の銘柄はありません。</div>');
+}
+
 function renderGroupPie(){
   const groups = loadGroups();
   const wrapEl = $('grpPieWrap'), emptyEl = $('grpEmpty');
@@ -2019,21 +2058,26 @@ function renderGroupPie(){
   emptyEl.style.display = 'none'; wrapEl.style.display = '';
   const selDate = nearestOnOrBefore($('analDate').value || DATES.at(-1)) || DATES.at(-1);
   const totalVal = sumAt(selDate);
+  $('grpDateLabel').textContent = selDate;
   const m = byDateName.get(selDate) || new Map();
   const grouped = new Set();
   const labels = [], data = [], counts = [];
+  grpPieDetails = new Map();
   for(const g of groups){
     let sum = 0, cnt = 0;
+    const items = [];
     for(const n of g.names){
       const amt = amountOfNameAt(n, selDate);
       sum += amt; grouped.add(n);
+      items.push({name:n, amount:amt});
       if(amt !== 0) cnt++;
     }
-    if(sum !== 0){ labels.push(g.name); data.push(sum); counts.push(cnt); }
+    if(sum !== 0){ labels.push(g.name); data.push(sum); counts.push(cnt); grpPieDetails.set(g.name,{items,totalVal}); }
   }
   let rest = 0, restCnt = 0;
-  for(const [n, amt] of m){ if(!grouped.has(n) && amt !== 0){ rest += amt; restCnt++; } }
-  if($('grpIncludeRest').checked && rest > 0){ labels.push('未分類'); data.push(rest); counts.push(restCnt); }
+  const restItems = [];
+  for(const [n, amt] of m){ if(!grouped.has(n) && amt !== 0){ rest += amt; restCnt++; restItems.push({name:n,amount:amt}); } }
+  if($('grpIncludeRest').checked && rest > 0){ labels.push('未分類'); data.push(rest); counts.push(restCnt); grpPieDetails.set('未分類',{items:restItems,totalVal}); }
 
   const palette = getPalette(labels.length);
   if(labels[labels.length-1] === '未分類') palette[palette.length-1] = 'rgba(80,80,100,0.5)';
@@ -2047,22 +2091,18 @@ function renderGroupPie(){
       plugins:{
         legend:{display:false},
         tooltip:{callbacks:{ label:(ctx)=>{ const t = ctx.dataset.data.reduce((s,v)=>s+v,0); return `${ctx.label}: ${yen(ctx.parsed)} (${(t?ctx.parsed/t*100:0).toFixed(1)}%)`; } }}
-      }
+      },
+      onClick:(_event,elements)=>{ if(elements.length) renderGroupDetail(labels[elements[0].index]); }
     },
     plugins:[pieLabelsPlugin]
   });
 
   const pieTotal = data.reduce((s,v)=>s+v,0);
   $('grpPieLegend').innerHTML = labels.map((k,i)=>
-    `<span class="legend-item"><span class="dot" style="background:${palette[i]}"></span>${escapeHtml(k)} ${(pieTotal?data[i]/pieTotal*100:0).toFixed(1)}%</span>`
+    `<button type="button" class="btn-ghost grp-legend-btn" data-group="${escapeHtml(k)}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 8px"><span class="dot" style="background:${palette[i]}"></span>${escapeHtml(k)} ${(pieTotal?data[i]/pieTotal*100:0).toFixed(1)}%</button>`
   ).join('');
-
-  $('grpTable').innerHTML = `<div class="table-wrap"><table style="font-size:12px">
-    <thead><tr><th>グループ</th><th style="text-align:right">評価額</th><th style="text-align:right">全体比</th><th style="text-align:right">銘柄数</th></tr></thead>
-    <tbody>${labels.map((k,i)=>
-      `<tr><td>${escapeHtml(k)}</td><td style="text-align:right">${yen(data[i])}</td><td style="text-align:right">${(totalVal?data[i]/totalVal*100:0).toFixed(1)}%</td><td style="text-align:right">${counts[i]}</td></tr>`
-    ).join('')}</tbody>
-  </table></div>`;
+  $('grpPieLegend').querySelectorAll('.grp-legend-btn').forEach(btn=>btn.addEventListener('click',()=>renderGroupDetail(btn.dataset.group)));
+  if(!grpPieDetails.has($('grpDetailTitle').textContent.split('：')[0])) $('grpDetail').style.display='none';
 }
 
 $('grpCreate').addEventListener('click', ()=>{
