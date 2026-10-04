@@ -179,6 +179,18 @@
     .target-goal-controls select{width:82px;padding:5px;font-size:12px}
     .target-goal-controls input{width:110px!important;min-width:0;padding:5px!important;text-align:right;font-size:12px}
     .target-over{color:#fbbf24}
+    .dash-secondary{padding:0}
+    .dash-secondary>summary{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;list-style:none;font-weight:600}
+    .dash-secondary>summary::-webkit-details-marker{display:none}
+    .dash-secondary>summary::after{content:'›';margin-left:auto;color:var(--muted);font-size:20px;transition:transform .15s}
+    .dash-secondary[open]>summary::after{transform:rotate(90deg)}
+    .dash-secondary-content{padding:0 14px 14px}
+    .dash-target-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .dash-target-list{display:grid;gap:8px}
+    .dash-target-row{display:grid;grid-template-columns:minmax(120px,1.25fr) repeat(5,minmax(90px,1fr));gap:10px;align-items:center;padding:10px 8px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+    .dash-target-row .target-field{min-width:0}
+    .dash-target-row .target-value{display:block;margin-top:3px;font-weight:600;font-size:13px}
+    .dash-target-name{font-weight:700;overflow-wrap:anywhere}
 
     /* pc */
     @media (min-width:900px){
@@ -261,6 +273,10 @@
       .target-goal-controls input{flex:1;width:auto!important}
       .target-field{min-width:0}
       .target-value{white-space:normal;overflow-wrap:anywhere}
+      .dash-target-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      .dash-target-name{grid-column:1/-1;padding-bottom:5px;border-bottom:1px solid var(--line)}
+      .dash-target-row .target-value{font-size:12px}
+      .dash-secondary-content{padding:0 10px 10px}
       .pat-grid{grid-template-columns:1fr!important}
 
       /* モーダル */
@@ -319,28 +335,45 @@
       <div class="sub" id="kpiMoMLine" style="margin-top:2px;">—</div>
       <div class="sub" id="kpiYtdLine" style="margin-top:2px;">—</div>
     </div>
-    <div class="card" id="kpiPnlCard" style="display:none">
-      <div class="muted">総含み損益</div>
-      <div class="big" id="pnlValue">—</div>
-      <div class="sub" id="pnlPctLine" style="margin-top:4px;">—</div>
-      <div class="sub" id="pnlCostLine" style="margin-top:2px;">—</div>
-      <details id="pnlBreakdown" class="pnl-breakdown">
-        <summary>銘柄別内訳 <span id="pnlBreakdownCount" class="pnl-breakdown-count"></span></summary>
-        <div id="pnlBreakdownList" class="pnl-breakdown-list"></div>
-      </details>
-    </div>
-    <div class="card" id="kpiRetCard" style="display:none">
-      <div class="muted">運用リターン・年初来 <span id="retBaseNote"></span></div>
-      <div class="big" id="retYtd">—</div>
-      <div class="sub" id="retMonthLine" style="margin-top:4px;">—</div>
-      <div class="sub" id="retAllLine" style="margin-top:2px;">—</div>
-      <div class="sub" id="retBenchLine" style="margin-top:2px;display:none">—</div>
-      <div class="sub" style="margin-top:4px;font-size:10px">※ 入金調整後（修正ディーツ法・保有数×取得単価の変化から資金流出入を推定）</div>
-    </div>
   </section>
 
+  <!-- 目標銘柄を最優先で表示 -->
+  <section class="panel wide" id="dashboardTargets">
+    <div class="dash-target-head">
+      <div><h2>目標銘柄</h2><div class="h2-sub" id="dashboardTargetNote">目標に対する現在の保有状況</div></div>
+      <button id="dashboardSetTargets" class="btn-ghost" style="font-size:12px;padding:6px 10px">目標を設定</button>
+    </div>
+    <div id="dashboardTargetList" class="dash-target-list"></div>
+  </section>
+
+  <details class="dash-secondary">
+    <summary>詳細指標（総含み損益・運用リターン）</summary>
+    <div class="dash-secondary-content" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+      <div class="card" id="kpiPnlCard" style="display:none">
+        <div class="muted">総含み損益</div>
+        <div class="big" id="pnlValue">—</div>
+        <div class="sub" id="pnlPctLine" style="margin-top:4px;">—</div>
+        <div class="sub" id="pnlCostLine" style="margin-top:2px;">—</div>
+        <details id="pnlBreakdown" class="pnl-breakdown">
+          <summary>銘柄別内訳 <span id="pnlBreakdownCount" class="pnl-breakdown-count"></span></summary>
+          <div id="pnlBreakdownList" class="pnl-breakdown-list"></div>
+        </details>
+      </div>
+      <div class="card" id="kpiRetCard" style="display:none">
+        <div class="muted">運用リターン・年初来 <span id="retBaseNote"></span></div>
+        <div class="big" id="retYtd">—</div>
+        <div class="sub" id="retMonthLine" style="margin-top:4px;">—</div>
+        <div class="sub" id="retAllLine" style="margin-top:2px;">—</div>
+        <div class="sub" id="retBenchLine" style="margin-top:2px;display:none">—</div>
+        <div class="sub" style="margin-top:4px;font-size:10px">※ 入金調整後（修正ディーツ法・保有数×取得単価の変化から資金流出入を推定）</div>
+      </div>
+    </div>
+  </details>
+
   <!-- IPS準拠チェック -->
-  <section class="panel">
+  <details class="panel dash-secondary">
+    <summary>IPS準拠チェック <span class="muted">配分としきい値の確認</span></summary>
+    <div class="dash-secondary-content">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
       <h2>IPS準拠チェック</h2>
       <button id="ipsEditBtn" class="btn-ghost" style="font-size:12px;padding:4px 10px;flex-shrink:0">⚙ 設定</button>
@@ -370,7 +403,8 @@
       </div>
     </div>
     <div id="ipsBody" class="muted" style="margin-top:8px">CSVを読み込むと表示されます</div>
-  </section>
+    </div>
+  </details>
 
   <!-- 資産分類 -->
   <section class="panel">
@@ -914,11 +948,13 @@ function pnlOfNameAt(name, date){
 function refreshKPIs(){
   if(!DATES.length){
     ["kpiDateLabel","totalValue","kpiDoDLine","kpiMoMLine","kpiYtdLine"].forEach(id=>$(id).textContent='—');
+    renderDashboardTargets('',0);
     return;
   }
   const picker = $("totalDate").value || DATES.at(-1);
   const curDate = nearestOnOrBefore(picker) || DATES.at(-1);
   const curVal  = sumAt(curDate);
+  renderDashboardTargets(curDate,curVal);
   $("kpiDateLabel").textContent = `（${curDate} 時点）`;
   $("totalValue").textContent   = yen(curVal);
 
@@ -993,6 +1029,48 @@ function refreshKPIs(){
     $('pnlBreakdownList').innerHTML = '';
     $('pnlBreakdownCount').textContent = '';
   }
+}
+
+function renderDashboardTargets(date,totalVal){
+  const host = $('dashboardTargetList');
+  const targets = loadTargets();
+  const entries = Object.entries(targets)
+    .filter(([,target])=>target.value>0)
+    .sort(([a],[b])=>a.localeCompare(b,'ja'));
+  if(!entries.length){
+    $('dashboardTargetNote').textContent = '目標銘柄を設定すると、目標までの金額と割合を表示します';
+    host.innerHTML = '<div class="muted">目標はまだ設定されていません。「目標を設定」から銘柄分析を開いて設定できます。</div>';
+    return;
+  }
+  const currentDate = date || (DATES.at(-1) || '');
+  $('dashboardTargetNote').textContent = currentDate
+    ? `${currentDate} 時点 ／ 設定済み ${entries.length}銘柄`
+    : `設定済み ${entries.length}銘柄 ／ CSVを読み込むと現在額を表示します`;
+  host.innerHTML = entries.map(([name,target])=>{
+    const amount = currentDate ? amountOfNameAt(name,currentDate) : 0;
+    const currentPct = totalVal>0 ? amount/totalVal*100 : 0;
+    const goalAmount = target.mode==='amount' ? target.value : totalVal*target.value/100;
+    const goalPct = target.mode==='percent' ? target.value : totalVal>0 ? goalAmount/totalVal*100 : null;
+    const difference = goalAmount-amount;
+    const remaining = Math.max(0,difference);
+    let gap = '<span class="muted">CSV読込後に表示</span>';
+    if(currentDate){
+      if(Math.abs(difference)<0.5) gap = '<span class="pos">達成</span>';
+      else if(difference>0) gap = `あと ${yen(remaining)}`;
+      else gap = `<span class="target-over">超過 ${yen(Math.abs(difference))}</span>`;
+    }
+    const goalLabel = target.mode==='amount' ? '金額目標' : '割合目標';
+    const pctLabel = goalPct==null ? '—' : `${goalPct.toFixed(1)}%`;
+    return `<div class="dash-target-row">
+      <div class="dash-target-name">${escapeHtml(name)}</div>
+      <div class="target-field"><small>現在評価額</small><span class="target-value">${currentDate?yen(amount):'—'}</span></div>
+      <div class="target-field"><small>現在割合</small><span class="target-value">${currentDate?`${currentPct.toFixed(1)}%`:'—'}</span></div>
+      <div class="target-field"><small>${goalLabel}</small><span class="target-value">${target.mode==='amount'?yen(target.value):`${target.value.toFixed(1)}%`}</span></div>
+      <div class="target-field"><small>目標評価額</small><span class="target-value">${totalVal>0||target.mode==='amount'?yen(goalAmount):'—'}</span></div>
+      <div class="target-field"><small>目標割合</small><span class="target-value">${pctLabel}</span></div>
+      <div class="target-field"><small>目標まで</small><span class="target-value">${gap}</span></div>
+    </div>`;
+  }).join('');
 }
 
 // ===================== Pie =====================
@@ -2112,6 +2190,7 @@ function renderTargetHoldings(date,totalVal,data){
     }
     saveTargets(next);
     drawStockAnal();
+    refreshKPIs();
   }));
 }
 
@@ -2706,6 +2785,12 @@ function switchTab(id){
   renderActiveTab();
 }
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+$('dashboardSetTargets').addEventListener('click', ()=>{
+  switchTab('tabAnal');
+  const targetsPanel = document.querySelector('.target-details');
+  if(targetsPanel) targetsPanel.open = true;
+  targetsPanel?.scrollIntoView({behavior:'smooth',block:'center'});
+});
 
 // ===================== lifecycle =====================
 function fillCalFilters(){
