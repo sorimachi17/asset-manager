@@ -164,6 +164,20 @@
     .anal-selected td{background:rgba(59,130,246,0.09)!important}
     #analTable{min-width:800px}
     .anal-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+    .target-details{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:rgba(255,255,255,.02)}
+    .target-details summary{display:flex;justify-content:space-between;gap:8px;align-items:center;cursor:pointer;font-weight:600;list-style:none}
+    .target-details summary::-webkit-details-marker{display:none}
+    .target-details summary::after{content:'›';color:var(--muted);font-size:18px;transition:transform .15s}
+    .target-details[open] summary::after{transform:rotate(90deg)}
+    .target-rows{margin-top:8px}
+    .target-row{display:grid;grid-template-columns:minmax(130px,1.4fr) repeat(5,minmax(100px,1fr));gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line);font-size:12px}
+    .target-row:last-child{border-bottom:0}
+    .target-name{font-weight:600;overflow-wrap:anywhere}
+    .target-field small{display:block;color:var(--muted);font-size:10px}
+    .target-value{font-variant-numeric:tabular-nums;white-space:nowrap}
+    .target-input{display:flex;align-items:center;gap:4px;white-space:nowrap}
+    .target-input input{width:68px!important;padding:5px!important;text-align:right;font-size:12px}
+    .target-over{color:#fbbf24}
 
     /* pc */
     @media (min-width:900px){
@@ -239,6 +253,11 @@
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
       #analQuickSel{overflow:hidden}
       #analQuickSel .btn-ghost,#analSetsWrap .btn-ghost{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .target-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+      .target-name{min-width:0}
+      .target-input{justify-content:flex-end}
+      .target-field{min-width:0}
+      .target-value{white-space:normal;overflow-wrap:anywhere}
       .pat-grid{grid-template-columns:1fr!important}
 
       /* モーダル */
@@ -423,6 +442,12 @@
         <div id="grpDetailBody"></div>
       </div>
     </div>
+    <details class="target-details">
+      <summary><span>個別銘柄の目標割合</span><span id="targetSummary" class="muted" style="margin-left:auto;font-weight:400">目標未設定</span></summary>
+      <div class="h2-sub" style="margin:8px 0">目標額は表示中の総資産×目標割合で計算します。追加額は現在の総資産が変わらない前提です。新規入金などで総資産が変わる場合は、データを更新すると再計算されます。</div>
+      <div id="targetAllocationNote" class="muted" style="margin-bottom:6px"></div>
+      <div id="targetRows" class="target-rows"></div>
+    </details>
   </section>
 
   <!-- 銘柄別割合・合算 -->
@@ -2002,6 +2027,69 @@ const LS_GROUPS_KEY = 'asset_mgr_v1_groups';
 function loadGroups(){ try{ const g = JSON.parse(localStorage.getItem(LS_GROUPS_KEY)||'[]'); return Array.isArray(g) ? g : []; }catch(e){ return []; } }
 function saveGroups(g){ localStorage.setItem(LS_GROUPS_KEY, JSON.stringify(g)); }
 
+const LS_TARGETS_KEY = 'asset_mgr_v1_targets';
+function loadTargets(){
+  try{
+    const targets = JSON.parse(localStorage.getItem(LS_TARGETS_KEY)||'{}');
+    return targets && typeof targets==='object' && !Array.isArray(targets) ? targets : {};
+  }catch(e){ return {}; }
+}
+function saveTargets(targets){ localStorage.setItem(LS_TARGETS_KEY, JSON.stringify(targets)); }
+
+function renderTargetHoldings(date,totalVal,data){
+  const targets = loadTargets();
+  const targetEntries = Object.entries(targets).filter(([,pct])=>Number(pct)>0);
+  const targetTotal = targetEntries.reduce((sum,[,pct])=>sum+Number(pct),0);
+  const names = new Set([...data.map(r=>r.name), ...targetEntries.map(([name])=>name)]);
+  const amountByName = new Map(data.map(r=>[r.name,r.amount]));
+  const nameList = [...names].sort((a,b)=>(amountByName.get(b)||0)-(amountByName.get(a)||0)||a.localeCompare(b));
+
+  $('targetSummary').textContent = targetEntries.length
+    ? `${targetEntries.length}銘柄・合計${targetTotal.toFixed(1)}%`
+    : '目標未設定';
+  $('targetSummary').className = `muted${targetTotal>100.0001?' neg':''}`;
+  const allocationBase = `基準: ${date} 総資産 ${yen(totalVal)} ／ 目標合計: <strong>${targetTotal.toFixed(1)}%</strong>`;
+  $('targetAllocationNote').innerHTML = targetTotal>100.0001
+    ? `${allocationBase}<br><span class="neg"><strong>目標合計が100%を超えています。</strong></span> 目標を同時に達成できるよう、合計を100%以内に調整してください。`
+    : `${allocationBase} ／ 未配分: <strong>${Math.max(0,100-targetTotal).toFixed(1)}%</strong>`;
+
+  $('targetRows').innerHTML = nameList.map(name=>{
+    const amount = amountByName.get(name)||0;
+    const currentPct = totalVal>0 ? amount/totalVal*100 : 0;
+    const configured = Number(targets[name])>0;
+    const goalPct = configured ? Number(targets[name]) : null;
+    const goalAmount = configured ? totalVal*goalPct/100 : null;
+    const difference = configured ? goalAmount-amount : null;
+    let gapHtml = '<span class="muted">—</span>';
+    if(configured){
+      if(Math.abs(difference)<0.5) gapHtml = '<span class="pos">達成</span>';
+      else if(difference>0) gapHtml = `<span>あと <strong>${yen(difference)}</strong></span>`;
+      else gapHtml = `<span class="target-over">超過 ${yen(Math.abs(difference))}</span>`;
+    }
+    const targetValue = configured ? yen(goalAmount) : '<span class="muted">—</span>';
+    return `<div class="target-row">
+      <div class="target-name">${escapeHtml(name)}</div>
+      <div class="target-field"><small>現在評価額</small><span class="target-value">${yen(amount)}</span></div>
+      <div class="target-field"><small>現在割合</small><span class="target-value">${currentPct.toFixed(1)}%</span></div>
+      <label class="target-input">目標 <input type="number" min="0" max="100" step="0.1" inputmode="decimal" data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)}の目標保有割合" value="${configured?goalPct:''}" placeholder="—">%</label>
+      <div class="target-field"><small>目標評価額</small><span class="target-value">${targetValue}</span></div>
+      <div class="target-field"><small>目標まで</small><span class="target-value">${gapHtml}</span></div>
+    </div>`;
+  }).join('') || '<div class="muted">表示できる銘柄がありません。</div>';
+
+  $('targetRows').querySelectorAll('input[data-name]').forEach(input=>input.addEventListener('change',()=>{
+    const value = input.value.trim()==='' ? null : Number(input.value);
+    const next = loadTargets();
+    if(value===null || !Number.isFinite(value) || value<=0){
+      delete next[input.dataset.name];
+    }else{
+      next[input.dataset.name] = Math.max(0,Math.min(100,value));
+    }
+    saveTargets(next);
+    drawStockAnal();
+  }));
+}
+
 function renderGroups(){
   const groups = loadGroups();
   const wrap = $('grpChips');
@@ -2218,6 +2306,7 @@ function drawStockAnal(){
 
   renderQuickSel();
   updateSelSummary(totalVal);
+  renderTargetHoldings(selDate,totalVal,data);
   renderGroups();
   renderGroupPie();
 }
