@@ -170,13 +170,14 @@
     .target-details summary::after{content:'›';color:var(--muted);font-size:18px;transition:transform .15s}
     .target-details[open] summary::after{transform:rotate(90deg)}
     .target-rows{margin-top:8px}
-    .target-row{display:grid;grid-template-columns:minmax(130px,1.4fr) repeat(5,minmax(100px,1fr));gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line);font-size:12px}
+    .target-row{display:grid;grid-template-columns:minmax(130px,1.4fr) minmax(100px,1fr) minmax(85px,.8fr) minmax(190px,1.7fr) minmax(100px,1fr) minmax(115px,1fr);gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line);font-size:12px}
     .target-row:last-child{border-bottom:0}
     .target-name{font-weight:600;overflow-wrap:anywhere}
     .target-field small{display:block;color:var(--muted);font-size:10px}
     .target-value{font-variant-numeric:tabular-nums;white-space:nowrap}
-    .target-input{display:flex;align-items:center;gap:4px;white-space:nowrap}
-    .target-input input{width:68px!important;padding:5px!important;text-align:right;font-size:12px}
+    .target-goal-controls{display:flex;align-items:center;gap:5px;white-space:nowrap}
+    .target-goal-controls select{width:82px;padding:5px;font-size:12px}
+    .target-goal-controls input{width:110px!important;min-width:0;padding:5px!important;text-align:right;font-size:12px}
     .target-over{color:#fbbf24}
 
     /* pc */
@@ -255,7 +256,9 @@
       #analQuickSel .btn-ghost,#analSetsWrap .btn-ghost{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .target-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
       .target-name{min-width:0}
-      .target-input{justify-content:flex-end}
+      .target-goal-field{grid-column:1/-1}
+      .target-goal-controls select{width:96px}
+      .target-goal-controls input{flex:1;width:auto!important}
       .target-field{min-width:0}
       .target-value{white-space:normal;overflow-wrap:anywhere}
       .pat-grid{grid-template-columns:1fr!important}
@@ -443,8 +446,8 @@
       </div>
     </div>
     <details class="target-details">
-      <summary><span>個別銘柄の目標割合</span><span id="targetSummary" class="muted" style="margin-left:auto;font-weight:400">目標未設定</span></summary>
-      <div class="h2-sub" style="margin:8px 0">目標額は表示中の総資産×目標割合で計算します。追加額は現在の総資産が変わらない前提です。新規入金などで総資産が変わる場合は、データを更新すると再計算されます。</div>
+      <summary><span>個別銘柄の目標（割合／金額）</span><span id="targetSummary" class="muted" style="margin-left:auto;font-weight:400">目標未設定</span></summary>
+      <div class="h2-sub" style="margin:8px 0">銘柄ごとに「割合」か「金額」を選んで設定します。割合の目標額は表示中の総資産を基準に計算します。新規入金などで総資産が変わる場合は、データ更新後に再計算されます。</div>
       <div id="targetAllocationNote" class="muted" style="margin-bottom:6px"></div>
       <div id="targetRows" class="target-rows"></div>
     </details>
@@ -2031,34 +2034,42 @@ const LS_TARGETS_KEY = 'asset_mgr_v1_targets';
 function loadTargets(){
   try{
     const targets = JSON.parse(localStorage.getItem(LS_TARGETS_KEY)||'{}');
-    return targets && typeof targets==='object' && !Array.isArray(targets) ? targets : {};
+    if(!targets || typeof targets!=='object' || Array.isArray(targets)) return {};
+    return Object.fromEntries(Object.entries(targets).map(([name,target])=>{
+      // 以前のバージョンで保存した数値は割合設定として引き継ぐ。
+      if(typeof target==='number') return [name,{mode:'percent',value:target}];
+      const mode = target?.mode==='amount' ? 'amount' : 'percent';
+      const value = Number.isFinite(Number(target?.value)) && Number(target.value)>0 ? Number(target.value) : null;
+      return [name,{mode,value}];
+    }));
   }catch(e){ return {}; }
 }
 function saveTargets(targets){ localStorage.setItem(LS_TARGETS_KEY, JSON.stringify(targets)); }
 
 function renderTargetHoldings(date,totalVal,data){
   const targets = loadTargets();
-  const targetEntries = Object.entries(targets).filter(([,pct])=>Number(pct)>0);
-  const targetTotal = targetEntries.reduce((sum,[,pct])=>sum+Number(pct),0);
-  const names = new Set([...data.map(r=>r.name), ...targetEntries.map(([name])=>name)]);
+  const targetEntries = Object.entries(targets).filter(([,target])=>target.value>0);
+  const targetTotalValue = targetEntries.reduce((sum,[,target])=>sum+(target.mode==='amount'?target.value:totalVal*target.value/100),0);
+  const targetTotalPct = totalVal>0 ? targetTotalValue/totalVal*100 : 0;
+  const names = new Set([...data.map(r=>r.name), ...Object.keys(targets)]);
   const amountByName = new Map(data.map(r=>[r.name,r.amount]));
   const nameList = [...names].sort((a,b)=>(amountByName.get(b)||0)-(amountByName.get(a)||0)||a.localeCompare(b));
 
   $('targetSummary').textContent = targetEntries.length
-    ? `${targetEntries.length}銘柄・合計${targetTotal.toFixed(1)}%`
+    ? `${targetEntries.length}銘柄・目標合計${targetTotalPct.toFixed(1)}%相当`
     : '目標未設定';
-  $('targetSummary').className = `muted${targetTotal>100.0001?' neg':''}`;
-  const allocationBase = `基準: ${date} 総資産 ${yen(totalVal)} ／ 目標合計: <strong>${targetTotal.toFixed(1)}%</strong>`;
-  $('targetAllocationNote').innerHTML = targetTotal>100.0001
-    ? `${allocationBase}<br><span class="neg"><strong>目標合計が100%を超えています。</strong></span> 目標を同時に達成できるよう、合計を100%以内に調整してください。`
-    : `${allocationBase} ／ 未配分: <strong>${Math.max(0,100-targetTotal).toFixed(1)}%</strong>`;
+  $('targetSummary').className = `muted${targetTotalPct>100.0001?' neg':''}`;
+  const allocationBase = `基準: ${date} 総資産 ${yen(totalVal)} ／ 目標合計: <strong>${yen(targetTotalValue)}（${targetTotalPct.toFixed(1)}%相当）</strong>`;
+  $('targetAllocationNote').innerHTML = targetTotalPct>100.0001
+    ? `${allocationBase}<br><span class="neg"><strong>目標金額の合計が総資産を超えています。</strong></span> 同時達成できるよう、目標を調整してください。`
+    : `${allocationBase} ／ 未配分: <strong>${Math.max(0,100-targetTotalPct).toFixed(1)}%相当</strong>`;
 
   $('targetRows').innerHTML = nameList.map(name=>{
     const amount = amountByName.get(name)||0;
     const currentPct = totalVal>0 ? amount/totalVal*100 : 0;
-    const configured = Number(targets[name])>0;
-    const goalPct = configured ? Number(targets[name]) : null;
-    const goalAmount = configured ? totalVal*goalPct/100 : null;
+    const target = targets[name] || {mode:'percent',value:null};
+    const configured = target.value>0;
+    const goalAmount = configured ? (target.mode==='amount'?target.value:totalVal*target.value/100) : null;
     const difference = configured ? goalAmount-amount : null;
     let gapHtml = '<span class="muted">—</span>';
     if(configured){
@@ -2067,23 +2078,37 @@ function renderTargetHoldings(date,totalVal,data){
       else gapHtml = `<span class="target-over">超過 ${yen(Math.abs(difference))}</span>`;
     }
     const targetValue = configured ? yen(goalAmount) : '<span class="muted">—</span>';
+    const amountMode = target.mode==='amount';
     return `<div class="target-row">
       <div class="target-name">${escapeHtml(name)}</div>
       <div class="target-field"><small>現在評価額</small><span class="target-value">${yen(amount)}</span></div>
       <div class="target-field"><small>現在割合</small><span class="target-value">${currentPct.toFixed(1)}%</span></div>
-      <label class="target-input">目標 <input type="number" min="0" max="100" step="0.1" inputmode="decimal" data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)}の目標保有割合" value="${configured?goalPct:''}" placeholder="—">%</label>
+      <div class="target-field target-goal-field"><small>目標の設定方法・値</small><div class="target-goal-controls">
+        <select data-target-mode data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)}の目標設定方法"><option value="percent" ${!amountMode?'selected':''}>割合</option><option value="amount" ${amountMode?'selected':''}>金額</option></select>
+        <input type="number" min="0" ${amountMode?'step="1000"':'max="100" step="0.1"'} inputmode="decimal" data-target-value data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)}の目標${amountMode?'金額':'割合'}" value="${configured?target.value:''}" placeholder="未設定">
+        <span>${amountMode?'円':'%'}</span>
+      </div></div>
       <div class="target-field"><small>目標評価額</small><span class="target-value">${targetValue}</span></div>
       <div class="target-field"><small>目標まで</small><span class="target-value">${gapHtml}</span></div>
     </div>`;
   }).join('') || '<div class="muted">表示できる銘柄がありません。</div>';
 
-  $('targetRows').querySelectorAll('input[data-name]').forEach(input=>input.addEventListener('change',()=>{
-    const value = input.value.trim()==='' ? null : Number(input.value);
+  $('targetRows').querySelectorAll('[data-target-mode], [data-target-value]').forEach(control=>control.addEventListener('change',()=>{
+    const name = control.dataset.name;
     const next = loadTargets();
-    if(value===null || !Number.isFinite(value) || value<=0){
-      delete next[input.dataset.name];
+    const previous = next[name] || {mode:'percent',value:null};
+    if(control.matches('[data-target-mode]')){
+      const mode = control.value;
+      let value = previous.value;
+      if(value!=null && previous.mode!==mode){
+        const targetAmount = previous.mode==='amount' ? value : totalVal*value/100;
+        value = mode==='amount' ? Math.round(targetAmount) : totalVal>0 ? Number((targetAmount/totalVal*100).toFixed(1)) : null;
+      }
+      next[name] = {mode,value};
     }else{
-      next[input.dataset.name] = Math.max(0,Math.min(100,value));
+      const value = control.value.trim()==='' ? null : Number(control.value);
+      const mode = control.closest('.target-row').querySelector('[data-target-mode]').value;
+      next[name] = {mode,value:value==null || !Number.isFinite(value) || value<=0 ? null : mode==='amount' ? Math.round(value) : Number(Math.min(100,value).toFixed(1))};
     }
     saveTargets(next);
     drawStockAnal();
