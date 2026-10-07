@@ -2230,6 +2230,29 @@ function renderGroups(){
 }
 
 let grpPieChart = null;
+const grpSelectionOutlinePlugin = {
+  id:'grpSelectionOutline',
+  afterDatasetsDraw(chart){
+    const indices=chart.options.memberSliceIndices || [];
+    if(!indices.length) return;
+    const arcs=chart.getDatasetMeta(0).data;
+    const first=arcs[indices[0]], last=arcs[indices.at(-1)];
+    if(!first || !last) return;
+    const {x,y,innerRadius:inner,outerRadius:outer,startAngle:start}=first;
+    const end=last.endAngle,ctx=chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x,y,outer,start,end);
+    ctx.lineTo(x+Math.cos(end)*inner,y+Math.sin(end)*inner);
+    ctx.arc(x,y,inner,end,start,true);
+    ctx.closePath();
+    ctx.strokeStyle='#ffffff';
+    ctx.lineWidth=4;
+    ctx.lineJoin='round';
+    ctx.stroke();
+    ctx.restore();
+  }
+};
 let grpPieDetails = new Map();
 let grpExpandedGroup = null;
 function selectGroupPie(name){
@@ -2301,11 +2324,11 @@ function renderGroupPie(){
   $('grpDrillBack').hidden = grpExpandedGroup===null;
   $('grpDrillTitle').textContent = grpExpandedGroup===null ? 'グループをタップすると内訳表示' : grpExpandedGroup+' の銘柄別内訳（割合は総資産比）';
 
-  if(grpPieChart){ grpPieChart.destroy(); grpPieChart = null; }
-  grpPieChart = new Chart($('grpPieCanvas'), {
+  const config = {
     type:'doughnut',
     data:{ labels:chartLabels, datasets:[{ data:chartValues, backgroundColor: palette, borderWidth:slices.map(r=>r.member?2:1) }] },
     options:{
+      animation:false,
       cutout:'30%', layout:{ padding:30 },
       pluginsTotal:totalVal,
       memberSliceIndices:slices.flatMap((r,i)=>r.member?[i]:[]),
@@ -2315,8 +2338,17 @@ function renderGroupPie(){
       },
       onClick:(_event,elements)=>{ if(elements.length){ const slice=slices[elements[0].index]; if(!slice.member) selectGroupPie(slice.group); } }
     },
-    plugins:[pieLabelsPlugin]
-  });
+    plugins:[pieLabelsPlugin,grpSelectionOutlinePlugin]
+  };
+  if(grpPieChart){
+    grpPieChart.setActiveElements([]);
+    if(grpPieChart.tooltip) grpPieChart.tooltip.setActiveElements([],{x:0,y:0});
+    grpPieChart.data=config.data;
+    grpPieChart.options=config.options;
+    grpPieChart.update('none');
+  }else{
+    grpPieChart = new Chart($('grpPieCanvas'),config);
+  }
 
   $('grpPieCanvas').style.cursor = 'pointer';
   $('grpPieLegend').innerHTML = slices.map((r,i)=>

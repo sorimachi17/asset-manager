@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v20-group-member-labels';
+const CACHE_NAME = 'asset-mgr-v21-group-selection-outline';
 const APP_SHELL = [
   './',
   './index.html',
