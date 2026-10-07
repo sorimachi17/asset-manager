@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v19-group-detail-legend';
+const CACHE_NAME = 'asset-mgr-v20-group-member-labels';
 const APP_SHELL = [
   './',
   './index.html',

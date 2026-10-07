@@ -63,6 +63,11 @@
     .legend-item.inactive{opacity:.4;text-decoration:line-through}
     .dot{width:10px;height:10px;border-radius:50%}
     .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+    #grpDrillBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 8px;font-size:12px}
+    #grpDrillBack[hidden]{display:none!important}
+    #grpPieLegend .grp-member-legend{width:100%;box-sizing:border-box;justify-content:flex-start}
+    #grpPieLegend .grp-legend-value{margin-left:auto;white-space:nowrap}
+    #grpPieLegend .grp-member-legend > span:nth-child(2){min-width:0;overflow-wrap:anywhere;text-align:left}
     .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
     .chart-wrap canvas{width:100%;}
 
@@ -472,6 +477,7 @@
         <label class="legend-item" style="cursor:pointer"><input type="checkbox" id="grpIncludeRest" checked style="accent-color:var(--accent)"> 未分類も表示</label>
         <span class="muted">表示日: <span id="grpDateLabel">—</span></span>
       </div>
+      <div id="grpDrillBar"><button id="grpDrillBack" class="btn-ghost" type="button" hidden>← グループ表示に戻る</button><span id="grpDrillTitle" class="muted">グループをタップすると内訳表示</span></div>
       <div class="chart-wrap" style="max-width:420px;margin:0 auto"><canvas id="grpPieCanvas" height="240"></canvas></div>
       <div id="grpPieLegend" class="legend-row"></div>
       <div id="grpDetail" class="cal-detail" style="display:none;margin-top:10px">
@@ -1099,8 +1105,8 @@ const pieLabelsPlugin = {
     meta.data.forEach((arc, i) => {
       if(!chart.getDataVisibility(i)) return;
       const val = data.datasets[0].data[i];
-      const pct = val / total * 100;
-      if(pct < 1) return;
+      const pct = val / (chart.options.pluginsTotal || total) * 100;
+      if(pct < 1 && !chart.options.memberSliceIndices?.includes(i)) return;
       const mid = (arc.startAngle + arc.endAngle) / 2;
       items.push({
         pct,
@@ -2225,6 +2231,12 @@ function renderGroups(){
 
 let grpPieChart = null;
 let grpPieDetails = new Map();
+let grpExpandedGroup = null;
+function selectGroupPie(name){
+  grpExpandedGroup = name;
+  renderGroupPie();
+}
+$('grpDrillBack').addEventListener('click',()=>selectGroupPie(null));
 
 function renderGroupDetail(name){
   const detail = $('grpDetail');
@@ -2271,30 +2283,51 @@ function renderGroupPie(){
   for(const [n, amt] of m){ if(!grouped.has(n) && amt !== 0){ rest += amt; restCnt++; restItems.push({name:n,amount:amt}); } }
   if($('grpIncludeRest').checked && rest > 0){ labels.push('未分類'); data.push(rest); counts.push(restCnt); grpPieDetails.set('未分類',{items:restItems,totalVal}); }
 
-  const palette = getPalette(labels.length);
-  if(labels[labels.length-1] === '未分類') palette[palette.length-1] = 'rgba(80,80,100,0.5)';
+  if(!grpPieDetails.has(grpExpandedGroup)) grpExpandedGroup = null;
+  const slices = labels.flatMap((name,i)=> {
+    const detail = grpPieDetails.get(name);
+    return name === grpExpandedGroup
+      ? detail.items.filter(r=>r.amount!==0).sort((a,b)=>b.amount-a.amount).map(r=>({label:r.name,amount:r.amount,group:name,member:true}))
+      : [{label:name,amount:data[i],group:name,member:false}];
+  });
+  const chartLabels = slices.map(r=>r.label);
+  const chartValues = slices.map(r=>r.amount);
+  const groupPalette = getPalette(labels.length);
+  const memberPalette = getPalette(slices.filter(r=>r.member).length);
+  let memberColorIndex = 0;
+  const palette = slices.map(r=>r.member ? memberPalette[memberColorIndex++] : groupPalette[labels.indexOf(r.group)]);
+  slices.forEach((r,i)=>{if(r.group==='未分類' && !r.member) palette[i]='rgba(80,80,100,0.5)';});
+  $('grpDrillBar').classList.toggle('is-expanded',grpExpandedGroup!==null);
+  $('grpDrillBack').hidden = grpExpandedGroup===null;
+  $('grpDrillTitle').textContent = grpExpandedGroup===null ? 'グループをタップすると内訳表示' : grpExpandedGroup+' の銘柄別内訳（割合は総資産比）';
 
   if(grpPieChart){ grpPieChart.destroy(); grpPieChart = null; }
   grpPieChart = new Chart($('grpPieCanvas'), {
     type:'doughnut',
-    data:{ labels, datasets:[{ data, backgroundColor: palette, borderWidth: 1 }] },
+    data:{ labels:chartLabels, datasets:[{ data:chartValues, backgroundColor: palette, borderWidth:slices.map(r=>r.member?2:1) }] },
     options:{
       cutout:'30%', layout:{ padding:30 },
+      pluginsTotal:totalVal,
+      memberSliceIndices:slices.flatMap((r,i)=>r.member?[i]:[]),
       plugins:{
         legend:{display:false},
-        tooltip:{callbacks:{ label:(ctx)=>{ const t = ctx.dataset.data.reduce((s,v)=>s+v,0); return `${ctx.label}: ${yen(ctx.parsed)} (${(t?ctx.parsed/t*100:0).toFixed(1)}%)`; } }}
+        tooltip:{callbacks:{ label:(ctx)=>`${ctx.label}: ${yen(ctx.parsed)} (${(totalVal?ctx.parsed/totalVal*100:0).toFixed(1)}%)` }}
       },
-      onClick:(_event,elements)=>{ if(elements.length) renderGroupDetail(labels[elements[0].index]); }
+      onClick:(_event,elements)=>{ if(elements.length){ const slice=slices[elements[0].index]; if(!slice.member) selectGroupPie(slice.group); } }
     },
     plugins:[pieLabelsPlugin]
   });
 
-  const pieTotal = data.reduce((s,v)=>s+v,0);
-  $('grpPieLegend').innerHTML = labels.map((k,i)=>
-    `<button type="button" class="btn-ghost grp-legend-btn" data-group="${escapeHtml(k)}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 8px"><span class="dot" style="background:${palette[i]}"></span>${escapeHtml(k)} ${(pieTotal?data[i]/pieTotal*100:0).toFixed(1)}%</button>`
+  $('grpPieCanvas').style.cursor = 'pointer';
+  $('grpPieLegend').innerHTML = slices.map((r,i)=>
+    `<button type="button" class="btn-ghost grp-legend-btn${r.member?' grp-member-legend':''}" data-slice="${i}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 8px"><span class="dot" style="background:${palette[i]}"></span><span>${escapeHtml(r.label)}</span><span class="grp-legend-value">${yen(r.amount)} · ${(totalVal?r.amount/totalVal*100:0).toFixed(1)}%</span></button>`
   ).join('');
-  $('grpPieLegend').querySelectorAll('.grp-legend-btn').forEach(btn=>btn.addEventListener('click',()=>renderGroupDetail(btn.dataset.group)));
-  if(!grpPieDetails.has($('grpDetailTitle').textContent.split('：')[0])) $('grpDetail').style.display='none';
+  $('grpPieLegend').querySelectorAll('.grp-legend-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const slice=slices[Number(btn.dataset.slice)];
+    if(!slice.member) selectGroupPie(slice.group);
+  }));
+  if(grpExpandedGroup!==null) renderGroupDetail(grpExpandedGroup);
+  else $('grpDetail').style.display='none';
 }
 
 $('grpCreate').addEventListener('click', ()=>{
