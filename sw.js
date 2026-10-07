@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v21-group-selection-outline';
+const CACHE_NAME = 'asset-mgr-v22-dashboard-pie-descending';
 const APP_SHELL = [
   './',
   './index.html',

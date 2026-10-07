@@ -1198,6 +1198,7 @@ function drawPie(){
     bucket.set(k, (bucket.get(k)||0) + r.Amount);
   }
   const rawLabels = [...bucket.keys()];
+  if(dim === 'Name') rawLabels.sort((a,b)=>bucket.get(b)-bucket.get(a));
   const rawData   = rawLabels.map(k=>bucket.get(k));
   const labels = [], data=[];
   rawLabels.forEach((k,i)=>{ if(rawData[i]!==0){ labels.push(k); data.push(rawData[i]); } });
