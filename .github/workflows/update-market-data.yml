@@ -1,0 +1,41 @@
+name: Update market sentiment datasets
+on:
+  workflow_dispatch:
+  schedule:
+    # After US close, Tue-Sat UTC (corresponds to Mon-Fri US sessions).
+    - cron: "30 02 * * 2-6"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-public-market-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download public market histories
+        id: download
+        continue-on-error: true
+        run: python scripts/update_market_data.py
+      - name: Commit updated public indices
+        run: |
+          if [ -f market-data.json ]; then
+            git add market-data.json
+            if ! git diff --cached --quiet; then
+              git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Update F&G and VIX historical indices"
+              git push
+            fi
+          fi
+      - name: Report total feed failure
+        if: steps.download.outcome == 'failure'
+        run: exit 1
