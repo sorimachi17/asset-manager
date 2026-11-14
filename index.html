@@ -454,6 +454,17 @@
       <button id="applyRange">反映</button>
     </div>
     <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
+    <details open style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:10px">
+      <summary style="cursor:pointer;font-weight:600">自分で設定する警戒・買い場ゾーン</summary>
+      <div class="controls">
+        <label><input id="zoneEnabled" type="checkbox" checked> 色付け</label>
+        <label>判定:<select id="zoneCombine"><option value="either">どちらか</option><option value="both">両方</option></select></label>
+        <label>F&amp;G <select id="zoneFgOp"><option value="le">以下</option><option value="ge">以上</option></select><input id="zoneFg" type="number" min="0" max="100" value="20" style="width:60px"></label>
+        <label>日経VI <select id="zoneViOp"><option value="ge">以上</option><option value="le">以下</option></select><input id="zoneVi" type="number" min="0" max="200" value="50" style="width:60px"></label>
+      </div>
+      <div id="zoneSummary" class="muted"></div>
+      <div class="muted">黄：F&amp;G条件、紫：日経VI条件、青：両方達成。設定は端末に保存されます。</div>
+    </details>
     <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)">
         <input type="checkbox" id="showBench" checked style="accent-color:#9ca3af">
@@ -464,7 +475,7 @@
       <label><input type="checkbox" id="showFearGreed" checked> CNN Fear &amp; Greed</label>
       <label><input type="checkbox" id="showVix" checked> VIX</label>
       <label><input type="checkbox" id="showNikkeiVi" checked> 日経VI</label>
-      <button id="updateMarket" class="btn-ghost" type="button">F&amp;G・VIXを取得／更新</button>
+      <button id="updateMarket" class="btn-ghost" type="button">3指数を取得／更新</button>
     </div>
     <div class="controls">
       <label>指数CSV: <select id="marketFileType">
@@ -475,6 +486,7 @@
       <input id="marketFile" type="file" accept=".csv,text/csv" aria-label="指数CSVを読み込む">
     </div>
     <div id="marketStatus" class="muted" aria-live="polite"></div>
+    <div id="marketErrors" class="muted" style="color:#fca5a5" aria-live="polite"></div>
     <div class="muted" style="margin-top:5px">
       右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
       <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
@@ -1280,6 +1292,60 @@ function drawPie(){
   });
 }
 
+
+const ZONE_KEY='asset_mgr_v1_market_zones';
+const ZONE_DEFAULT={enabled:true,combine:'either',fgOp:'le',fg:20,viOp:'ge',vi:50};
+function readZoneSettings(){
+  try{
+    const v={...ZONE_DEFAULT,...JSON.parse(localStorage.getItem(ZONE_KEY)||'null')};
+    v.fg=Math.max(0,Math.min(100,Number(v.fg)||0));v.vi=Math.max(0,Math.min(200,Number(v.vi)||0));
+    return v;
+  }catch(_){return {...ZONE_DEFAULT};}
+}
+let ZONE=readZoneSettings();
+function zoneFlags(date){
+  const f=marketReading('fg',date),v=marketReading('nikkei_vi',date);
+  const fg=f!==null&&(ZONE.fgOp==='le'?f<=ZONE.fg:f>=ZONE.fg);
+  const vi=v!==null&&(ZONE.viOp==='ge'?v>=ZONE.vi:v<=ZONE.vi);
+  return {fg,vi,active:ZONE.combine==='both'?(fg&&vi):(fg||vi)};
+}
+function renderZoneSummary(labels){
+  $('zoneSummary').textContent='該当する資産記録日：'+(ZONE.enabled?labels.filter(d=>zoneFlags(d).active).length:0)+'日'
+    +(MARKET_SERIES.nikkei_vi.length?'':' ｜ 日経VI未取得のため日経VI条件は判定できません');
+}
+const zonePlugin={
+  id:'assetZones',
+  beforeDatasetsDraw(chart){
+    if(!ZONE.enabled)return;
+    const x=chart.scales.x,a=chart.chartArea,labels=chart.data.labels||[],ctx=chart.ctx;
+    if(!x||!a)return;
+    ctx.save();
+    for(let i=0;i<labels.length;i++){
+      const z=zoneFlags(labels[i]);if(!z.active)continue;
+      const mid=x.getPixelForValue(i);
+      const left=Math.max(a.left,i?(x.getPixelForValue(i-1)+mid)/2:a.left);
+      const right=Math.min(a.right,i+1<labels.length?(mid+x.getPixelForValue(i+1))/2:a.right);
+      ctx.fillStyle=z.fg&&z.vi?'rgba(59,130,246,.24)':z.fg?'rgba(251,191,36,.18)':'rgba(167,139,250,.18)';
+      ctx.fillRect(left,a.top,Math.max(0,right-left),a.bottom-a.top);
+    }
+    ctx.restore();
+  }
+};
+function saveZoneSettings(){
+  ZONE={
+    enabled:$('zoneEnabled').checked,combine:$('zoneCombine').value,
+    fgOp:$('zoneFgOp').value,viOp:$('zoneViOp').value,
+    fg:Math.max(0,Math.min(100,Number($('zoneFg').value)||0)),
+    vi:Math.max(0,Math.min(200,Number($('zoneVi').value)||0))
+  };
+  localStorage.setItem(ZONE_KEY,JSON.stringify(ZONE));
+  if(DATES.length)drawLine();
+}
+for(const [id,key] of [['zoneEnabled','enabled'],['zoneCombine','combine'],['zoneFgOp','fgOp'],['zoneViOp','viOp'],['zoneFg','fg'],['zoneVi','vi']]){
+  $(id)[key==='enabled'?'checked':'value']=ZONE[key];
+  $(id).addEventListener('change',saveZoneSettings);
+}
+
 // ===================== Line =====================
 let lineChart = null;
 function drawLine(){
@@ -1334,6 +1400,7 @@ function drawLine(){
   const filtered = [], filteredCats = [];
   series.forEach((arr,i)=>{ if(arr[arr.length-1] !== 0){ filtered.push(arr); filteredCats.push(cats[i]); } });
 
+  renderZoneSummary(labels);
   if(lineChart) lineChart.destroy();
   lineChart = new Chart($("lineChart"), {
     type:'line',
@@ -1355,7 +1422,8 @@ function drawLine(){
         yMarket:{type:'linear',position:'right',display:marketDatasets(labels).length>0,min:0,suggestedMax:100,grid:{drawOnChartArea:false},ticks:{color:'#fbbf24'}}
       },
       plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>ctx.parsed.y===null ? `${ctx.dataset.label}: —` : `${ctx.dataset.label}: ${ctx.dataset.yAxisID==='yMarket' ? ctx.parsed.y.toFixed(1) : (percentMode ? ctx.parsed.y.toFixed(2)+'%' : yen(ctx.parsed.y))}`}}}
-    }
+    },
+    plugins:[zonePlugin]
   });
 }
 
