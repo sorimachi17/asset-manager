@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v28-zone-three-indices-nikkei-import';
+const CACHE_NAME = 'asset-mgr-v29-clean-links-nikkei-page';
 const APP_SHELL = [
   './',
   './index.html',
