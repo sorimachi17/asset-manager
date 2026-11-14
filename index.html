@@ -458,7 +458,27 @@
         <span style="color:#9ca3af">- -</span> ベンチマークを重ねる（指数CSV読込時・起点で指数化）
       </label>
     </div>
-    <div class="muted" style="margin-top:4px">※ 記録日のみ表示。構成比表示は各記録日の総資産を100％として計算（ベンチマークは金額モードのみ）。</div>
+    <div class="controls" style="margin-top:12px">
+      <label><input type="checkbox" id="showFearGreed" checked> CNN Fear &amp; Greed</label>
+      <label><input type="checkbox" id="showVix" checked> VIX</label>
+      <label><input type="checkbox" id="showNikkeiVi" checked> 日経VI</label>
+      <button id="updateMarket" class="btn-ghost" type="button">F&amp;G・VIXを取得／更新</button>
+    </div>
+    <div class="controls">
+      <label>指数CSV: <select id="marketFileType">
+        <option value="fg">CNN Fear &amp; Greed</option>
+        <option value="vix">VIX</option>
+        <option value="nikkei_vi">日経VI</option>
+      </select></label>
+      <input id="marketFile" type="file" accept=".csv,text/csv" aria-label="指数CSVを読み込む">
+    </div>
+    <div id="marketStatus" class="muted" aria-live="polite"></div>
+    <div class="muted" style="margin-top:5px">
+      右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
+      <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
+      <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a>
+    </div>
+    <div class="muted" style="margin-top:4px">※ 構成比表示は各記録日の総資産を100％として計算します。ベンチマークは金額モードのみ。</div>
   </section>
 
 </div><!-- /tabTrend -->
@@ -1315,15 +1335,17 @@ function drawLine(){
         borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]
       })),
       ...(percentMode ? [] : [{label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}]),
-      ...(percentMode ? [] : benchDatasets(labels, totals))
+      ...(percentMode ? [] : benchDatasets(labels, totals)),
+      ...marketDatasets(labels)
     ]},
     options:{
       responsive:true,
       scales:{
         x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
-        y:{min:percentMode?0:undefined,max:percentMode?100:undefined,grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>percentMode?v+'%':'¥'+fmt(v)}}
+        y:{min:percentMode?0:undefined,max:percentMode?100:undefined,grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>percentMode?v+'%':'¥'+fmt(v)}},
+        yMarket:{type:'linear',position:'right',display:marketDatasets(labels).length>0,min:0,suggestedMax:100,grid:{drawOnChartArea:false},ticks:{color:'#fbbf24'}}
       },
-      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${percentMode ? ctx.parsed.y.toFixed(2)+'%' : yen(ctx.parsed.y)}`}}}
+      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>ctx.parsed.y===null ? `${ctx.dataset.label}: —` : `${ctx.dataset.label}: ${ctx.dataset.yAxisID==='yMarket' ? ctx.parsed.y.toFixed(1) : (percentMode ? ctx.parsed.y.toFixed(2)+'%' : yen(ctx.parsed.y))}`}}}
     }
   });
 }
@@ -2607,6 +2629,118 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
+
+// ===================== 市場センチメント指数 =====================
+const MARKET_CACHE_KEY='asset_mgr_v1_market_indices';
+const MARKET_SERIES={fg:[],vix:[],nikkei_vi:[]};
+const MARKET_SOURCES={fg:'',vix:'',nikkei_vi:''};
+function normalizeMarketDate(raw){
+  const value=String(raw??'').trim();
+  if(!value)return '';
+  const parsed=/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)
+    ? dayjs(value,['MM/DD/YYYY','M/D/YYYY'],true)
+    : dayjs(normalizeDate(value),'YYYY-MM-DD',true);
+  return parsed.isValid()?parsed.format('YYYY-MM-DD'):'';
+}
+
+function persistMarketSeries(){
+  try{localStorage.setItem(MARKET_CACHE_KEY,JSON.stringify({series:MARKET_SERIES,sources:MARKET_SOURCES}));}
+  catch(error){console.warn('指数保存に失敗',error);}
+}
+
+function restoreMarketSeries(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(MARKET_CACHE_KEY)||'null');
+    if(!saved?.series)return;
+    for(const type of Object.keys(MARKET_SERIES)){
+      if(!Array.isArray(saved.series[type]))continue;
+      MARKET_SERIES[type]=saved.series[type].filter(row=>row&&/^\d{4}-\d{2}-\d{2}$/.test(row.date)&&typeof row.value==='number'&&Number.isFinite(row.value)).sort((a,b)=>a.date.localeCompare(b.date));
+      MARKET_SOURCES[type]=String(saved.sources?.[type]||'保存済み');
+    }
+  }catch(error){console.warn('指数保存データを読み込めません',error);}
+}
+
+function refreshMarketStatus(note=''){
+  const labels={fg:'CNN F&G',vix:'VIX',nikkei_vi:'日経VI'};
+  const items=Object.entries(labels).map(([type,label])=>{
+    const data=MARKET_SERIES[type];
+    if(!data.length)return label+': 未取得';
+    const latest=data.at(-1);
+    return label+': '+latest.value.toFixed(1)+'（'+latest.date+' / '+MARKET_SOURCES[type]+'）';
+  });
+  $('marketStatus').textContent=(note?note+'　':'')+items.join(' ｜ ');
+}
+
+function importMarketCSV(parsed,type,source){
+  const fields=(parsed.meta.fields||[]).map(original=>({original,normalized:original.trim()}));
+  const dateKey=fields.find(f=>/^date$|^日付$/i.test(f.normalized));
+  const specific=type==='fg' ? fields.find(f=>/fear[\s_-]*greed|^f&g$/i.test(f.normalized)) : null;
+  const valueKey=specific||fields.find(f=>/^close$|^終値$|^value$|^score$|^指数値$/i.test(f.normalized));
+  if(!dateKey||!valueKey)return false;
+  const values=new Map();
+  for(const row of parsed.data){
+    const date=normalizeMarketDate(row[dateKey.original]);
+    const raw=String(row[valueKey.original]??'').replace(/,/g,'').trim();
+    if(!date||!raw)continue;
+    const value=Number(raw);
+    if(!Number.isFinite(value)||value<0||(type==='fg'&&value>100))continue;
+    values.set(date,value);
+  }
+  if(!values.size)return false;
+  MARKET_SERIES[type]=[...values.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+  MARKET_SOURCES[type]=source;
+  persistMarketSeries();
+  refreshMarketStatus();
+  if(DATES.length)drawLine();
+  return true;
+}
+
+function marketReading(type,date){
+  const records=MARKET_SERIES[type];let low=0,high=records.length-1,best=-1;
+  while(low<=high){
+    const middle=(low+high)>>1;
+    if(records[middle].date<=date){best=middle;low=middle+1;}else high=middle-1;
+  }
+  if(best<0||dayjs(date).diff(records[best].date,'day')>4)return null;
+  return records[best].value;
+}
+
+function marketDatasets(labels){
+  const cfg=[
+    {type:'fg',control:'showFearGreed',label:'CNN Fear & Greed',color:'rgba(251,191,36,0.95)'},
+    {type:'vix',control:'showVix',label:'VIX',color:'rgba(244,114,182,0.95)'},
+    {type:'nikkei_vi',control:'showNikkeiVi',label:'日経VI',color:'rgba(167,139,250,0.95)'}
+  ];
+  return cfg.filter(c=>$(c.control).checked&&MARKET_SERIES[c.type].length)
+    .map(c=>({label:c.label,data:labels.map(date=>marketReading(c.type,date)),yAxisID:'yMarket',
+      borderColor:c.color,backgroundColor:c.color,borderWidth:2,borderDash:[5,3],
+      fill:false,pointRadius:0,pointHitRadius:8,tension:0.2,spanGaps:false,order:-3}))
+    .filter(ds=>ds.data.some(v=>v!==null));
+}
+
+async function updateMarketOnline(){
+  const button=$('updateMarket');
+  button.disabled=true;refreshMarketStatus('データ取得中');
+  const feeds=[
+    {type:'fg',url:'https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv',source:'CNN履歴・第三者提供'},
+    {type:'vix',url:'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',source:'Cboe公式'}
+  ];
+  const outcomes=await Promise.all(feeds.map(async feed=>{
+    try{
+      const response=await fetch(feed.url,{cache:'no-store'});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const csv=await response.text();
+      const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
+      if(!importMarketCSV(parsed,feed.type,feed.source))throw new Error('CSVの列を認識できません');
+      return true;
+    }catch(err){console.warn(feed.type+' の取得に失敗',err);return false;}
+  }));
+  button.disabled=false;
+  refreshMarketStatus(outcomes.every(Boolean)?'指数を更新しました':outcomes.some(Boolean)?'一部取得に失敗。CSVを読み込んでください':'自動取得に失敗。CSVの手動読込を利用してください');
+}
+restoreMarketSeries();
+refreshMarketStatus();
+
 // ===================== ベンチマーク =====================
 let BENCH = [];      // [{date, close}] 昇順
 let BENCH_NAME = '';
@@ -2902,9 +3036,14 @@ $("file").addEventListener('change', e=>{
     reader.onload = ()=>{
       const parsed = Papa.parse(reader.result, {header:true, skipEmptyLines:true});
       const fields = (parsed.meta.fields || []).map(f => f.trim());
+      const isMarketFG = fields.some(f=>/fear[\s_-]*greed|^f&g$/i.test(f)) || /fear[\s_-]*greed|f.?&.?g/i.test(file.name);
+      const isMarketVix = /^vix([._-]|$)/i.test(file.name);
       const isBench = fields.some(f => /^close$|adj.*close|終値/i.test(f))
                    && !fields.includes('Name') && !fields.includes('Amount');
-      if(isBench) parseBenchmarkCSV(parsed, file.name);
+      if(isMarketFG||isMarketVix){
+        const type=isMarketFG?'fg':'vix';
+        if(!importMarketCSV(parsed,type,file.name))alert('指数CSVを解釈できません。DateとClose／Fear Greed列を確認してください。');
+      }else if(isBench)parseBenchmarkCSV(parsed,file.name);
       else parseCSVParsed(parsed);
     };
     reader.readAsText(file);
@@ -2914,6 +3053,20 @@ $("file").addEventListener('change', e=>{
 $("exportCsv").addEventListener('click', exportCsv);
 $("totalDate").addEventListener('change', ()=>{ refreshKPIs(); renderReturns(); renderIPS(); drawPie(); });
 $("showBench").addEventListener('change', ()=>{ if(DATES.length) drawLine(); });
+['showFearGreed','showVix','showNikkeiVi'].forEach(id=>$(id).addEventListener('change',()=>{if(DATES.length)drawLine();}));
+$('updateMarket').addEventListener('click',updateMarketOnline);
+$('marketFile').addEventListener('change',event=>{
+  const file=event.target.files?.[0];
+  if(!file)return;
+  const type=$('marketFileType').value;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const parsed=Papa.parse(reader.result,{header:true,skipEmptyLines:true});
+    if(!importMarketCSV(parsed,type,file.name))alert('指数CSVを解釈できません。DateとClose／Value／Fear Greed列を確認してください。');
+  };
+  reader.readAsText(file);
+  event.target.value='';
+});
 $("pieDimension").addEventListener('change', drawPie);
 $("lineDimension").addEventListener('change', drawLine);
 $("applyRange").addEventListener('click', drawLine);
