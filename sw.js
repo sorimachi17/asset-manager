@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v23-returns-and-market-overlays';
+const CACHE_NAME = 'asset-mgr-v24-negative-pnl-and-index-links';
 const APP_SHELL = [
   './',
   './index.html',
