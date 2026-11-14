@@ -2747,7 +2747,8 @@ function refreshMarketStatus(note=''){
     const data=MARKET_SERIES[type];
     if(!data.length)return label+': 未取得';
     const latest=data.at(-1);
-    return label+': '+latest.value.toFixed(1)+'（'+latest.date+' / '+MARKET_SOURCES[type]+'）';
+    const stale=dayjs().diff(latest.date,'day')>7;
+    return label+': '+latest.value.toFixed(1)+'（'+latest.date+' / '+MARKET_SOURCES[type]+'）'+(stale?'【古いデータ・要更新】':'');
   });
   $('marketStatus').textContent=(note?note+'　':'')+items.join(' ｜ ');
 }
@@ -3207,10 +3208,16 @@ $('marketFile').addEventListener('change',event=>{
   const type=$('marketFileType').value;
   const reader=new FileReader();
   reader.onload=()=>{
-    const parsed=Papa.parse(reader.result,{header:true,skipEmptyLines:true});
-    if(!importMarketCSV(parsed,type,file.name))alert('指数CSVを解釈できません。DateとClose／Value／Fear Greed列を確認してください。');
+    const buf=reader.result;
+    let ok=false;
+    for(const encoding of ['utf-8','shift_jis']){
+      const csv=new TextDecoder(encoding).decode(buf).replace(/^\uFEFF/,'');
+      const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
+      if(importMarketCSV(parsed,type,file.name)){ok=true;break;}
+    }
+    if(!ok)alert('指数CSVを解釈できません。DateとClose／Value／Fear Greed列を確認してください。');
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
   event.target.value='';
 });
 $("pieDimension").addEventListener('change', drawPie);
