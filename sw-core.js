@@ -151,7 +151,7 @@ const MOBILE_UI_SCRIPT = String.raw`
       note.style.marginTop = '8px';
       note.style.fontSize = '10px';
       note.style.lineHeight = '1.5';
-      note.textContent = '損益はProfitLoss（円）の直接入力を優先します。未入力の円建て銘柄のみ、評価額 −（数量 × 取得単価）で算出します。外貨銘柄は円建てProfitLossの入力が必要です。';
+      note.textContent = '損益はProfitLoss（円）の直接入力を優先します。未入力の場合、円建ては数量×取得単価、外貨建ては数量×取得単価×FxRateを使って計算します。負数も表示します。';
       pnlCard.appendChild(note);
     }
 
