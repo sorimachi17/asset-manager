@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v29-clean-links-nikkei-page';
+const CACHE_NAME = 'asset-mgr-v30-desktop-trend-height';
 const APP_SHELL = [
   './',
   './index.html',
