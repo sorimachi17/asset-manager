@@ -456,14 +456,31 @@
     <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
     <details open style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:10px">
       <summary style="cursor:pointer;font-weight:600">自分で設定する警戒・買い場ゾーン</summary>
-      <div class="controls">
-        <label><input id="zoneEnabled" type="checkbox" checked> 色付け</label>
-        <label>判定:<select id="zoneCombine"><option value="either">どちらか</option><option value="both">両方</option></select></label>
-        <label>F&amp;G <select id="zoneFgOp"><option value="le">以下</option><option value="ge">以上</option></select><input id="zoneFg" type="number" min="0" max="100" value="20" style="width:60px"></label>
-        <label>日経VI <select id="zoneViOp"><option value="ge">以上</option><option value="le">以下</option></select><input id="zoneVi" type="number" min="0" max="200" value="50" style="width:60px"></label>
+      <div class="controls" style="align-items:center">
+        <label><input id="zoneEnabled" type="checkbox" checked> ゾーンを色付け</label>
+        <label>条件の組合せ:
+          <select id="zoneCombine"><option value="either">いずれかを満たす（OR）</option><option value="both">すべてを満たす（AND）</option></select>
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:7px;margin:9px 0">
+        <div class="row" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+          <label style="min-width:132px"><input type="checkbox" id="zoneUseFg" checked> CNN F&amp;G</label>
+          <select id="zoneFgOp"><option value="le">以下</option><option value="ge">以上</option></select>
+          <input id="zoneFg" type="number" min="0" max="100" value="20" step="0.1" style="width:80px" aria-label="F&G閾値">
+        </div>
+        <div class="row" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+          <label style="min-width:132px"><input type="checkbox" id="zoneUseVix"> 米国VIX</label>
+          <select id="zoneVixOp"><option value="ge">以上</option><option value="le">以下</option></select>
+          <input id="zoneVix" type="number" min="0" max="200" value="30" step="0.1" style="width:80px" aria-label="VIX閾値">
+        </div>
+        <div class="row" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+          <label style="min-width:132px"><input type="checkbox" id="zoneUseVi" checked> 日経VI</label>
+          <select id="zoneViOp"><option value="ge">以上</option><option value="le">以下</option></select>
+          <input id="zoneVi" type="number" min="0" max="200" value="50" step="0.1" style="width:80px" aria-label="日経VI閾値">
+        </div>
       </div>
       <div id="zoneSummary" class="muted"></div>
-      <div class="muted">黄：F&amp;G条件、紫：日経VI条件、青：両方達成。設定は端末に保存されます。</div>
+      <div class="muted">選択した指数の判定結果をグラフ背景に色付けします。判定に必要なデータがない日は不明として扱い、設定は端末に保存します。</div>
     </details>
     <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)">
@@ -1296,39 +1313,66 @@ function drawPie(){
 
 
 const ZONE_KEY='asset_mgr_v1_market_zones';
-const ZONE_DEFAULT={enabled:true,combine:'either',fgOp:'le',fg:20,viOp:'ge',vi:50};
+const ZONE_DEFAULT={enabled:true,combine:'either',
+  useFg:true,useVix:false,useVi:true,fgOp:'le',fg:20,vixOp:'ge',vix:30,viOp:'ge',vi:50};
 function readZoneSettings(){
   try{
-    const v={...ZONE_DEFAULT,...JSON.parse(localStorage.getItem(ZONE_KEY)||'null')};
-    v.fg=Math.max(0,Math.min(100,Number(v.fg)||0));v.vi=Math.max(0,Math.min(200,Number(v.vi)||0));
-    return v;
+    const saved=JSON.parse(localStorage.getItem(ZONE_KEY)||'null');
+    const z={...ZONE_DEFAULT,...(saved&&typeof saved==='object'?saved:{})};
+    z.enabled=z.enabled!==false;
+    z.combine=z.combine==='both'?'both':'either';
+    for(const [name,max] of [['fg',100],['vix',200],['vi',200]]){
+      z[name]=Math.max(0,Math.min(max,Number(z[name])||0));
+      const op=name+'Op';
+      z[op]=['ge','le'].includes(z[op])?z[op]:ZONE_DEFAULT[op];
+    }
+    return z;
   }catch(_){return {...ZONE_DEFAULT};}
 }
 let ZONE=readZoneSettings();
+const ZONE_TYPES=[
+  {type:'fg',use:'useFg',field:'fg',op:'fgOp',title:'F&G'},
+  {type:'vix',use:'useVix',field:'vix',op:'vixOp',title:'VIX'},
+  {type:'nikkei_vi',use:'useVi',field:'vi',op:'viOp',title:'日経VI'}
+];
 function zoneFlags(date){
-  const f=marketReading('fg',date),v=marketReading('nikkei_vi',date);
-  const fg=f!==null&&(ZONE.fgOp==='le'?f<=ZONE.fg:f>=ZONE.fg);
-  const vi=v!==null&&(ZONE.viOp==='ge'?v>=ZONE.vi:v<=ZONE.vi);
-  return {fg,vi,active:ZONE.combine==='both'?(fg&&vi):(fg||vi)};
+  const results=ZONE_TYPES.filter(t=>ZONE[t.use]).map(t=>{
+    const value=marketReading(t.type,date);
+    if(value===null||!Number.isFinite(value))return {type:t.type,valid:false,match:false};
+    return {type:t.type,valid:true,match:ZONE[t.op]==='le'?value<=ZONE[t.field]:value>=ZONE[t.field]};
+  });
+  const matches=results.filter(r=>r.match);
+  const active=results.length>0&&(ZONE.combine==='both'?results.every(r=>r.valid&&r.match):matches.length>0);
+  return {results,active,matches,unknown:results.filter(r=>!r.valid)};
 }
 function renderZoneSummary(labels){
-  $('zoneSummary').textContent='該当する資産記録日：'+(ZONE.enabled?labels.filter(d=>zoneFlags(d).active).length:0)+'日'
-    +(MARKET_SERIES.nikkei_vi.length?'':' ｜ 日経VI未取得のため日経VI条件は判定できません');
+  const selected=ZONE_TYPES.filter(t=>ZONE[t.use]);
+  if(!ZONE.enabled){$('zoneSummary').textContent='ゾーンの色付けをオフにしています。';return;}
+  if(!selected.length){$('zoneSummary').textContent='判定したい指数を1つ以上選択してください。';return;}
+  const flags=labels.map(zoneFlags);
+  const hits=flags.filter(x=>x.active).length;
+  const unknown=flags.filter(x=>x.unknown.length>0).length;
+  const conditions=selected.map(t=>t.title+' '+ZONE[t.field]+(ZONE[t.op]==='le'?'以下':'以上'));
+  $('zoneSummary').textContent=conditions.join(ZONE.combine==='both'?' かつ ':' または ')
+    +' ｜ 該当する資産記録日 '+hits+'日'
+    +(unknown?' ｜ 一部指数のデータが不足している記録日 '+unknown+'日':'');
 }
 const zonePlugin={
   id:'assetZones',
   beforeDatasetsDraw(chart){
     if(!ZONE.enabled)return;
-    const x=chart.scales.x,a=chart.chartArea,labels=chart.data.labels||[],ctx=chart.ctx;
-    if(!x||!a)return;
+    const x=chart.scales.x,area=chart.chartArea,labels=chart.data.labels||[],ctx=chart.ctx;
+    if(!x||!area)return;
     ctx.save();
     for(let i=0;i<labels.length;i++){
       const z=zoneFlags(labels[i]);if(!z.active)continue;
       const mid=x.getPixelForValue(i);
-      const left=Math.max(a.left,i?(x.getPixelForValue(i-1)+mid)/2:a.left);
-      const right=Math.min(a.right,i+1<labels.length?(mid+x.getPixelForValue(i+1))/2:a.right);
-      ctx.fillStyle=z.fg&&z.vi?'rgba(59,130,246,.24)':z.fg?'rgba(251,191,36,.18)':'rgba(167,139,250,.18)';
-      ctx.fillRect(left,a.top,Math.max(0,right-left),a.bottom-a.top);
+      const left=Math.max(area.left,i?(x.getPixelForValue(i-1)+mid)/2:area.left);
+      const right=Math.min(area.right,i+1<labels.length?(mid+x.getPixelForValue(i+1))/2:area.right);
+      // Two or three simultaneously satisfied conditions stand out; one condition is amber.
+      const count=z.matches.length;
+      ctx.fillStyle=count>=3?'rgba(34,197,94,.24)':count===2?'rgba(59,130,246,.24)':'rgba(251,191,36,.2)';
+      ctx.fillRect(left,area.top,Math.max(0,right-left),area.bottom-area.top);
     }
     ctx.restore();
   }
@@ -1336,15 +1380,22 @@ const zonePlugin={
 function saveZoneSettings(){
   ZONE={
     enabled:$('zoneEnabled').checked,combine:$('zoneCombine').value,
-    fgOp:$('zoneFgOp').value,viOp:$('zoneViOp').value,
+    useFg:$('zoneUseFg').checked,useVix:$('zoneUseVix').checked,useVi:$('zoneUseVi').checked,
+    fgOp:$('zoneFgOp').value,vixOp:$('zoneVixOp').value,viOp:$('zoneViOp').value,
     fg:Math.max(0,Math.min(100,Number($('zoneFg').value)||0)),
+    vix:Math.max(0,Math.min(200,Number($('zoneVix').value)||0)),
     vi:Math.max(0,Math.min(200,Number($('zoneVi').value)||0))
   };
-  localStorage.setItem(ZONE_KEY,JSON.stringify(ZONE));
+  try{localStorage.setItem(ZONE_KEY,JSON.stringify(ZONE));}catch(_){}
   if(DATES.length)drawLine();
 }
-for(const [id,key] of [['zoneEnabled','enabled'],['zoneCombine','combine'],['zoneFgOp','fgOp'],['zoneViOp','viOp'],['zoneFg','fg'],['zoneVi','vi']]){
-  $(id)[key==='enabled'?'checked':'value']=ZONE[key];
+for(const [id,key] of [
+  ['zoneEnabled','enabled'],['zoneCombine','combine'],['zoneUseFg','useFg'],
+  ['zoneUseVix','useVix'],['zoneUseVi','useVi'],
+  ['zoneFgOp','fgOp'],['zoneVixOp','vixOp'],['zoneViOp','viOp'],
+  ['zoneFg','fg'],['zoneVix','vix'],['zoneVi','vi']
+]){
+  $(id)[['enabled','useFg','useVix','useVi'].includes(key)?'checked':'value']=ZONE[key];
   $(id).addEventListener('change',saveZoneSettings);
 }
 
