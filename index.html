@@ -574,7 +574,7 @@
       <button id="analColPct" class="btn-ghost active" style="font-size:11px;padding:3px 8px">割合</button>
       <button id="analColPnl" class="btn-ghost" style="font-size:11px;padding:3px 8px">含み損益</button>
     </div>
-    <div class="muted" style="margin-bottom:6px">各銘柄の含み損益は、直接入力したProfitLoss（円）を優先して表示します。スマホでは横スクロールして確認できます。</div>
+    <div class="muted" style="margin-bottom:6px">各銘柄の含み損益はProfitLoss（円）の入力を優先。円建て銘柄のみ、未入力時は数量×取得単価から算出します。外貨銘柄は円建てProfitLossを入力してください。スマホでは横スクロールできます。</div>
     <div class="table-wrap">
       <table id="analTable">
         <thead>
@@ -849,7 +849,10 @@ function pnlOfRow(r){
   const directPnl = optionalNumber(r.ProfitLoss);
   const qty = Number(r.Quantity) || 0;
   const costBasis = Number(r.CostBasis) || 0;
-  if(directPnl === null && !(qty > 0 && costBasis > 0)) return null;
+  // 外貨建てCostBasisと円評価額を直接引くと、誤った損益になるため自動計算しない。
+  // 外貨銘柄はProfitLoss（JPY）の直接入力を優先・必須とする。
+  const isForeign = !!String(r.Currency || '').trim() && String(r.Currency).trim().toUpperCase() !== 'JPY';
+  if(directPnl === null && (isForeign || !(qty > 0 && costBasis > 0))) return null;
   const amount = Number(r.Amount) || 0;
   const pnl = directPnl !== null ? directPnl : amount - qty * costBasis;
   const cost = amount - pnl;
