@@ -2730,24 +2730,40 @@ function marketDatasets(labels){
 
 async function updateMarketOnline(){
   const button=$('updateMarket');
-  button.disabled=true;refreshMarketStatus('データ取得中');
+  button.disabled=true;
+  refreshMarketStatus('データ取得中');
   const feeds=[
-    {type:'fg',url:'https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv',source:'CNN履歴・第三者提供'},
-    {type:'vix',url:'https://cdn-api.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',source:'Cboe公式'}
+    {type:'fg',sources:[
+      {url:'https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv',name:'CNN履歴・第三者提供'}
+    ]},
+    {type:'vix',sources:[
+      {url:'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',name:'Cboe公式'},
+      {url:'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv',name:'Cboe由来・GitHub公開データ'}
+    ]}
   ];
   const outcomes=await Promise.all(feeds.map(async feed=>{
-    try{
-      const response=await fetch(feed.url,{cache:'no-store'});
-      if(!response.ok)throw new Error('HTTP '+response.status);
-      const csv=await response.text();
-      const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
-      if(!importMarketCSV(parsed,feed.type,feed.source))throw new Error('CSVの列を認識できません');
-      return true;
-    }catch(err){console.warn(feed.type+' の取得に失敗',err);return false;}
+    const errors=[];
+    for(const source of feed.sources){
+      try{
+        const response=await fetch(source.url,{cache:'no-store'});
+        if(!response.ok)throw new Error('HTTP '+response.status);
+        const csv=await response.text();
+        const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
+        if(!importMarketCSV(parsed,feed.type,source.name))throw new Error('CSVの列を認識できません');
+        return true;
+      }catch(error){
+        errors.push(source.name+': '+error.message);
+      }
+    }
+    console.warn(feed.type+' の取得に失敗',errors.join(' / '));
+    return false;
   }));
   button.disabled=false;
-  refreshMarketStatus(outcomes.every(Boolean)?'指数を更新しました':outcomes.some(Boolean)?'一部取得に失敗。CSVを読み込んでください':'自動取得に失敗。CSVの手動読込を利用してください');
+  refreshMarketStatus(outcomes.every(Boolean)?'F&G・VIXを更新しました'
+    : outcomes.some(Boolean)?'一部取得に失敗。CSVを読み込んでください'
+    :'自動取得に失敗。CSVの手動読込を利用してください');
 }
+
 restoreMarketSeries();
 refreshMarketStatus();
 
