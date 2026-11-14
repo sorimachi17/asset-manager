@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v24-negative-pnl-and-index-links';
+const CACHE_NAME = 'asset-mgr-v25-vix-fallback';
 const APP_SHELL = [
   './',
   './index.html',
