@@ -1,6 +1,9 @@
 name: Update market sentiment datasets
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/update-market-data.yml"
   schedule:
     # After US close, Tue-Sat UTC (corresponds to Mon-Fri US sessions).
     - cron: "30 02 * * 2-6"
