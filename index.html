@@ -476,7 +476,7 @@
     <div class="muted" style="margin-top:5px">
       右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
       <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
-      <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a>
+      <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a> / <a href="https://indexes.nikkei.co.jp/nkave/index/profile?cid=5&amp;idx=nk225vi" target="_blank" rel="noopener noreferrer">日経VI公式CSV（日次データ）</a>
     </div>
     <div class="muted" style="margin-top:4px">※ 構成比表示は各記録日の総資産を100％として計算します。ベンチマークは金額モードのみ。</div>
   </section>
@@ -574,7 +574,7 @@
       <button id="analColPct" class="btn-ghost active" style="font-size:11px;padding:3px 8px">割合</button>
       <button id="analColPnl" class="btn-ghost" style="font-size:11px;padding:3px 8px">含み損益</button>
     </div>
-    <div class="muted" style="margin-bottom:6px">各銘柄の含み損益はProfitLoss（円）の入力を優先。円建て銘柄のみ、未入力時は数量×取得単価から算出します。外貨銘柄は円建てProfitLossを入力してください。スマホでは横スクロールできます。</div>
+    <div class="muted" style="margin-bottom:6px">各銘柄の含み損益はProfitLoss（円）を優先し、マイナス値も表示します。未入力の場合、円建ては数量×取得単価、外貨建ては数量×取得単価×FxRate（円換算レート）から計算します。計算できない場合は「—」。スマホでは横スクロールできます。</div>
     <div class="table-wrap">
       <table id="analTable">
         <thead>
@@ -840,7 +840,8 @@ function compactJPY(n){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 function optionalNumber(v){
-  const s = String(v ?? '').replace(/,/g,'').trim();
+  // CSV上の負数やUnicodeマイナスも正しく数値として扱う。
+  const s = String(v ?? '').replace(/,/g,'').replace(/[−－﹣]/g,'-').replace(/^[（(]\s*(.*?)\s*[）)]$/, '-$1').trim();
   if(s === '') return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -849,12 +850,15 @@ function pnlOfRow(r){
   const directPnl = optionalNumber(r.ProfitLoss);
   const qty = Number(r.Quantity) || 0;
   const costBasis = Number(r.CostBasis) || 0;
-  // 外貨建てCostBasisと円評価額を直接引くと、誤った損益になるため自動計算しない。
-  // 外貨銘柄はProfitLoss（JPY）の直接入力を優先・必須とする。
+  // 入力済みの損益（円）が正負どちらでも最優先。
+  // 外貨建て取得単価が入力されている場合、正しい円換算にはFxRateが必要。
   const isForeign = !!String(r.Currency || '').trim() && String(r.Currency).trim().toUpperCase() !== 'JPY';
-  if(directPnl === null && (isForeign || !(qty > 0 && costBasis > 0))) return null;
+  const fx = optionalNumber(r.FxRate);
+  if(directPnl === null && !(qty > 0 && costBasis > 0)) return null;
+  if(directPnl === null && isForeign && !(fx > 0)) return null;
   const amount = Number(r.Amount) || 0;
-  const pnl = directPnl !== null ? directPnl : amount - qty * costBasis;
+  const acquisitionJPY = isForeign ? qty * costBasis * fx : qty * costBasis;
+  const pnl = directPnl !== null ? directPnl : amount - acquisitionJPY;
   const cost = amount - pnl;
   const pnlPct = cost > 0 ? pnl / cost * 100 : null;
   return {qty, costBasis, cost, pnl, pnlPct};
@@ -2454,7 +2458,7 @@ function drawStockAnal(){
     const cost = hasPnlData ? amount - pnl : null;
     const pnlPct = (hasPnlData && cost > 0) ? pnl / cost * 100 : null;
     return { name, amount, pct: totalVal > 0 ? amount/totalVal*100 : 0, pnl, pnlPct, cost, ...meta };
-  }).filter(r => r.amount !== 0);
+  }).filter(r => r.amount !== 0 || r.pnl !== null || r.Quantity > 0);
 
   data.sort((a,b)=>{
     const ka = analSort.key==='name' ? a.name : a[analSort.key];
@@ -2473,7 +2477,8 @@ function drawStockAnal(){
     const checked = analSelected.has(r.name) ? 'checked' : '';
     const rowCls  = analSelected.has(r.name) ? 'anal-selected' : '';
     const pnlCls  = r.pnl !== null ? (r.pnl >= 0 ? 'pos' : 'neg') : '';
-    const pnlStr  = r.pnl !== null ? (r.pnl >= 0 ? '+' : '') + yen(r.pnl) : '—';
+    const pnlStr  = r.pnl !== null ? (r.pnl >= 0 ? '+' : '') + yen(r.pnl)
+      : (String(r.Currency||'').toUpperCase()!=='JPY' && !optionalNumber(r.FxRate) && !r.ProfitLoss ? '要入力' : '—');
     const pnlPctStr = r.pnlPct !== null ? (r.pnlPct >= 0 ? '+' : '') + r.pnlPct.toFixed(2) + '%' : '—';
     return `<tr class="${rowCls}" data-name="${escapeHtml(r.name)}">
       <td style="text-align:center"><input type="checkbox" class="anal-chk" data-name="${escapeHtml(r.name)}" ${checked}></td>
@@ -2675,10 +2680,10 @@ function refreshMarketStatus(note=''){
 }
 
 function importMarketCSV(parsed,type,source){
-  const fields=(parsed.meta.fields||[]).map(original=>({original,normalized:original.trim()}));
-  const dateKey=fields.find(f=>/^date$|^日付$/i.test(f.normalized));
+  const fields=(parsed.meta.fields||[]).map(original=>({original,normalized:original.trim().replace(/^\uFEFF/,'')}));
+  const dateKey=fields.find(f=>/^date$|^日付$|^年月日$/i.test(f.normalized));
   const specific=type==='fg' ? fields.find(f=>/fear[\s_-]*greed|^f&g$/i.test(f.normalized)) : null;
-  const valueKey=specific||fields.find(f=>/^close$|^終値$|^value$|^score$|^指数値$/i.test(f.normalized));
+  const valueKey=specific||fields.find(f=>/^close$|^終値$|^value$|^score$|^指数値$|^終値\s*\(.*\)$/i.test(f.normalized));
   if(!dateKey||!valueKey)return false;
   const values=new Map();
   for(const row of parsed.data){
@@ -2726,7 +2731,7 @@ async function updateMarketOnline(){
   button.disabled=true;refreshMarketStatus('データ取得中');
   const feeds=[
     {type:'fg',url:'https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv',source:'CNN履歴・第三者提供'},
-    {type:'vix',url:'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',source:'Cboe公式'}
+    {type:'vix',url:'https://cdn-api.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',source:'Cboe公式'}
   ];
   const outcomes=await Promise.all(feeds.map(async feed=>{
     try{
@@ -3031,6 +3036,25 @@ function onDataReady(){
   renderActiveTab();
 }
 
+
+// CSV作成ツールの「資産管理アプリに反映」で保存されたデータを自動読み込み。
+// 読み込めない場合は保存値を消さず、上部に理由を表示する。
+function restoreTransferredAssets(){
+  const raw=localStorage.getItem('asset_mgr_v1');
+  if(!raw)return;
+  try{
+    const parsed=JSON.parse(raw);
+    if(!Array.isArray(parsed))throw new Error('保存データが配列ではありません');
+    if(!parsed.length)return;
+    const mapping=Object.fromEntries(REQUIRED_FIELDS.map(f=>[f,f]));
+    applyMappingAndProcess(mapping,parsed);
+    $('importNote').textContent+='（CSV作成ツールから自動読込）';
+  }catch(error){
+    console.warn('保存済み資産の復元に失敗',error);
+    $('importNote').textContent='保存済み資産を読み込めません。データは削除していません。CSV読込をお試しください。';
+  }
+}
+
 // ===================== events =====================
 $("file").addEventListener('change', e=>{
   const files = [...e.target.files]; if(!files.length) return;
@@ -3172,6 +3196,7 @@ $("yearPrev").addEventListener('click', ()=>{ calState.year -= 1; renderCalendar
 $("yearNext").addEventListener('click', ()=>{ calState.year += 1; renderCalendar(); });
 $("yearMode").addEventListener('change', ()=>{ calState.yearMode=$("yearMode").value; renderCalendar(); });
 
+restoreTransferredAssets();
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }
