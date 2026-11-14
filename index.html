@@ -501,16 +501,14 @@
         <option value="nikkei_vi">日経VI</option>
       </select></label>
       <input id="marketFile" type="file" accept=".csv,text/csv" aria-label="指数CSVを読み込む">
-      <a href="https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv" target="_blank" rel="noopener noreferrer" style="font-size:12px;white-space:nowrap">日経VI公式CSVをダウンロード</a>
+      <a href="https://indexes.nikkei.co.jp/nkave/index/profile?cid=5&amp;idx=nk225vi" target="_blank" rel="noopener noreferrer" style="font-size:12px;white-space:nowrap">日経VI公式ページを開く</a>
     </div>
     <div id="marketStatus" class="muted" aria-live="polite"></div>
     <div id="marketErrors" class="muted" style="color:#fca5a5" aria-live="polite"></div>
-    <div class="muted" style="margin-top:4px"><a href="https://github.com/sorimachi17/asset-manager/actions/workflows/update-market-data.yml" target="_blank" rel="noopener noreferrer">GitHubの自動更新状況・手動実行</a></div>
+    
     <div class="muted" style="margin-top:5px">
-      F&G・VIXはGitHub Actionsで更新します。日経VIは上のリンクから公式CSVをダウンロードし、「指数CSV」でファイルを選択してください。iPhoneでは「ファイル」に保存してから選択します。端末内のみに保存されます。
-      右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
-      <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
-      <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a> / <a href="https://indexes.nikkei.co.jp/nkave/index/profile?cid=5&amp;idx=nk225vi" target="_blank" rel="noopener noreferrer">日経VI公式CSV（日次データ）</a>
+      F&G・VIXは自動取得します。日経VIは「公式ページを開く」→「関連データ」→「日次データ(CSV)」から取得してください。iPhoneでCSVが開くだけの場合は共有メニューから「ファイルに保存」し、上で読み込みます。
+      指数は右軸に表示し、資産記録日に対応する直近4日以内の値を使用します。
     </div>
     <div class="muted" style="margin-top:4px">※ 構成比表示は各記録日の総資産を100％として計算します。ベンチマークは金額モードのみ。</div>
   </section>
