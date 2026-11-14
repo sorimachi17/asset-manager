@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v25-vix-fallback';
+const CACHE_NAME = 'asset-mgr-v26-threshold-zones-fresh-market-indices';
 const APP_SHELL = [
   './',
   './index.html',
