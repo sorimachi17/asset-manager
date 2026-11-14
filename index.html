@@ -501,12 +501,13 @@
         <option value="nikkei_vi">日経VI</option>
       </select></label>
       <input id="marketFile" type="file" accept=".csv,text/csv" aria-label="指数CSVを読み込む">
+      <a href="https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv" target="_blank" rel="noopener noreferrer" style="font-size:12px;white-space:nowrap">日経VI公式CSVをダウンロード</a>
     </div>
     <div id="marketStatus" class="muted" aria-live="polite"></div>
     <div id="marketErrors" class="muted" style="color:#fca5a5" aria-live="polite"></div>
     <div class="muted" style="margin-top:4px"><a href="https://github.com/sorimachi17/asset-manager/actions/workflows/update-market-data.yml" target="_blank" rel="noopener noreferrer">GitHubの自動更新状況・手動実行</a></div>
     <div class="muted" style="margin-top:5px">
-      F&G・VIXはGitHub Actionsで更新したデータを同じサイトから読み込みます。日経VIは公式CSVを端末内に保存（公開GitHubにアップロードしません）。
+      F&G・VIXはGitHub Actionsで更新します。日経VIは上のリンクから公式CSVをダウンロードし、「指数CSV」でファイルを選択してください。iPhoneでは「ファイル」に保存してから選択します。端末内のみに保存されます。
       右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
       <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
       <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a> / <a href="https://indexes.nikkei.co.jp/nkave/index/profile?cid=5&amp;idx=nk225vi" target="_blank" rel="noopener noreferrer">日経VI公式CSV（日次データ）</a>
@@ -2827,6 +2828,35 @@ function parseMarketCSV(parsed,type){
   }
   return [...values].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
 }
+// 日経の公式日次CSVはCP932で、先頭行に見出しがある形式や日付・終値・始値・高値・安値の形式がある。
+// 見出し名に依存せず、各行の先頭の日付と2列目の終値を確認する。
+function parseNikkeiOfficialCsv(text){
+  const parsed=Papa.parse(text.replace(/^\uFEFF/,''),{header:false,skipEmptyLines:true});
+  const points=new Map();
+  for(const raw of parsed.data){
+    if(!Array.isArray(raw)||raw.length<2)continue;
+    const day=normalizeMarketDate(raw[0]);
+    if(!day)continue;
+    const close=String(raw[1]??'').replace(/,/g,'').trim();
+    if(!close||close==='—'||close==='-')continue;
+    const value=Number(close);
+    if(!Number.isFinite(value)||value<=0||value>300)continue;
+    points.set(day,value);
+  }
+  return [...points].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+}
+function importNikkeiText(text,source){
+  const rows=parseNikkeiOfficialCsv(text);
+  if(!rows.length)return false;
+  const current=MARKET_SERIES.nikkei_vi;
+  const merged=new Map([...current,...rows].map(r=>[r.date,r.value]));
+  MARKET_SERIES.nikkei_vi=[...merged].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+  MARKET_SOURCES.nikkei_vi=source;
+  persistMarketSeries();
+  refreshMarketStatus();
+  if(DATES.length)drawLine();
+  return true;
+}
 function importMarketCSV(parsed,type,source,{fresh=false}={}){
   const rows=parseMarketCSV(parsed,type);
   if(!rows.length)return false;
@@ -3273,13 +3303,21 @@ $('marketFile').addEventListener('change',event=>{
   const reader=new FileReader();
   reader.onload=()=>{
     const buf=reader.result;
+    // 公式ファイル名なら選択メニューがF&Gのままでも日経VIとして処理する。
+    const isNikkei=/nikkei.*vi|nk225vi/i.test(file.name);
+    const target=isNikkei?'nikkei_vi':type;
+    if(isNikkei)$('marketFileType').value='nikkei_vi';
     let ok=false;
-    for(const encoding of ['utf-8','shift_jis']){
+    for(const encoding of ['shift_jis','utf-8']){
       const csv=new TextDecoder(encoding).decode(buf).replace(/^\uFEFF/,'');
+      if(target==='nikkei_vi' && importNikkeiText(csv,file.name)){ok=true;break;}
       const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
-      if(importMarketCSV(parsed,type,file.name)){ok=true;break;}
+      if(importMarketCSV(parsed,target,file.name)){ok=true;break;}
     }
-    if(!ok)alert('指数CSVを解釈できません。DateとClose／Value／Fear Greed列を確認してください。');
+    if(!ok){
+      $('marketErrors').textContent='CSVを解析できませんでした。日経VI公式の「日次データ(CSV)」を選んでください。';
+      alert('指数CSVを解釈できません。公式CSVの日付と終値を確認してください。');
+    }else $('marketErrors').textContent='';
   };
   reader.readAsArrayBuffer(file);
   event.target.value='';
