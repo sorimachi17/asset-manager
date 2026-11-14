@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v26-threshold-zones-fresh-market-indices';
+const CACHE_NAME = 'asset-mgr-v27-same-origin-market-fetch';
 const APP_SHELL = [
   './',
   './index.html',
@@ -112,6 +112,11 @@ self.addEventListener('fetch',(event)=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
   if(url.origin!==self.location.origin)return;
+  // Never serve stale market-data.json from the offline application shell cache.
+  if(url.pathname.endsWith('/market-data.json')){
+    event.respondWith(fetch(event.request,{cache:'no-store'}));
+    return;
+  }
   const isMainHtml=event.request.mode==='navigate'||url.pathname.endsWith('/')||url.pathname.endsWith('/index.html')||url.pathname==='/index.html';
   if(isMainHtml){
     event.respondWith((async()=>{
