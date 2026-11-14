@@ -151,7 +151,7 @@ const MOBILE_UI_SCRIPT = String.raw`
       note.style.marginTop = '8px';
       note.style.fontSize = '10px';
       note.style.lineHeight = '1.5';
-      note.textContent = '計算: 各銘柄の「評価額 −（保有数量 × 取得単価）」を合算。損益率 = 総含み損益 ÷ 取得総額。Quantity / CostBasis がある銘柄のみ対象。';
+      note.textContent = '損益はProfitLoss（円）の直接入力を優先します。未入力の円建て銘柄のみ、評価額 −（数量 × 取得単価）で算出します。外貨銘柄は円建てProfitLossの入力が必要です。';
       pnlCard.appendChild(note);
     }
 
