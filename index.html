@@ -259,13 +259,14 @@
       /* 銘柄分析（base の min-width:800px を上書き） */
       #analTable{min-width:100%;font-size:11px}
       #analTable th,#analTable td{padding:4px 3px}
-      #analTable th:nth-child(5),#analTable td:nth-child(5){display:none}
-      #analTable th:nth-child(n+6),#analTable td:nth-child(n+6){display:none}
+      /* Mobile: always show holding P&L amount and return alongside composition. */
+      #analTable{min-width:570px!important;table-layout:auto!important}
+      #analTable th:nth-child(5),#analTable td:nth-child(5),#analTable th:nth-child(6),#analTable td:nth-child(6){display:table-cell!important;white-space:nowrap}
+      #analTable th:nth-child(n+7),#analTable td:nth-child(n+7){display:none}
       #analTable th:nth-child(4){min-width:0!important}
       #analTable td:nth-child(4) .pct-bar-wrap{min-width:20px}
-      #analTable.show-pnl th:nth-child(4),#analTable.show-pnl td:nth-child(4){display:none}
-      #analTable.show-pnl th:nth-child(5),#analTable.show-pnl td:nth-child(5){display:table-cell}
-      #analColToggle{display:flex!important}
+      #analTable.show-pnl th:nth-child(4),#analTable.show-pnl td:nth-child(4){display:table-cell!important}
+      #analColToggle{display:none!important}
       .sel-summary{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;font-size:12px;width:100%;overflow:hidden;box-sizing:border-box}
       #selStats{min-width:0;overflow:hidden}
       #selBarView,#selPieView{width:100%;overflow:hidden;min-width:0}
@@ -446,6 +447,7 @@
           <option value="Account">Account（口座）</option>
         </select>
       </label>
+      <label>表示: <select id="lineValueMode"><option value="amount">金額（円）</option><option value="pct">構成比（％）</option></select></label>
       <label style="grid-column:1/-1">期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
       <button id="applyRange">反映</button>
     </div>
@@ -456,7 +458,7 @@
         <span style="color:#9ca3af">- -</span> ベンチマークを重ねる（指数CSV読込時・起点で指数化）
       </label>
     </div>
-    <div class="muted" style="margin-top:4px">※ 記録日のみ表示（点マーカーは非表示）／最新日が¥0の系列は非表示</div>
+    <div class="muted" style="margin-top:4px">※ 記録日のみ表示。構成比表示は各記録日の総資産を100％として計算（ベンチマークは金額モードのみ）。</div>
   </section>
 
 </div><!-- /tabTrend -->
@@ -552,6 +554,7 @@
       <button id="analColPct" class="btn-ghost active" style="font-size:11px;padding:3px 8px">割合</button>
       <button id="analColPnl" class="btn-ghost" style="font-size:11px;padding:3px 8px">含み損益</button>
     </div>
+    <div class="muted" style="margin-bottom:6px">各銘柄の含み損益は、直接入力したProfitLoss（円）を優先して表示します。スマホでは横スクロールして確認できます。</div>
     <div class="table-wrap">
       <table id="analTable">
         <thead>
@@ -733,6 +736,7 @@
       <button class="btn-ghost stock-period" data-p="3M">3ヶ月</button>
       <button class="btn-ghost stock-period" data-p="1M">1ヶ月</button>
     </div>
+    <div id="stockPnlLine" class="sub" style="margin:3px 0 9px">—</div>
     <div class="chart-wrap"><canvas id="stockCanvas" height="300"></canvas></div>
     <p class="muted" id="stockModalNote" style="margin-top:8px"></p>
   </div>
@@ -1252,11 +1256,12 @@ let lineChart = null;
 function drawLine(){
   if(!DATES.length) return;
   const dim = $("lineDimension").value;
+  const percentMode = $("lineValueMode").value === "pct";
   const from = $("fromDate").value ? nearestOnOrBefore($("fromDate").value) : DATES[0];
   const to   = nearestOnOrBefore($("toDate").value || DATES.at(-1)) || DATES.at(-1);
   const labels = DATES.filter(d => d>=from && d<=to);
   if(labels.length===0) return;
-  $("lineRangeNote").textContent = `${from} 〜 ${to}`;
+  $("lineRangeNote").textContent = `${from} 〜 ${to}（${percentMode ? "構成比" : "金額"}）`;
 
   let cats = [], series = [];
   const totals = labels.map(d=> sumAt(d));
@@ -1305,20 +1310,20 @@ function drawLine(){
     type:'line',
     data:{labels, datasets:[
       ...filteredCats.map((c,i)=>({
-        label:c, data:filtered[i], tension:0.35, borderWidth:1.5, fill:false,
+        label:c, data:percentMode ? filtered[i].map((v,j)=>totals[j]>0?v/totals[j]*100:null) : filtered[i], tension:0.35, borderWidth:1.5, fill:false,
         pointRadius:0, pointHitRadius:8,
         borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]
       })),
-      {label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1},
-      ...benchDatasets(labels, totals)
+      ...(percentMode ? [] : [{label:'合計',data:totals,borderColor:'rgba(0,255,200,1)',backgroundColor:'rgba(0,255,200,1)',borderWidth:3,tension:0.35,pointRadius:0,pointHitRadius:10,order:-1}]),
+      ...(percentMode ? [] : benchDatasets(labels, totals))
     ]},
     options:{
       responsive:true,
       scales:{
         x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
-        y:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>'¥'+fmt(v)}}
+        y:{min:percentMode?0:undefined,max:percentMode?100:undefined,grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>percentMode?v+'%':'¥'+fmt(v)}}
       },
-      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${yen(ctx.parsed.y)}`}}}
+      plugins:{legend:{position:'bottom',labels:{color:'#ccfff2'}},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${percentMode ? ctx.parsed.y.toFixed(2)+'%' : yen(ctx.parsed.y)}`}}}
     }
   });
 }
@@ -1638,6 +1643,14 @@ function showStockChart(name){
   _stockName = name; _stockPeriod = 'all';
   document.querySelectorAll('.stock-period').forEach(b => b.classList.toggle('active', b.dataset.p==='all'));
   $('stockModalTitle').textContent = name;
+  const latest = [...DATES].reverse().find(d=>byDateName.get(d)?.has(name));
+  const pnl = latest ? pnlOfNameAt(name,latest) : null;
+  const amount = latest ? amountOfNameAt(name,latest) : 0;
+  const signed = pnl ? (pnl.pnl>=0?'+':'')+yen(pnl.pnl) : '—';
+  const rate = pnl && pnl.pnlPct!==null ? ' ('+(pnl.pnlPct>=0?'+':'')+pnl.pnlPct.toFixed(2)+'%)' : '';
+  const el = $('stockPnlLine');
+  el.textContent = latest ? '評価額 '+yen(amount)+' / 含み損益 '+signed+rate+' （'+latest+'）' : '含み損益 —';
+  el.className = 'sub '+(pnl?(pnl.pnl>=0?'pos':'neg'):'');
   $('stockModal').style.display = 'flex';
   renderStockChart();
 }
@@ -2904,6 +2917,7 @@ $("showBench").addEventListener('change', ()=>{ if(DATES.length) drawLine(); });
 $("pieDimension").addEventListener('change', drawPie);
 $("lineDimension").addEventListener('change', drawLine);
 $("applyRange").addEventListener('click', drawLine);
+$("lineValueMode").addEventListener('change',drawLine);
 $("applyCmp").addEventListener('click', drawCmp);
 
 // 2日比較ソート
