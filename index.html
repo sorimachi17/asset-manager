@@ -2713,12 +2713,15 @@ const MARKET_CACHE_KEY='asset_mgr_v1_market_indices';
 const MARKET_SERIES={fg:[],vix:[],nikkei_vi:[]};
 const MARKET_SOURCES={fg:'',vix:'',nikkei_vi:''};
 function normalizeMarketDate(raw){
-  const value=String(raw??'').trim();
+  let value=String(raw??'').replace(/^["'\s]+|["'\s]+$/g,'').trim();
   if(!value)return '';
-  const parsed=/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)
-    ? dayjs(value,['MM/DD/YYYY','M/D/YYYY'],true)
-    : dayjs(normalizeDate(value),'YYYY-MM-DD',true);
-  return parsed.isValid()?parsed.format('YYYY-MM-DD'):'';
+  value=value.replace(/年|月/g,'/').replace(/日/g,'').replace(/\./g,'/');
+  // 日経CSV等の日付、ISO日付、米国式の日付を区別
+  let m=value.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(m){const d=dayjs(m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'),'YYYY-MM-DD',true);return d.isValid()?d.format('YYYY-MM-DD'):'';}
+  m=value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if(m){const d=dayjs(m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'),'YYYY-MM-DD',true);return d.isValid()?d.format('YYYY-MM-DD'):'';}
+  return '';
 }
 
 function persistMarketSeries(){
@@ -2749,26 +2752,42 @@ function refreshMarketStatus(note=''){
   $('marketStatus').textContent=(note?note+'　':'')+items.join(' ｜ ');
 }
 
-function importMarketCSV(parsed,type,source){
-  const fields=(parsed.meta.fields||[]).map(original=>({original,normalized:original.trim().replace(/^\uFEFF/,'')}));
-  const dateKey=fields.find(f=>/^date$|^日付$|^年月日$/i.test(f.normalized));
-  const specific=type==='fg' ? fields.find(f=>/fear[\s_-]*greed|^f&g$/i.test(f.normalized)) : null;
-  const valueKey=specific||fields.find(f=>/^close$|^終値$|^value$|^score$|^指数値$|^終値\s*\(.*\)$/i.test(f.normalized));
-  if(!dateKey||!valueKey)return false;
+function parseMarketCSV(parsed,type){
+  const fields=(parsed.meta.fields||[]).map(original=>({original,name:String(original).replace(/^\uFEFF/,'').trim()}));
+  const date=fields.find(f=>/^(date|observation_date|日付|年月日|基準日)$/i.test(f.name));
+  const value=fields.find(f=>{
+    const n=f.name.replace(/[\s_-]/g,'').toLowerCase();
+    if(type==='fg')return n==='feargreed'||n==='f&g'||n==='score'||n==='value';
+    if(type==='vix'&&n==='vixcls')return true;
+    return ['close','value','score','終値','指数値','終値(円)'].includes(n)||n.startsWith('終値(');
+  });
+  if(!date||!value)return [];
   const values=new Map();
   for(const row of parsed.data){
-    const date=normalizeMarketDate(row[dateKey.original]);
-    const raw=String(row[valueKey.original]??'').replace(/,/g,'').trim();
-    if(!date||!raw)continue;
-    const value=Number(raw);
-    if(!Number.isFinite(value)||value<0||(type==='fg'&&value>100))continue;
-    values.set(date,value);
+    const day=normalizeMarketDate(row[date.original]);
+    const text=String(row[value.original]??'').replace(/,/g,'').trim();
+    if(!day||!text||text==='.')continue;
+    const n=Number(text);
+    if(!Number.isFinite(n)||n<0||(type==='fg'&&n>100))continue;
+    values.set(day,n);
   }
-  if(!values.size)return false;
-  MARKET_SERIES[type]=[...values.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+  return [...values].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+}
+function importMarketCSV(parsed,type,source,{fresh=false}={}){
+  const rows=parseMarketCSV(parsed,type);
+  if(!rows.length)return false;
+  const today=dayjs().format('YYYY-MM-DD');
+  const newest=rows.at(-1).date;
+  // リモート取得は休場日を見込んでも最大7日以上古ければ採用しない
+  if(fresh&&dayjs(today).diff(newest,'day')>7)return false;
+  const prior=MARKET_SERIES[type];
+  if(prior.length&&prior.at(-1).date>newest){
+    // 旧データで最新値を巻き戻さない。履歴だけマージする。
+    const values=new Map([...rows,...prior].map(r=>[r.date,r.value]));
+    MARKET_SERIES[type]=[...values].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+  }else MARKET_SERIES[type]=rows;
   MARKET_SOURCES[type]=source;
-  persistMarketSeries();
-  refreshMarketStatus();
+  persistMarketSeries();refreshMarketStatus();
   if(DATES.length)drawLine();
   return true;
 }
@@ -2796,40 +2815,54 @@ function marketDatasets(labels){
     .filter(ds=>ds.data.some(v=>v!==null));
 }
 
+async function fetchMarketCsv(url,type){
+  const response=await fetch(url,{cache:'no-store'});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const buffer=await response.arrayBuffer();
+  const utf=new TextDecoder('utf-8').decode(buffer);
+  let p=Papa.parse(utf.replace(/^\uFEFF/,''),{header:true,skipEmptyLines:true});
+  if(parseMarketCSV(p,type).length)return p;
+  // 日本語の公式CSVがShift-JISの場合も解釈
+  const jp=new TextDecoder('shift_jis').decode(buffer);
+  p=Papa.parse(jp.replace(/^\uFEFF/,''),{header:true,skipEmptyLines:true});
+  return p;
+}
 async function updateMarketOnline(){
-  const button=$('updateMarket');
-  button.disabled=true;
-  refreshMarketStatus('データ取得中');
+  const btn=$('updateMarket');
+  btn.disabled=true;
+  refreshMarketStatus('指数を更新しています');
   const feeds=[
     {type:'fg',sources:[
-      {url:'https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv',name:'CNN履歴・第三者提供'}
+      ['https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv','F&G履歴・第三者']
     ]},
     {type:'vix',sources:[
-      {url:'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',name:'Cboe公式'},
-      {url:'https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv',name:'Cboe由来・GitHub公開データ'}
+      ['https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv','Cboe公式'],
+      ['https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS','FRED・VIXCLS'],
+      ['https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv','GitHubミラー']
+    ]},
+    {type:'nikkei_vi',sources:[
+      ['https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv','日経公式日次CSV']
     ]}
   ];
-  const outcomes=await Promise.all(feeds.map(async feed=>{
-    const errors=[];
-    for(const source of feed.sources){
+  const checks=await Promise.all(feeds.map(async feed=>{
+    let success=false;const problems=[];
+    for(const [url,name] of feed.sources){
       try{
-        const response=await fetch(source.url,{cache:'no-store'});
-        if(!response.ok)throw new Error('HTTP '+response.status);
-        const csv=await response.text();
-        const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
-        if(!importMarketCSV(parsed,feed.type,source.name))throw new Error('CSVの列を認識できません');
-        return true;
-      }catch(error){
-        errors.push(source.name+': '+error.message);
-      }
+        const parsed=await fetchMarketCsv(url,feed.type);
+        if(!importMarketCSV(parsed,feed.type,name,{fresh:true}))throw new Error('CSVが解釈できないか、最新日が7日超前');
+        success=true;break;
+      }catch(error){problems.push(name+'：'+error.message);}
     }
-    console.warn(feed.type+' の取得に失敗',errors.join(' / '));
-    return false;
+    return {type:feed.type,success,problems};
   }));
-  button.disabled=false;
-  refreshMarketStatus(outcomes.every(Boolean)?'F&G・VIXを更新しました'
-    : outcomes.some(Boolean)?'一部取得に失敗。CSVを読み込んでください'
-    :'自動取得に失敗。CSVの手動読込を利用してください');
+  btn.disabled=false;
+  const good=checks.filter(v=>v.success).map(v=>v.type==='nikkei_vi'?'日経VI':v.type.toUpperCase());
+  const failed=checks.filter(v=>!v.success);
+  refreshMarketStatus('更新完了 '+good.join('・'));
+  $('marketErrors').textContent=failed.length
+    ? '取得できなかった指数: '+failed.map(v=>(v.type==='nikkei_vi'?'日経VI':v.type.toUpperCase())+'（'+v.problems.map(x=>x.slice(0,85)).join(' / ')+'）').join(' ｜ ')
+      +'。日経VIは公式CSVを手動で取り込めます。'
+    :'';
 }
 
 restoreMarketSeries();
