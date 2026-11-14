@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v22-dashboard-pie-descending';
+const CACHE_NAME = 'asset-mgr-v23-returns-and-market-overlays';
 const APP_SHELL = [
   './',
   './index.html',
