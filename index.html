@@ -475,7 +475,7 @@
       <label><input type="checkbox" id="showFearGreed" checked> CNN Fear &amp; Greed</label>
       <label><input type="checkbox" id="showVix" checked> VIX</label>
       <label><input type="checkbox" id="showNikkeiVi" checked> 日経VI</label>
-      <button id="updateMarket" class="btn-ghost" type="button">3指数を取得／更新</button>
+      <button id="updateMarket" class="btn-ghost" type="button">F&G・VIXを更新（GitHub経由）</button>
     </div>
     <div class="controls">
       <label>指数CSV: <select id="marketFileType">
@@ -487,7 +487,9 @@
     </div>
     <div id="marketStatus" class="muted" aria-live="polite"></div>
     <div id="marketErrors" class="muted" style="color:#fca5a5" aria-live="polite"></div>
+    <div class="muted" style="margin-top:4px"><a href="https://github.com/sorimachi17/asset-manager/actions/workflows/update-market-data.yml" target="_blank" rel="noopener noreferrer">GitHubの自動更新状況・手動実行</a></div>
     <div class="muted" style="margin-top:5px">
+      F&G・VIXはGitHub Actionsで更新したデータを同じサイトから読み込みます。日経VIは公式CSVを端末内に保存（公開GitHubにアップロードしません）。
       右軸で指数の実数値を表示。資産記録日に対応する直近4日以内の指数を使用します。
       <a href="https://www.cboe.com/tradable-products/vix/vix-historical-data/" target="_blank" rel="noopener noreferrer">Cboe公式VIX履歴</a> /
       <a href="https://github.com/whit3rabbit/fear-greed-data" target="_blank" rel="noopener noreferrer">CNN F&amp;G履歴（第三者）</a> / <a href="https://indexes.nikkei.co.jp/nkave/index/profile?cid=5&amp;idx=nk225vi" target="_blank" rel="noopener noreferrer">日経VI公式CSV（日次データ）</a>
@@ -2829,45 +2831,56 @@ async function fetchMarketCsv(url,type){
   return p;
 }
 async function updateMarketOnline(){
-  const btn=$('updateMarket');
-  btn.disabled=true;
-  refreshMarketStatus('指数を更新しています');
-  const feeds=[
-    {type:'fg',sources:[
-      ['https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv','F&G履歴・第三者']
-    ]},
-    {type:'vix',sources:[
-      ['https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv','Cboe公式'],
-      ['https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS','FRED・VIXCLS'],
-      ['https://raw.githubusercontent.com/datasets/finance-vix/main/data/vix-daily.csv','GitHubミラー']
-    ]},
-    {type:'nikkei_vi',sources:[
-      ['https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv','日経公式日次CSV']
-    ]}
-  ];
-  const checks=await Promise.all(feeds.map(async feed=>{
-    let success=false;const problems=[];
-    for(const [url,name] of feed.sources){
-      try{
-        const parsed=await fetchMarketCsv(url,feed.type);
-        if(!importMarketCSV(parsed,feed.type,name,{fresh:true}))throw new Error('CSVが解釈できないか、最新日が7日超前');
-        success=true;break;
-      }catch(error){problems.push(name+'：'+error.message);}
+  const button=$('updateMarket');
+  if(button.disabled)return;
+  button.disabled=true;
+  refreshMarketStatus('GitHubで保存した最新指数を確認中');
+  const problems=[];
+  const updated=[];
+  try{
+    // Same-origin GitHub Pages file: avoids external-host browser CORS restrictions.
+    const url='./market-data.json?refresh='+Date.now();
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error('GitHub配信データ HTTP '+response.status);
+    const snapshot=await response.json();
+    if(!snapshot||!snapshot.series||typeof snapshot.series!=='object')throw new Error('JSON形式が不正');
+    const today=dayjs().format('YYYY-MM-DD');
+    for(const type of ['fg','vix']){
+      const raw=snapshot.series[type];
+      if(!Array.isArray(raw)||!raw.length){problems.push(type.toUpperCase()+': GitHub Actionsに履歴が未登録');continue;}
+      const fresh=raw.filter(p=>p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&Number.isFinite(p.value)&&(type!=='fg'||p.value<=100));
+      fresh.sort((a,b)=>a.date.localeCompare(b.date));
+      if(!fresh.length){problems.push(type.toUpperCase()+': データ形式が不正');continue;}
+      const last=fresh.at(-1).date;
+      if(dayjs(today).diff(last,'day')>7){problems.push(type.toUpperCase()+': 最終更新 '+last+'（7日超前）');continue;}
+      const merged=new Map(MARKET_SERIES[type].map(p=>[p.date,p.value]));
+      for(const point of fresh)merged.set(point.date,point.value);
+      MARKET_SERIES[type]=[...merged].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,value])=>({date,value}));
+      MARKET_SOURCES[type]='GitHub自動取得 / '+String(snapshot.sources?.[type]||type);
+      updated.push(type.toUpperCase());
     }
-    return {type:feed.type,success,problems};
-  }));
-  btn.disabled=false;
-  const good=checks.filter(v=>v.success).map(v=>v.type==='nikkei_vi'?'日経VI':v.type.toUpperCase());
-  const failed=checks.filter(v=>!v.success);
-  refreshMarketStatus('更新完了 '+good.join('・'));
-  $('marketErrors').textContent=failed.length
-    ? '取得できなかった指数: '+failed.map(v=>(v.type==='nikkei_vi'?'日経VI':v.type.toUpperCase())+'（'+v.problems.map(x=>x.slice(0,85)).join(' / ')+'）').join(' ｜ ')
-      +'。日経VIは公式CSVを手動で取り込めます。'
-    :'';
+    if(snapshot.last_errors?.vix&&!updated.includes('VIX'))problems.push('GitHub側VIX取得エラー：'+String(snapshot.last_errors.vix).slice(0,150));
+  }catch(error){problems.push('GitHubデータの読込失敗：'+error.message);}
+  // F&G has a publicly CORS-accessible GitHub raw CSV; keep it as independent backup.
+  if(!updated.includes('FG')){
+    try{
+      const parsed=await fetchMarketCsv('https://raw.githubusercontent.com/whit3rabbit/fear-greed-data/main/fear-greed.csv','fg');
+      if(importMarketCSV(parsed,'fg','F&G履歴（GitHub公開CSV）',{fresh:true}))updated.push('FG');
+      else problems.push('F&G：予備データの形式不正・更新遅延');
+    }catch(error){problems.push('F&G：予備取得失敗 '+error.message);}
+  }
+  persistMarketSeries();
+  if(DATES.length)drawLine();
+  button.disabled=false;
+  refreshMarketStatus(updated.length?'更新できた指数 '+updated.join('・'):'更新なし');
+  $('marketErrors').textContent=problems.length
+    ? problems.join(' ｜ ')+'。VIXはGitHub Actionsの実行履歴を確認してください。日経VIは公式CSVから取り込めます。'
+    : '';
 }
 
 restoreMarketSeries();
 refreshMarketStatus();
+window.addEventListener('load',()=>updateMarketOnline());
 
 // ===================== ベンチマーク =====================
 let BENCH = [];      // [{date, close}] 昇順
