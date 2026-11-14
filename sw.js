@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asset-mgr-v27-same-origin-market-fetch';
+const CACHE_NAME = 'asset-mgr-v28-zone-three-indices-nikkei-import';
 const APP_SHELL = [
   './',
   './index.html',
