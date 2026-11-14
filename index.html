@@ -70,6 +70,19 @@
     #grpPieLegend .grp-member-legend > span:nth-child(2){min-width:0;overflow-wrap:anywhere;text-align:left}
     .chart-wrap{background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px}
     .chart-wrap canvas{width:100%;}
+    /* Desktop trend: fit the entire chart (including legend) within the visible window. */
+    @media (min-width:900px){
+      #trendChartWrap{
+        position:relative;
+        height:clamp(300px, calc(100dvh - 365px), 560px);
+        min-height:0;
+      }
+      #trendChartWrap canvas{
+        display:block;
+        width:100%!important;
+        height:100%!important;
+      }
+    }
 
     /* ===== Tabs ===== */
     .tabs{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
@@ -453,7 +466,7 @@
       <label style="grid-column:1/-1">期間: <input type="date" id="fromDate"> ～ <input type="date" id="toDate"></label>
       <button id="applyRange">反映</button>
     </div>
-    <div class="chart-wrap"><canvas id="lineChart" height="300"></canvas></div>
+    <div class="chart-wrap" id="trendChartWrap"><canvas id="lineChart" height="300"></canvas></div>
     <details open style="padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:10px">
       <summary style="cursor:pointer;font-weight:600">自分で設定する警戒・買い場ゾーン</summary>
       <div class="controls" style="align-items:center">
@@ -1468,6 +1481,7 @@ function drawLine(){
     ]},
     options:{
       responsive:true,
+      maintainAspectRatio:false,
       scales:{
         x:{grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',autoSkip:true,maxTicksLimit:12}},
         y:{min:percentMode?0:undefined,max:percentMode?100:undefined,grid:{color:'rgba(0,255,255,0.1)'},ticks:{color:'#aaf0ff',callback:(v)=>percentMode?v+'%':'¥'+fmt(v)}},
